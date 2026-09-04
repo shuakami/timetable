@@ -558,6 +558,9 @@ function TodayView({
 /* ---------------- 周视图 ---------------- */
 
 const HOUR = 42
+/* 卡片能读清课名与地点的最低高度；最短的课不够时放大整个时间轴，不单独拉高卡片 */
+const MIN_CARD = 44
+const MAX_HOUR = 120
 
 function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }: { snap: Snapshot; anchor: string; setAnchor: (d: string) => void; onPick: (o: Occurrence) => void; onMenu: (o: Occurrence, r: Rect, el: HTMLElement) => void; onSearch: () => void; liftKey?: string }) {
   const sem = snap.semester
@@ -580,8 +583,24 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
   const dayEnd = Math.max(20, ...all.map((o) => Math.ceil(o.end / 60))) * 60
   const hours: number[] = []
   for (let h = dayStart / 60; h <= dayEnd / 60; h += 2) hours.push(h)
-  const gridH = ((dayEnd - dayStart) / 60) * HOUR + 8
-  const nowTop = ((now - dayStart) / 60) * HOUR
+  const shortest = Math.min(...all.map((o) => o.end - o.start).filter((m) => m > 0))
+  const hour = Number.isFinite(shortest) ? Math.min(MAX_HOUR, Math.max(HOUR, Math.ceil(((MIN_CARD + 2) * 60) / shortest))) : HOUR
+  const gridH = ((dayEnd - dayStart) / 60) * hour + 8
+  const nowTop = ((now - dayStart) / 60) * hour
+
+  /* 首次进入且本周含今天：滚到当前时刻附近 */
+  const scroller = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const scrolled = useRef(false)
+  useEffect(() => {
+    const sc = scroller.current
+    const grid = gridRef.current
+    if (scrolled.current || !sc || !grid || todayIdx < 0 || nowTop <= 0) return
+    scrolled.current = true
+    const gridTop = grid.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop
+    const target = gridTop + nowTop - sc.clientHeight * 0.4
+    if (target > 0) sc.scrollTop = target
+  }, [todayIdx, nowTop])
 
   const shift = (delta: number) => setAnchor(addDays(monday, delta * 7))
 
@@ -597,7 +616,7 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto pb-[130px] [scrollbar-width:none]">
+      <div ref={scroller} className="flex-1 overflow-y-auto pb-[130px] [scrollbar-width:none]">
         <StickyHead className="px-5">
           <div className="flex items-center justify-between">
           <button onClick={() => setCal(true)} className="flex items-center gap-1.5 text-[17px] font-extrabold tracking-[-.01em]">
@@ -644,19 +663,19 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
 
             <div className="relative mt-2">
               {hours.map((h, i) => (
-                <div key={h} className="absolute right-0 left-8 h-px bg-(--c-surface2)" style={{ top: i * 2 * HOUR + 6 }} />
+                <div key={h} className="absolute right-0 left-8 h-px bg-(--c-surface2)" style={{ top: i * 2 * hour + 6 }} />
               ))}
               <div className="flex pt-1.5">
                 <div className="relative w-8 flex-none">
                   {hours.map((h) => (
-                    <div key={h} className="pr-1.5 text-right text-[9.5px] font-semibold tabular-nums text-(--c-ink5)" style={{ height: 2 * HOUR }}>{h}:00</div>
+                    <div key={h} className="pr-1.5 text-right text-[9.5px] font-semibold tabular-nums text-(--c-ink5)" style={{ height: 2 * hour }}>{h}:00</div>
                   ))}
                   {/* 时间刻度跟随真实课程范围 */}
                   {todayIdx >= 0 && nowTop > 0 && hours.every((h) => Math.abs(now - h * 60) >= 20) && (
                     <div className="absolute right-1.5 text-[9.5px] font-bold tabular-nums text-(--c-accent)" style={{ top: nowTop - 6 }}>{fmtMinutes(now)}</div>
                   )}
                 </div>
-                <div className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
+                <div ref={gridRef} className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
                   {days.map((d, i) => {
                     const occ = byDay.get(weekdayOf(d)) ?? []
                     const pastCol = d < today
@@ -675,8 +694,8 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
                               key={o.key}
                               className="absolute"
                               style={{
-                                top: ((o.start - dayStart) / 60) * HOUR,
-                                height: Math.max(40, ((o.end - o.start) / 60) * HOUR - 2),
+                                top: ((o.start - dayStart) / 60) * hour,
+                                height: ((o.end - o.start) / 60) * hour - 2,
                                 left: half ? `${lane * 50}%` : 0,
                                 width: half ? '50%' : '100%',
                               }}
@@ -693,7 +712,7 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
                             >
                               <span className="line-clamp-2">{o.name}</span>
                               {o.location && <div className="mt-0.5 line-clamp-1 text-[8.5px] leading-[1.3] font-semibold opacity-60">{o.location}</div>}
-                              {nowOn && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: ((now - o.start) / 60) * HOUR }} />}
+                              {nowOn && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: ((now - o.start) / 60) * hour }} />}
                             </button>
                             </div>
                           )

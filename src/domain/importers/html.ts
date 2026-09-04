@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../types'
 import type { RuleCourse, RuleOutput, CsvMapping } from '../importer'
-import { parseWeekday } from '../importer'
+import { extractPhone, parseWeekday } from '../importer'
 import { parsePeriodRange } from '../weeks'
  
 /* HTML 课表导入：不依赖 DOMParser，纯文本表格提取，Node/浏览器通用。
@@ -8,12 +8,6 @@ import { parsePeriodRange } from '../weeks'
    - table：一行一条课，列映射同 CSV
    - grid：课表网格，行=节次、列=星期，格内多行文本按模板拆字段 */
 
-const PHONE_RE = /(?:\+?86[- ]?)?1[3-9]\d(?:[ \-]?\d){8}/
-function extractPhone(s: string | undefined): string | undefined {
-  if (!s) return undefined
-  const m = s.match(PHONE_RE)
-  return m ? m[0].replace(/[\s\-]/g, '').replace(/^\+?86/, '') : undefined
-}
  
 interface Cell {
   text: string

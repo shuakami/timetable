@@ -22,6 +22,16 @@ export interface RuleOutput {
   timeGrid?: TimeSlot[] // 课表自带节次表时覆盖学期设置
 }
 
+const PHONE_RE = /(?:\+?86[- ]?)?1[3-9]\d(?:[ \-]?\d){8}/
+
+/** 从任意文本里取出第一个大陆手机号，去 86 前缀与分隔符 */
+export function extractPhone(s: unknown): string | undefined {
+  if (typeof s === 'number') s = String(s)
+  if (typeof s !== 'string') return undefined
+  const m = s.match(PHONE_RE)
+  return m ? m[0].replace(/[\s\-]/g, '').replace(/^\+?86/, '') : undefined
+}
+
 function parseHm(s: unknown): number | null {
   const m = typeof s === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(s.trim()) : null
   return m ? +m[1] * 60 + +m[2] : null
@@ -129,9 +139,13 @@ export function parseJsonTable(text: string): RuleOutput {
       diags.push({ level: 'error', code: 'MISSING_FIELDS', message: `第 ${i + 1} 条课程缺少必需字段`, at: { row: i + 1 } })
       return
     }
+    const teacherRaw = typeof o.teacher === 'string' ? o.teacher : undefined
+    const teacherPhone = extractPhone(o.teacherPhone ?? o.phone ?? o.tel ?? o.mobile) ?? extractPhone(teacherRaw)
+    const teacher = teacherRaw && teacherPhone ? teacherRaw.replace(PHONE_RE, '').replace(/[\s,，;；:：()（）]+$/, '').trim() || undefined : teacherRaw
     courses.push({
       name,
-      teacher: typeof o.teacher === 'string' ? o.teacher : undefined,
+      teacher,
+      teacherPhone,
       location: typeof o.location === 'string' ? o.location : undefined,
       weekday: day,
       startPeriod: startNode,

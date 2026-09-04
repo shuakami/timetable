@@ -35,6 +35,18 @@ describe('parseJsonTable', () => {
     expect(out.courses[0].endPeriod).toBe(2)
     expect(out.diagnostics).toHaveLength(0)
   })
+  it('picks teacher phone from field or teacher text', () => {
+    const out = parseJsonTable(JSON.stringify({
+      courses: [
+        { name: 'A', teacher: '王', teacherPhone: '+86 138-1234-5678', day: 1, startNode: 1, step: 1, weeks: [1] },
+        { name: 'B', teacher: '李 13912345678', day: 2, startNode: 1, step: 1, weeks: [1] },
+        { name: 'C', teacher: '赵', day: 3, startNode: 1, step: 1, weeks: [1] },
+      ],
+    }))
+    expect(out.courses[0].teacherPhone).toBe('13812345678')
+    expect(out.courses[1]).toMatchObject({ teacher: '李', teacherPhone: '13912345678' })
+    expect(out.courses[2].teacherPhone).toBeUndefined()
+  })
   it('invalid json → diagnostic', () => {
     expect(parseJsonTable('{oops').diagnostics[0].code).toBe('INVALID_JSON')
   })

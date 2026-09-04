@@ -258,7 +258,7 @@ export class Store {
       let course: Course
       if (ex) {
         course = edited.has(ex.id)
-          ? { ...ex, removedByImport: false } // 保留用户值
+          ? { ...ex, teacherPhone: ex.teacherPhone ?? nc.course.teacherPhone, removedByImport: false } // 保留用户值
           : { ...ex, ...nc.course, id: ex.id, semesterId: ex.semesterId, removedByImport: false }
         updated++
         exByName.delete(k)

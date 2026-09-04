@@ -19,6 +19,21 @@ function formatPhone(phone: string): string {
   return `${phone.slice(0, 3)} **** ${phone.slice(-4)}`
 }
 
+/** 规则的钟点区间：14:30 – 16:00；节次表里查不到时回退到节次 */
+function ruleClock(grid: { index: number; start: number; end: number }[] | undefined, r: { startPeriod: number; endPeriod: number }): string {
+  const s = grid?.find((t) => t.index === r.startPeriod)
+  const e = grid?.find((t) => t.index === r.endPeriod)
+  return s && e ? `${fmtMinutes(s.start)} – ${fmtMinutes(e.end)}` : rulePeriods(r)
+}
+
+function rulePeriods(r: { startPeriod: number; endPeriod: number }): string {
+  return r.startPeriod === r.endPeriod ? `第 ${r.startPeriod} 节` : `第 ${r.startPeriod}–${r.endPeriod} 节`
+}
+
+function sortRules<T extends { weekday: number; startPeriod: number }>(rules: T[]): T[] {
+  return [...rules].sort((a, b) => a.weekday - b.weekday || a.startPeriod - b.startPeriod)
+}
+
 function PageFooter({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">{children}</div>
@@ -298,7 +313,6 @@ export function CourseDetailPage({
     if (all.length === 0) return ''
     return `第 ${Math.min(...all)}–${Math.max(...all)} 周`
   })()
-  const dayList = [...new Set(rules.map((r) => WD[r.weekday]))].join('、')
   const tasks = state.tasks.filter((t) => t.courseId === cur.id)
   const changes = state.changes.filter((c) => c.target === cur.id || rules.some((r) => r.id === c.target))
 
@@ -340,8 +354,13 @@ export function CourseDetailPage({
                   </svg>
                 </a>
               ) : '—'],
-              ['上课日', dayList ? `每${dayList}` : '—'],
-              ['节次', rules.length > 0 ? rules.map((r) => (r.startPeriod === r.endPeriod ? `${r.startPeriod}` : `${r.startPeriod}–${r.endPeriod}`)).join('、') + ' 节' : '—'],
+              ['上课时间', rules.length > 0 ? (
+                <span className="block space-y-1">
+                  {sortRules(rules).map((r) => (
+                    <span key={r.id} className="block tabular-nums">{WD[r.weekday]} {ruleClock(sem.timeGrid, r)}</span>
+                  ))}
+                </span>
+              ) : '—'],
             ] as [string, React.ReactNode][]).map(([k, v], i) => (
               <div key={k} className={`flex items-baseline ${i > 0 ? 'mt-4' : ''}`}>
                 <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">{k}</span>
@@ -408,12 +427,12 @@ export function CourseDetailPage({
 
         {rules.length > 0 && (
           <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">
-            {rules.map((r) => (
+            {sortRules(rules).map((r) => (
               <MenuRow
                 key={r.id}
                 icon={ICON.clock}
-                title={`每${WD[r.weekday]} ${r.startPeriod === r.endPeriod ? r.startPeriod : `${r.startPeriod}–${r.endPeriod}`} 节`}
-                desc={[r.location, r.teacher].filter(Boolean).join('，') || '调整这一段时间与地点'}
+                title={`${WD[r.weekday]} ${ruleClock(sem.timeGrid, r)}`}
+                desc={[rulePeriods(r), r.location].filter(Boolean).join('，')}
                 onClick={() => onEditSession(r.id)}
               />
             ))}
@@ -510,12 +529,12 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
           <>
             <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">上课时间</div>
             <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
-              {rules.map((r) => (
+              {sortRules(rules).map((r) => (
                 <div key={r.id} className="flex items-baseline px-4 py-3">
-                  <span className="w-[68px] flex-none text-[12.5px] font-medium text-(--c-ink4)">{WD[r.weekday]} ·</span>
-                  <div className="min-w-0 flex-1 text-[14px] font-semibold tabular-nums text-(--c-ink)">
-                    {r.startPeriod === r.endPeriod ? `第 ${r.startPeriod} 节` : `第 ${r.startPeriod}–${r.endPeriod} 节`}
-                    {r.location && <span className="ml-2 font-medium text-(--c-ink4)">{r.location}</span>}
+                  <span className="w-[68px] flex-none text-[12.5px] font-medium text-(--c-ink4)">{WD[r.weekday]}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">{ruleClock(state.semester?.timeGrid, r)}</div>
+                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{[rulePeriods(r), r.location].filter(Boolean).join('，')}</div>
                   </div>
                 </div>
               ))}

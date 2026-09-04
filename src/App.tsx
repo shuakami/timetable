@@ -363,7 +363,7 @@ function WeekScreen({ overlay }: { overlay?: React.ReactNode }) {
                               className="absolute inset-x-0 overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
                               style={{
                                 top: ev.top,
-                                height: Math.max(40, ev.h),
+                                height: ev.h,
                                 background: tint(ev.color, ev.now ? 22 : done ? 7 : 10),
                                 color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
                                 boxShadow: ev.now ? `inset 0 0 0 1.5px ${ev.color}` : undefined,
@@ -504,7 +504,7 @@ function DetailScreen() {
               ['地点', '教学三楼 302'],
               ['老师', '王立群，数学学院'],
               ['教师电话', <a key="p" href="tel:13845214521" className="inline-flex items-center gap-1 font-semibold text-(--c-accent)">138 <span>****</span> 4521<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg></a>],
-              ['上课日', '每周二、周四'],
+              ['上课时间', <span key="t" className="block space-y-1 tabular-nums"><span className="block">周二 08:00 – 09:40</span><span className="block">周四 08:00 – 09:40</span></span>],
               ['考核', '期末 60%，平时 40%'],
               ['提醒', '上课前 20 分钟'],
             ] as [string, React.ReactNode][]).map(([k, v], i) => (

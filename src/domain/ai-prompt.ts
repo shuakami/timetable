@@ -18,6 +18,7 @@ export const AI_IMPORT_PROMPT = `你是课表数据转换器。我会给你一�
       "step": 2,
       "weeks": [1, 2, 3],
       "teacher": "教师",
+      "teacherPhone": "13800000000",
       "location": "地点"
     }
   ]
@@ -30,6 +31,7 @@ export const AI_IMPORT_PROMPT = `你是课表数据转换器。我会给你一�
 - 同一门课在不同时间段或不同周次上课，拆成多条 courses 记录，name 保持一致。
 - 一个格子里有多门课，每门课各一条记录。
 - teacher、location 不存在时省略该字段，不要写 null 或空字符串。
+- teacherPhone：课表里出现的教师手机号，11 位纯数字，不含空格、短横线、+86；没有就省略。不要把手机号写进 teacher。
 - timeSlots：课表上有节次时间就完整列出，node 从 1 连续编号；没有就省略 timeSlots。
 - startDate：第 1 周周一的日期；课表没有写就省略。totalWeeks：总周数；没有就省略。
 - 只转换有明确星期和节次的课程；没有具体时间的课程（如实践周、讲座）忽略。
