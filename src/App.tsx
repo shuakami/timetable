@@ -497,14 +497,13 @@ function DetailScreen() {
 
         <Card>
           <div className="text-[22px] font-extrabold tracking-[-.01em] text-(--c-ink)">高等数学（下）</div>
-          <div className="mt-1.5 text-[12.5px] font-medium text-(--c-ink3)">必修课，5 学分，第 1–16 周</div>
+          <div className="mt-1.5 text-[12.5px] font-medium text-(--c-ink3)">必修课，5 学分，9月2日 – 12月18日</div>
           <div className="mt-5">
             {([
               ['下次上课', '后天 08:00 – 09:40'],
               ['地点', '教学三楼 302'],
               ['老师', '王立群，数学学院'],
               ['教师电话', <a key="p" href="tel:13845214521" className="inline-flex items-center gap-1 font-semibold text-(--c-accent)">138 <span>****</span> 4521<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg></a>],
-              ['上课时间', <span key="t" className="block space-y-1.5 tabular-nums"><span className="block">每周二 08:00 – 09:40</span><span className="block">每周四 08:00 – 09:40</span><span className="block text-[12px] font-medium text-(--c-ink4)">第 1–16 周</span></span>],
               ['考核', '期末 60%，平时 40%'],
               ['提醒', '上课前 20 分钟'],
             ] as [string, React.ReactNode][]).map(([k, v], i) => (
@@ -513,6 +512,30 @@ function DetailScreen() {
                 <span className="text-[14px] font-semibold text-(--c-ink)">{v}</span>
               </div>
             ))}
+          </div>
+          <div className="mt-5 border-t border-(--c-surface2) pt-4">
+            <div className="grid grid-cols-7 gap-1">
+              {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => {
+                const on = i === 1 || i === 3
+                return (
+                  <div key={d} className="flex flex-col items-center">
+                    <span className={`text-[11px] font-bold ${i === 1 ? 'text-(--c-accent)' : 'text-(--c-ink4)'}`}>{d}</span>
+                    <div
+                      className={`mt-1.5 flex w-full flex-col items-center justify-center rounded-[10px] py-2 ${on ? '' : 'bg-(--c-bg)'}`}
+                      style={on ? { background: 'color-mix(in srgb, #5B6CFF 22%, var(--c-surface))', minHeight: 46 } : { minHeight: 46 }}
+                    >
+                      {on ? (
+                        <span className="flex flex-col items-center text-[10.5px] font-bold leading-[1.35] tabular-nums text-(--c-ink)">
+                          <span>08:00</span>
+                          <span className="text-(--c-ink4)">09:40</span>
+                        </span>
+                      ) : <span className="text-[11px] font-medium text-(--c-ink5)">–</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-3 text-[12px] font-medium text-(--c-ink4)">9月2日 – 12月18日，10月1日、10月3日不上</div>
           </div>
         </Card>
 

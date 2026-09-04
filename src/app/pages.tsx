@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import type { Course, Occurrence, OverrideKind, Task, UserEntry } from '../domain/types'
+import type { Course, Occurrence, OverrideKind, Semester, Task, UserEntry } from '../domain/types'
 import { dateOf, fmtDuration, fmtMinutes, fromDate, weekdayOf } from '../domain/dates'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
 import { maskHasWeek } from '../domain/weeks'
@@ -34,18 +34,26 @@ function sortRules<T extends { weekday: number; startPeriod: number }>(rules: T[
   return [...rules].sort((a, b) => a.weekday - b.weekday || a.startPeriod - b.startPeriod)
 }
 
-/** 周次描述：第 3–19 周（第 6、13 周不上） */
-function weeksLabel(mask: bigint, totalWeeks: number): string {
-  const on: number[] = []
-  for (let w = 1; w <= totalWeeks; w++) if (maskHasWeek(mask, w)) on.push(w)
-  if (on.length === 0) return ''
-  const lo = on[0]
-  const hi = on[on.length - 1]
-  if (lo === hi) return `仅第 ${lo} 周`
-  const off: number[] = []
-  for (let w = lo; w <= hi; w++) if (!maskHasWeek(mask, w)) off.push(w)
-  const span = `第 ${lo}–${hi} 周`
-  return off.length === 0 || off.length > 4 ? span : `${span}（第 ${off.join('、')} 周不上）`
+/** 一条规则落到真实日期：9月14日 – 1月4日，10月5日不上 */
+function ruleDates(sem: Semester, r: { weekday: number; weeksMask: bigint }): { first: string; last: string; off: string[] } | null {
+  const on: string[] = []
+  const off: string[] = []
+  let started = false
+  for (let w = 1; w <= sem.totalWeeks; w++) {
+    const d = dateOf(sem, w, r.weekday)
+    if (maskHasWeek(r.weeksMask, w)) { on.push(d); started = true }
+    else if (started) off.push(d)
+  }
+  if (on.length === 0) return null
+  const last = on[on.length - 1]
+  return { first: on[0], last, off: off.filter((d) => d < last) }
+}
+
+function datesLabel(x: { first: string; last: string; off: string[] } | null): string {
+  if (!x) return ''
+  if (x.first === x.last) return `仅 ${md(x.first)}`
+  const span = `${md(x.first)} – ${md(x.last)}`
+  return x.off.length === 0 || x.off.length > 3 ? span : `${span}，${x.off.map(md).join('、')}不上`
 }
 
 /** 同一天前后相连、地点与周次相同的规则合并成一段：第 6–7 节 + 第 8–9 节 → 14:30 – 17:40 */
@@ -345,17 +353,12 @@ export function CourseDetailPage({
   const attended = passed.filter((s) => ovOf(s.ruleId, s.date)?.kind !== 'leave' && ovOf(s.ruleId, s.date)?.kind !== 'cancelled')
   const absent = passed.filter((s) => ovOf(s.ruleId, s.date)?.kind === 'leave')
   const rate = passed.length > 0 ? Math.round((attended.length / passed.length) * 100) : 0
-  const weeksSpan = (() => {
-    const all: number[] = []
-    for (const r of rules) for (let w = 1; w <= sem.totalWeeks; w++) if (maskHasWeek(r.weeksMask, w)) all.push(w)
-    if (all.length === 0) return ''
-    return `第 ${Math.min(...all)}–${Math.max(...all)} 周`
-  })()
+  const weeksSpan = sessions.length > 0 ? `${md(sessions[0].date)} – ${md(sessions[sessions.length - 1].date)}` : ''
   const tasks = state.tasks.filter((t) => t.courseId === cur.id)
   const changes = state.changes.filter((c) => c.target === cur.id || rules.some((r) => r.id === c.target))
 
   const merged = mergeRules(rules)
-  const sameWeeks = merged.every((m) => m.weeksMask === merged[0].weeksMask)
+  const todayWd = weekdayOf(today)
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-4 pb-10 [scrollbar-width:none]">
@@ -393,17 +396,6 @@ export function CourseDetailPage({
                   </svg>
                 </a>
               ) : '—'],
-              ['上课时间', merged.length > 0 ? (
-                <span className="block space-y-1.5">
-                  {merged.map((m, i) => (
-                    <span key={i} className="block">
-                      <span className="block tabular-nums">每{WD[m.weekday]} {ruleClock(sem.timeGrid, m)}</span>
-                      {!sameWeeks && <span className="mt-0.5 block text-[12px] font-medium text-(--c-ink4)">{weeksLabel(m.weeksMask, sem.totalWeeks)}</span>}
-                    </span>
-                  ))}
-                  {sameWeeks && <span className="block text-[12px] font-medium text-(--c-ink4)">{weeksLabel(merged[0].weeksMask, sem.totalWeeks)}</span>}
-                </span>
-              ) : '—'],
             ] as [string, React.ReactNode][]).map(([k, v], i) => (
               <div key={k} className={`flex items-baseline ${i > 0 ? 'mt-4' : ''}`}>
                 <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">{k}</span>
@@ -411,6 +403,44 @@ export function CourseDetailPage({
               </div>
             ))}
           </div>
+
+          {merged.length > 0 && (
+            <div className="mt-5 border-t border-(--c-surface2) pt-4">
+              <div className="grid grid-cols-7 gap-1">
+                {[1, 2, 3, 4, 5, 6, 7].map((wd) => {
+                  const segs = merged.filter((m) => m.weekday === wd)
+                  const on = segs.length > 0
+                  return (
+                    <div key={wd} className="flex flex-col items-center">
+                      <span className={`text-[11px] font-bold ${wd === todayWd ? 'text-(--c-accent)' : 'text-(--c-ink4)'}`}>{WD_SHORT[wd]}</span>
+                      <div
+                        className={`mt-1.5 flex w-full flex-col items-center justify-center rounded-[10px] py-2 ${on ? '' : 'bg-(--c-bg)'}`}
+                        style={on ? { background: tint(cur.color, 22), minHeight: 46 } : { minHeight: 46 }}
+                      >
+                        {on ? segs.map((m, i) => {
+                          const s = sem.timeGrid.find((t) => t.index === m.startPeriod)
+                          const e = sem.timeGrid.find((t) => t.index === m.endPeriod)
+                          return (
+                            <span key={i} className={`flex flex-col items-center text-[10.5px] font-bold leading-[1.35] tabular-nums text-(--c-ink) ${i > 0 ? 'mt-1.5' : ''}`}>
+                              <span>{s ? fmtMinutes(s.start) : `第${m.startPeriod}节`}</span>
+                              <span className="text-(--c-ink4)">{e ? fmtMinutes(e.end) : `第${m.endPeriod}节`}</span>
+                            </span>
+                          )
+                        }) : <span className="text-[11px] font-medium text-(--c-ink5)">–</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="mt-3 space-y-1">
+                {merged.map((m, i) => (
+                  <div key={i} className="text-[12px] font-medium text-(--c-ink4)">
+                    {merged.length > 1 ? `${WD[m.weekday]}：` : ''}{datesLabel(ruleDates(sem, m))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card>
@@ -475,7 +505,7 @@ export function CourseDetailPage({
                 key={r.id}
                 icon={ICON.clock}
                 title={`每${WD[r.weekday]} ${ruleClock(sem.timeGrid, r)}`}
-                desc={[rulePeriods(r), r.location].filter(Boolean).join('，')}
+                desc={[datesLabel(ruleDates(sem, r)), r.location].filter(Boolean).join('，')}
                 onClick={() => onEditSession(r.id)}
               />
             ))}
@@ -576,7 +606,7 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
                 <div key={r.id} className="flex items-baseline px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">每{WD[r.weekday]} {ruleClock(state.semester?.timeGrid, r)}</div>
-                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{[rulePeriods(r), state.semester ? weeksLabel(r.weeksMask, state.semester.totalWeeks) : '', r.location].filter(Boolean).join('，')}</div>
+                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{[state.semester ? datesLabel(ruleDates(state.semester, r)) : rulePeriods(r), r.location].filter(Boolean).join('，')}</div>
                   </div>
                 </div>
               ))}
