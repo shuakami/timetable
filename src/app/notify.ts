@@ -49,19 +49,19 @@ export async function requestExactAlarms(): Promise<boolean> {
   }
 }
 
-/** 排一条测试通知；group 标成 snooze 以免被重排时撤掉 */
-export async function scheduleTestNotification(at: Date): Promise<boolean> {
+/** 测试通知：at 为空立即弹出，否则定时；group 标成 snooze 以免被重排时撤掉 */
+export async function scheduleTestNotification(at?: Date): Promise<boolean> {
   if (!native()) return false
   try {
     if (!(await notificationsAllowed())) return false
     await ensureChannel()
     await LocalNotifications.schedule({
       notifications: [{
-        id: stableId('test'),
-        title: '通知测试',
-        body: '能看到这条，说明上课提醒能正常送达。',
+        id: stableId(at ? 'test:timed' : 'test:now'),
+        title: at ? '定时通知测试' : '通知测试',
+        body: at ? '定时提醒能正常送达。' : '通知本身正常，接下来试定时。',
         channelId: CHANNEL,
-        schedule: { at, allowWhileIdle: true },
+        ...(at ? { schedule: { at, allowWhileIdle: true } } : {}),
         extra: { group: 'snooze' },
       }],
     })

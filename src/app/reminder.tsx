@@ -6,7 +6,7 @@ import { todayStr } from './semester'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
 import type { Minutes, Prefs, WidgetStyle } from '../domain/types'
 import { exactAlarmsAllowed, notificationsAllowed, requestExactAlarms, requestNotifications, scheduleTestNotification, syncNotifications } from './notify'
-import { addWidgetToHome, nativeToast, syncWidgets, widgetPinSupported } from './widgets'
+import { addWidgetToHome, nativeToast, requestIgnoreBattery, syncWidgets, widgetPinSupported } from './widgets'
 
 /* ---------------- 通知偏好 ---------------- */
 
@@ -134,12 +134,19 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
     void exactAlarmsAllowed().then(setExact)
   }, [])
 
-  const testAt = (() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(8, 0, 0, 0)
-    return d
-  })()
+  const tests: [string, string, () => Promise<void>][] = [
+    ['立即发一条', '', async () => {
+      const ok = await scheduleTestNotification()
+      if (!ok) nativeToast('通知未开启')
+    }],
+    ['1 分钟后发一条', '锁屏等它', async () => {
+      const ok = await scheduleTestNotification(new Date(Date.now() + 60_000))
+      nativeToast(ok ? '1 分钟后弹出，可以锁屏等' : '通知未开启')
+    }],
+    ['电池不限制', '防止被系统杀后收不到', async () => {
+      if (await requestIgnoreBattery()) nativeToast('已是不限制')
+    }],
+  ]
 
   return (
     <Page>
@@ -188,16 +195,18 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
           ))}
           <div className="mt-5">
             <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">测试</div>
-            <button
-              onClick={async () => {
-                const ok = await scheduleTestNotification(testAt)
-                nativeToast(ok ? `明天 08:00 会收到一条测试通知` : '通知未开启')
-              }}
-              className="mt-2 flex w-full items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5 text-left transition-opacity active:opacity-60"
-            >
-              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">发一条测试通知</span>
-              <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">明天 08:00</span>
-            </button>
+            <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+              {tests.map(([title, sub, run], i) => (
+                <button
+                  key={title}
+                  onClick={() => void run()}
+                  className={`flex w-full items-center py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}
+                >
+                  <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{title}</span>
+                  {sub && <span className="text-[12.5px] font-medium text-(--c-ink4)">{sub}</span>}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

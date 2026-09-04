@@ -11,6 +11,7 @@ interface WidgetBridgePlugin {
   setTheme(o: { bg: string; light: boolean }): Promise<void>
   systemDark(): Promise<{ dark: boolean }>
   toast(o: { text: string }): Promise<void>
+  requestIgnoreBatteryOptimizations(): Promise<{ ignoring: boolean }>
   pickDate(o: { value: string }): Promise<{ value: string }>
   pickTime(o: { value: string }): Promise<{ value: string }>
   pickOption(o: { options: string[]; selected: number; title?: string }): Promise<{ index: number }>
@@ -63,6 +64,16 @@ export function notifyWebReady(): void {
 export function syncNativeTheme(bg: string, light: boolean): void {
   if (!native()) return
   WidgetBridge.setTheme({ bg, light }).catch(() => undefined)
+}
+
+/** 请求加入电池优化白名单；已在名单返回 true */
+export async function requestIgnoreBattery(): Promise<boolean> {
+  if (!native()) return true
+  try {
+    return (await WidgetBridge.requestIgnoreBatteryOptimizations()).ignoring
+  } catch {
+    return false
+  }
 }
 
 export function nativeToast(text: string): void {

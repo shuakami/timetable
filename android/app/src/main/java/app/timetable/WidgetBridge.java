@@ -7,6 +7,10 @@ import android.app.TimePickerDialog;
 import android.appwidget.AppWidgetManager;
 import android.graphics.Color;
 import android.content.ComponentName;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.os.Build;
 import android.widget.Toast;
 
@@ -153,6 +157,28 @@ public class WidgetBridge extends Plugin {
         Activity act = getActivity();
         if (text != null && act != null) act.runOnUiThread(() -> Toast.makeText(act, text, Toast.LENGTH_SHORT).show());
         call.resolve();
+    }
+
+    /** 电池优化白名单：已在名单返回 ignoring=true，否则弹系统请求，失败退到应用详情页 */
+    @PluginMethod
+    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+        Activity act = getActivity();
+        if (act == null) { call.reject("no activity"); return; }
+        PowerManager pm = (PowerManager) act.getSystemService(Activity.POWER_SERVICE);
+        boolean ignoring = pm != null && pm.isIgnoringBatteryOptimizations(act.getPackageName());
+        JSObject r = new JSObject();
+        r.put("ignoring", ignoring);
+        if (!ignoring) {
+            try {
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + act.getPackageName()));
+                act.startActivity(i);
+            } catch (Exception e) {
+                try {
+                    act.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + act.getPackageName())));
+                } catch (Exception ignored) { }
+            }
+        }
+        call.resolve(r);
     }
 
     @PluginMethod
