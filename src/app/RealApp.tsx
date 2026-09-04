@@ -1677,14 +1677,15 @@ export default function RealApp() {
 
   /** 引导选了去向时：内页从右侧推入盖住引导；内页退回后有课才算完成，否则回到引导 */
   const [onboardUnder, setOnboardUnder] = useState(false)
-  /* 内页退回的同一帧就把引导卸掉，不等 effect，避免退场动画期间露出引导页 */
+  /* 内页退回的同一帧就把引导隐藏（visibility），不等 effect，避免退场动画期间露出引导页 */
   const onboardDone = onboardUnder && stack.length === 0 && state.courses.length > 0
-  const showOnboard = (!onboarded || !snap) && !onboardDone
+  const showOnboard = !onboarded || !snap
   useEffect(() => {
     if (!onboardUnder || stack.length > 0) return
     if (store.state.courses.length === 0) {
-      setOnboardUnder(false)
-      return
+      /* 没有课就回到引导：等内页滑出后再升回顶层，否则会盖住退场动画 */
+      const t = window.setTimeout(() => setOnboardUnder(false), SLIDE.duration * 1000)
+      return () => window.clearTimeout(t)
     }
     try {
       localStorage.setItem(ONBOARD_KEY, '1')
@@ -1931,6 +1932,7 @@ export default function RealApp() {
             exit={onboardUnder ? { opacity: 1 } : { transform: 'translateX(-28%)', opacity: 0 }}
             transition={onboardUnder ? { duration: 0 } : SLIDE}
             className={`absolute inset-0 ${onboardUnder ? 'z-[35]' : 'z-[90]'}`}
+            style={{ visibility: onboardDone ? 'hidden' : 'visible' }}
           >
             <Onboarding
               backRef={onboardBack}

@@ -31,6 +31,7 @@ export GIT_AUTHOR_NAME="$NAME" GIT_AUTHOR_EMAIL="$EMAIL" GIT_COMMITTER_NAME="$NA
 git -c user.name="$NAME" -c user.email="$EMAIL" commit -q -m "$MSG" || echo "nothing to commit"
 
 # token 走 header，不写进 remote url，不落盘
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
 git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
   push -q "https://github.com/$LOGIN/$REPO.git" main:main
 echo "pushed https://github.com/$LOGIN/$REPO"
