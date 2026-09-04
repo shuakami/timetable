@@ -68,7 +68,7 @@
   --gutter: clamp(20px, 4vw, 48px);
   --shadow-phone: 0 0 0 0.5px rgba(27, 28, 32, 0.06), 0 2px 6px rgba(27, 28, 32, 0.03), 0 24px 60px -12px rgba(27, 28, 32, 0.1);
   --phone-fill: #f7f7f6;
-  --btn-hover: #3a3d45;
+  --btn-hover: #4f5460;
   --ghost-ring: rgba(27, 28, 32, 0.16);
   --ghost-hover: rgba(27, 28, 32, 0.04);
   --tag-bg: #fff;
@@ -92,7 +92,7 @@
 
     --shadow-phone: 0 0 0 0.5px rgba(255, 255, 255, 0.09), 0 2px 6px rgba(0, 0, 0, 0.3), 0 24px 60px -12px rgba(0, 0, 0, 0.55);
     --phone-fill: #111214;
-    --btn-hover: #45474e;
+    --btn-hover: #5a606b;
     --ghost-ring: rgba(255, 255, 255, 0.22);
     --ghost-hover: rgba(255, 255, 255, 0.06);
     --tag-bg: #1a1b1f;
