@@ -954,7 +954,7 @@ export function ActionSheet({ groups, onClose, title }: { groups: ActionItem[][]
   )
 }
 
-/* 滚轮：scroll-snap 列，中间一行为选中 */
+/* 滚轮：scroll-snap 列，中间一行为选中；上下淡出用叠在上面的渐变层而不是 mask-image（Android WebView 给滚动层建 mask 层时会闪一帧） */
 const WHEEL_ROW = 40
 export function Wheel({ items, index, onChange, className = '' }: { items: string[]; index: number; onChange: (i: number) => void; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -989,8 +989,8 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
       <div
         ref={ref}
         onScroll={onScroll}
-        className="h-full snap-y snap-mandatory overflow-y-auto [scrollbar-width:none]"
-        style={{ paddingTop: WHEEL_ROW * 2, paddingBottom: WHEEL_ROW * 2, maskImage: 'linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent)' }}
+        className="relative h-full snap-y snap-mandatory overflow-y-auto [scrollbar-width:none]"
+        style={{ paddingTop: WHEEL_ROW * 2, paddingBottom: WHEEL_ROW * 2 }}
       >
         {items.map((t, i) => (
           <div
@@ -1003,6 +1003,8 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
           </div>
         ))}
       </div>
+      <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: WHEEL_ROW * 1.5, background: 'linear-gradient(to bottom, var(--c-surface), transparent)' }} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: WHEEL_ROW * 1.5, background: 'linear-gradient(to top, var(--c-surface), transparent)' }} />
     </div>
   )
 }
@@ -1069,76 +1071,73 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
   /* 选中日的主题色圆按行列定位、在格子间滑动；不用 layoutId，卡片推入时不会被量到半路的位置 */
   const selIdx = ymOf(d) === month ? cells.indexOf(d) : -1
 
+  /* 月历与年月日滚轮两层常驻，切换只改透明度；不在切换时新建/销毁子树，WebView 不会为新合成层闪一帧 */
+  const cal = view === 'cal'
   return (
     <div className="relative" style={{ height: CAL_H }}>
-      <AnimatePresence initial={false}>
-        {view === 'cal' ? (
-          <motion.div key="cal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0">
-            <div className="flex h-10 items-center justify-between">
-              <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={-1} /></button>
-              <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
-                {Number(month.slice(0, 4))}年{Number(month.slice(5, 7))}月
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-ink3)"><path d="M6 9h12l-6 7z" /></svg>
-              </button>
-              <button onClick={() => goMonth(1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={1} /></button>
-            </div>
-            <div className="grid h-[26px] grid-cols-7 items-center">
-              {WD_SHORT.slice(1).map((w) => <span key={w} className="text-center text-[12px] font-semibold text-(--c-ink4)">{w}</span>)}
-            </div>
-            <div className="relative" style={{ height: CAL_ROW * 6 }}>
-              <AnimatePresence initial={false} custom={dir}>
-                <motion.div
-                  key={month}
-                  custom={dir}
-                  variants={{
-                    enter: (n: number) => ({ opacity: 0, transform: `translateX(${n * 18}px)` }),
-                    show: { opacity: 1, transform: 'translateX(0px)' },
-                    exit: (n: number) => ({ opacity: 0, transform: `translateX(${-n * 18}px)` }),
-                  }}
-                  initial="enter"
-                  animate="show"
-                  exit="exit"
+      <motion.div initial={false} animate={{ opacity: cal ? 1 : 0 }} transition={SWAP} className="absolute inset-0" style={{ pointerEvents: cal ? 'auto' : 'none' }} aria-hidden={!cal}>
+        <div className="flex h-10 items-center justify-between">
+          <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={-1} /></button>
+          <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
+            {Number(month.slice(0, 4))}年{Number(month.slice(5, 7))}月
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-ink3)"><path d="M6 9h12l-6 7z" /></svg>
+          </button>
+          <button onClick={() => goMonth(1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={1} /></button>
+        </div>
+        <div className="grid h-[26px] grid-cols-7 items-center">
+          {WD_SHORT.slice(1).map((w) => <span key={w} className="text-center text-[12px] font-semibold text-(--c-ink4)">{w}</span>)}
+        </div>
+        <div className="relative" style={{ height: CAL_ROW * 6 }}>
+          <AnimatePresence initial={false} custom={dir}>
+            <motion.div
+              key={month}
+              custom={dir}
+              variants={{
+                enter: (n: number) => ({ opacity: 0, transform: `translateX(${n * 18}px)` }),
+                show: { opacity: 1, transform: 'translateX(0px)' },
+                exit: (n: number) => ({ opacity: 0, transform: `translateX(${-n * 18}px)` }),
+              }}
+              initial="enter"
+              animate="show"
+              exit="exit"
+              transition={SHEET}
+              className="absolute inset-0 grid grid-cols-7"
+            >
+              {selIdx >= 0 && (
+                <motion.span
+                  initial={false}
+                  animate={{ left: `${((selIdx % 7) + 0.5) * (100 / 7)}%`, top: (Math.floor(selIdx / 7) + 0.5) * CAL_ROW }}
                   transition={SHEET}
-                  className="absolute inset-0 grid grid-cols-7"
-                >
-                  {selIdx >= 0 && (
-                    <motion.span
-                      initial={false}
-                      animate={{ left: `${((selIdx % 7) + 0.5) * (100 / 7)}%`, top: (Math.floor(selIdx / 7) + 0.5) * CAL_ROW }}
-                      transition={SHEET}
-                      className="pointer-events-none absolute -mt-[17px] -ml-[17px] h-[34px] w-[34px] rounded-full bg-(--c-accent)"
-                    />
-                  )}
-                  {cells.map((c) => {
-                    const inMonth = ymOf(c) === month
-                    const sel = c === d && inMonth
-                    const isToday = c === today
-                    return (
-                      <button key={c} onClick={() => pick(c)} className="relative flex items-center justify-center" style={{ height: CAL_ROW }}>
-                        <span className={`relative text-[15px] tabular-nums ${sel ? 'font-bold text-white' : isToday ? 'font-bold text-(--c-accent)' : inMonth ? 'font-medium text-(--c-ink)' : 'font-medium text-(--c-ink5)'}`}>
-                          {Number(c.slice(8))}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div key="ym" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex flex-col">
-            <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
-              {dy}年{dm}月
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
-            </button>
-            <div className="flex flex-1 items-center gap-2">
-              <Wheel items={years} index={Math.max(0, Math.min(years.length - 1, dy - (y0 - 1)))} onChange={(i) => setYmd(y0 - 1 + i, dm, dd)} className="flex-1" />
-              <Wheel items={months} index={dm - 1} onChange={(i) => setYmd(dy, i + 1, dd)} className="flex-1" />
-              <Wheel items={mdays} index={Math.min(dd, mdays.length) - 1} onChange={(i) => setYmd(dy, dm, i + 1)} className="flex-1" />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  className="pointer-events-none absolute -mt-[17px] -ml-[17px] h-[34px] w-[34px] rounded-full bg-(--c-accent)"
+                />
+              )}
+              {cells.map((c) => {
+                const inMonth = ymOf(c) === month
+                const sel = c === d && inMonth
+                const isToday = c === today
+                return (
+                  <button key={c} onClick={() => pick(c)} className="relative flex items-center justify-center" style={{ height: CAL_ROW }}>
+                    <span className={`relative text-[15px] tabular-nums ${sel ? 'font-bold text-white' : isToday ? 'font-bold text-(--c-accent)' : inMonth ? 'font-medium text-(--c-ink)' : 'font-medium text-(--c-ink5)'}`}>
+                      {Number(c.slice(8))}
+                    </span>
+                  </button>
+                )
+              })}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </motion.div>
+      <motion.div initial={false} animate={{ opacity: cal ? 0 : 1 }} transition={SWAP} className="absolute inset-0 flex flex-col" style={{ pointerEvents: cal ? 'none' : 'auto' }} aria-hidden={cal}>
+        <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
+          {dy}年{dm}月
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
+        </button>
+        <div className="flex flex-1 items-center gap-2">
+          <Wheel items={years} index={Math.max(0, Math.min(years.length - 1, dy - (y0 - 1)))} onChange={(i) => setYmd(y0 - 1 + i, dm, dd)} className="flex-1" />
+          <Wheel items={months} index={dm - 1} onChange={(i) => setYmd(dy, i + 1, dd)} className="flex-1" />
+          <Wheel items={mdays} index={Math.min(dd, mdays.length) - 1} onChange={(i) => setYmd(dy, dm, i + 1)} className="flex-1" />
+        </div>
+      </motion.div>
     </div>
   )
 }
