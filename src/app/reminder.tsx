@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Page, StickyHead, BackButton, TopBar, tint, WD } from './ui'
+import { Page, StickyHead, BackButton, TopBar, tint, WD, Tick } from './ui'
 import { store, useStore } from './store'
 import { addDays, fmtMinutes, weekOf, dateOf } from '../domain/dates'
 import { todayStr } from './semester'
@@ -245,10 +245,8 @@ export function PrefPickPage({ pref, onBack }: { pref: PrefKey; onBack: () => vo
                 }}
                 className={`flex w-full items-center py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}
               >
-                <span className={`flex-1 text-[14px] font-semibold ${on ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{o.label}</span>
-                {on && (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-accent)' }} strokeWidth="2.6"><path d="m5 13 4.5 4.5L19 7" /></svg>
-                )}
+                <span className={`flex-1 text-[14px] font-semibold ${on && !multi ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{o.label}</span>
+                <Tick on={on} multi={multi} />
               </button>
             )
           })}

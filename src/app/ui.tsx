@@ -891,6 +891,8 @@ export interface ActionItem {
   danger?: boolean
   /** 点了不收起（多选） */
   keepOpen?: boolean
+  /** 行尾用方框而不是勾 */
+  multi?: boolean
   onClick: () => void
 }
 
@@ -913,10 +915,24 @@ export function SheetRow({ item, onPick }: { item: ActionItem; onPick: (it: Acti
       )}
       <span className={`min-w-0 flex-1 truncate text-[15px] font-medium ${item.danger ? 'text-(--c-danger)' : 'text-(--c-ink)'}`}>{item.title}</span>
       {item.value != null && <span className="ml-3 flex-none text-[14px] font-medium tabular-nums text-(--c-ink4)">{item.value}</span>}
-      {item.selected && (
-        <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="ml-3 h-[16px] w-[16px] flex-none"><path d="m5 13 4.5 4.5L19 7" /></svg>
-      )}
+      {!item.danger && <Tick on={!!item.selected} multi={item.multi} className="ml-3" />}
     </button>
+  )
+}
+
+/** 行尾选中标记：占位宽度固定，选不选都不挤动左边；多选是方框，单选是勾 */
+export function Tick({ on, multi, className = '' }: { on: boolean; multi?: boolean; className?: string }) {
+  if (multi) {
+    return (
+      <span
+        className={`flex h-[20px] w-[20px] flex-none items-center justify-center rounded-[6px] border-[1.6px] transition-colors duration-150 ${on ? 'border-(--c-accent) bg-(--c-accent)' : 'border-(--c-ink5) bg-transparent'} ${className}`}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`h-[12px] w-[12px] transition-opacity duration-150 ${on ? 'opacity-100' : 'opacity-0'}`}><path d="m5 13 4.5 4.5L19 7" /></svg>
+      </span>
+    )
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className={`h-[16px] w-[16px] flex-none transition-opacity duration-150 ${on ? 'opacity-100' : 'opacity-0'} ${className}`}><path d="m5 13 4.5 4.5L19 7" /></svg>
   )
 }
 

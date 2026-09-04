@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { animate, motion, useIsPresent, useMotionValue } from 'motion/react'
+import { AnimatePresence, animate, motion, useIsPresent, useMotionValue } from 'motion/react'
 import type { Course, Task, TaskPhoto } from '../domain/types'
 import { fmtMinutes, weekdayOf } from '../domain/dates'
 import type { Snapshot } from '../domain/engine'
@@ -11,7 +11,7 @@ import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './ca
 import { TaskPhotoImg } from './photo'
 import {
   ActionSheet, ArrowUpIcon, BottomVeil, COMPOSE_RADIUS, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
-  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, WD, Wheel, composeLayoutId, dockStyle, md, type ActionItem,
+  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, WD, WD_SHORT, Wheel, composeLayoutId, dockStyle, md, type ActionItem,
 } from './ui'
 
 const KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
@@ -295,9 +295,10 @@ export function ComposeOverlay({
   const ref = useRef<HTMLTextAreaElement>(null)
   const course = state.courses.find((c) => c.id === meta.cid)
 
-  /* 形状与键盘同时起步，只抬一次 */
+  /* 先让胶囊长成卡，再叫键盘：键盘抬升由下面的 y 平滑接管 */
   useEffect(() => {
-    ref.current?.focus({ preventScroll: true })
+    const t = window.setTimeout(() => ref.current?.focus({ preventScroll: true }), 300)
+    return () => window.clearTimeout(t)
   }, [])
 
   /* 键盘弹出/收起改的是窗口高度，卡片会跟着硬跳：先把它放回原处，再平滑滑到新位置 */
@@ -795,12 +796,33 @@ function KindSheet({ kind, onPick, onClose }: { kind: Task['kind']; onPick: (k: 
   return <ActionSheet title="分类" groups={[items]} onClose={onClose} />
 }
 
-const WHEEL_DAYS = 120
 const WHEEL_STEP = 5
+const CAL_ROW = 42
+const CAL_H = 40 + 26 + CAL_ROW * 6
+
+const ymOf = (d: string) => d.slice(0, 7)
+const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate()
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const ymd = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`
+const shiftMonth = (ym: string, n: number) => {
+  const y = Number(ym.slice(0, 4))
+  const m = Number(ym.slice(5, 7)) - 1 + n
+  return `${y + Math.floor(m / 12)}-${pad2(((m % 12) + 12) % 12 + 1)}`
+}
+/** 六行七列，周一起；不足处用上月末与下月初补齐 */
+function calendarCells(ym: string): string[] {
+  const y = Number(ym.slice(0, 4))
+  const m = Number(ym.slice(5, 7))
+  const first = ymd(y, m, 1)
+  const lead = weekdayOf(first) - 1
+  return Array.from({ length: 42 }, (_, i) => addDaysStr(first, i - lead))
+}
+
+const SWAP = { duration: 0.2 } as const
 
 /**
- * 截止选择：常用的「今晚 / 明天 / 下次课前」直接点；「自定」在同一张 sheet 里换成日期 + 时刻滚轮。
- * 胶囊上显示的是合起来的说法（今晚 23:00），日期与时刻永远一起走。
+ * 截止选择：一张卡里放日期胶囊 + 时刻胶囊，下面随选中的胶囊切成月历 / 年月日滚轮 / 时刻滚轮。
+ * 常用的「今晚 / 明天 / 下次课前」是一排快捷项，点了直接定；月历里挑完按底部确定。
  */
 function DueSheet({
   due, dueMinutes, today, suggest, onPick, onClose,
@@ -813,75 +835,157 @@ function DueSheet({
   onClose: () => void
 }) {
   const dismiss = useRef<(() => void) | null>(null)
-  const [custom, setCustom] = useState(false)
-  const days = useMemo(() => Array.from({ length: WHEEL_DAYS }, (_, i) => addDaysStr(today, i)), [today])
-  const dayLabel = (d: string, i: number) => (i === 0 ? '今天' : i === 1 ? '明天' : `${md(d)} ${WD[weekdayOf(d)]}`)
-  const dayIdx0 = Math.max(0, days.indexOf(due || today))
-  const mins0 = dueMinutes ?? 23 * 60
-  const [di, setDi] = useState(dayIdx0)
-  const [hi, setHi] = useState(Math.floor(mins0 / 60))
-  const [mi, setMi] = useState(Math.round((mins0 % 60) / WHEEL_STEP) % (60 / WHEEL_STEP))
-  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')), [])
-  const minutes = useMemo(() => Array.from({ length: 60 / WHEEL_STEP }, (_, i) => String(i * WHEEL_STEP).padStart(2, '0')), [])
+  const [d, setD] = useState(due || today)
+  const [m, setM] = useState(dueMinutes ?? 23 * 60)
+  const [view, setView] = useState<'cal' | 'ym' | 'time'>('cal')
+  const [month, setMonth] = useState(ymOf(due || today))
+  const [dir, setDir] = useState(1)
+
+  const goMonth = (n: number) => { setDir(n); setMonth((x) => shiftMonth(x, n)) }
+  const pickDay = (x: string) => {
+    setD(x)
+    if (ymOf(x) !== month) { setDir(x > month ? 1 : -1); setMonth(ymOf(x)) }
+  }
 
   const tomorrow = addDaysStr(today, 1)
-  const is = (d: string, m: number) => due === d && dueMinutes === m
-  const quick: ActionItem[] = [
-    { title: '今晚', value: '23:00', icon: ICON.moon, selected: is(today, 23 * 60), onClick: () => onPick(today, 23 * 60) },
-    { title: '明天', value: '09:00', icon: ICON.sun, selected: is(tomorrow, 9 * 60), onClick: () => onPick(tomorrow, 9 * 60) },
+  const is = (x: string, mm: number) => due === x && dueMinutes === mm
+  const done = (x: string, mm?: number) => { onPick(x, mm); dismiss.current?.() }
+  const quick: { label: string; on: boolean; go: () => void }[] = [
+    { label: '今晚 23:00', on: is(today, 23 * 60), go: () => done(today, 23 * 60) },
+    { label: '明天 09:00', on: is(tomorrow, 9 * 60), go: () => done(tomorrow, 9 * 60) },
   ]
-  if (suggest && suggest.beforeClass) {
+  if (suggest?.beforeClass) {
     quick.push({
-      title: '下次课前',
-      value: `${dueText(suggest.due, undefined, today)} ${fmtMinutes(suggest.dueMinutes)}`,
-      icon: ICON.book,
-      selected: is(suggest.due, suggest.dueMinutes),
-      onClick: () => onPick(suggest.due, suggest.dueMinutes),
+      label: `下次课前 ${dueText(suggest.due, suggest.dueMinutes, today)}`,
+      on: is(suggest.due, suggest.dueMinutes),
+      go: () => done(suggest.due, suggest.dueMinutes),
     })
   }
-  const presetHit = quick.some((q) => q.selected)
-  const more: ActionItem[] = [
-    {
-      title: '自定',
-      icon: ICON.calendar,
-      value: due && !presetHit ? dueText(due, dueMinutes, today) : undefined,
-      selected: !!due && !presetHit,
-      keepOpen: true,
-      onClick: () => setCustom(true),
-    },
-  ]
-  const clear: ActionItem[] = due ? [{ title: '没有截止', icon: ICON.ban, danger: true, onClick: () => onPick('', undefined) }] : []
+  if (due) quick.push({ label: '没有截止', on: false, go: () => done('', undefined) })
 
-  const pick = (it: ActionItem) => {
-    it.onClick()
-    if (!it.keepOpen) dismiss.current?.()
-  }
-  const confirm = () => {
-    onPick(days[di], hi * 60 + mi * WHEEL_STEP)
-    dismiss.current?.()
-  }
+  /* 年月日滚轮 */
+  const y0 = Number(today.slice(0, 4))
+  const years = useMemo(() => Array.from({ length: 4 }, (_, i) => `${y0 - 1 + i}年`), [y0])
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => `${i + 1}月`), [])
+  const dy = Number(d.slice(0, 4))
+  const dm = Number(d.slice(5, 7))
+  const dd = Number(d.slice(8))
+  const mdays = useMemo(() => Array.from({ length: daysInMonth(dy, dm) }, (_, i) => `${i + 1}日`), [dy, dm])
+  const setYmd = (y: number, mo: number, day: number) => pickDay(ymd(y, mo, Math.min(day, daysInMonth(y, mo))))
+
+  /* 时刻滚轮 */
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => pad2(i)), [])
+  const minutes = useMemo(() => Array.from({ length: 60 / WHEEL_STEP }, (_, i) => pad2(i * WHEEL_STEP)), [])
+  const hi = Math.floor(m / 60)
+  const mi = Math.round((m % 60) / WHEEL_STEP) % (60 / WHEEL_STEP)
+
+  const cells = useMemo(() => calendarCells(month), [month])
+  const dateLabel = `${dy !== y0 ? `${dy}年` : ''}${md(d)} ${WD[weekdayOf(d)]}`
+  const pill = (on: boolean) =>
+    `h-[38px] rounded-full px-4 text-[14.5px] font-bold tabular-nums transition-colors duration-200 ${on ? 'bg-(--c-accent) text-white' : 'bg-(--c-surface2) text-(--c-ink)'}`
 
   return (
     <Sheet
       onClose={onClose}
       dismissRef={dismiss}
-      className="px-3 pb-2"
-      header={<SheetHead title={custom ? '自定截止' : '截止'} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
-      footer={custom ? <div className="px-5 pt-2"><PrimaryButton onClick={confirm}>{`${dayLabel(days[di], di)} ${hours[hi]}:${minutes[mi]}`}</PrimaryButton></div> : undefined}
+      className="px-5 pb-1"
+      header={<SheetHead title="截止" trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
+      footer={<div className="px-5 pt-2"><PrimaryButton onClick={() => done(d, m)}>确定</PrimaryButton></div>}
     >
-      {custom ? (
-        <div className="flex gap-2 px-2 pt-1">
-          <Wheel items={days.map(dayLabel)} index={di} onChange={setDi} className="flex-[1.6]" />
-          <Wheel items={hours} index={hi} onChange={setHi} className="flex-1" />
-          <Wheel items={minutes} index={mi} onChange={setMi} className="flex-1" />
-        </div>
-      ) : (
-        <>
-          <div>{quick.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}</div>
-          <div className="mt-2 border-t border-(--c-line) pt-2">{more.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}</div>
-          {clear.length > 0 && <div className="mt-2 border-t border-(--c-line) pt-2">{clear.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}</div>}
-        </>
-      )}
+      <div className="flex items-center gap-2 pb-3.5">
+        <span className="mr-auto text-[15px] font-semibold text-(--c-ink)">截止于</span>
+        <button onClick={() => setView(view === 'time' ? 'cal' : view)} className={pill(view !== 'time')}>{dateLabel}</button>
+        <button onClick={() => setView('time')} className={pill(view === 'time')}>{fmtMinutes(m)}</button>
+      </div>
+      <div className="flex flex-wrap gap-1.5 border-t border-(--c-line) py-3">
+        {quick.map((q) => (
+          <button
+            key={q.label}
+            onClick={q.go}
+            className={`h-[30px] rounded-full px-3 text-[12.5px] font-bold transition-transform duration-150 active:scale-[.96] ${q.on ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'}`}
+          >
+            {q.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative border-t border-(--c-line)" style={{ height: CAL_H }}>
+        <AnimatePresence initial={false}>
+          {view === 'cal' && (
+            <motion.div key="cal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0">
+              <div className="flex h-10 items-center justify-between">
+                <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 5-7 7 7 7" /></svg>
+                </button>
+                <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
+                  {Number(month.slice(0, 4))}年{Number(month.slice(5, 7))}月
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-ink3)"><path d="M6 9h12l-6 7z" /></svg>
+                </button>
+                <button onClick={() => goMonth(1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
+              <div className="grid h-[26px] grid-cols-7 items-center">
+                {WD_SHORT.slice(1).map((w) => <span key={w} className="text-center text-[12px] font-semibold text-(--c-ink4)">{w}</span>)}
+              </div>
+              <div className="relative" style={{ height: CAL_ROW * 6 }}>
+                <AnimatePresence initial={false} custom={dir}>
+                  <motion.div
+                    key={month}
+                    custom={dir}
+                    variants={{
+                      enter: (n: number) => ({ opacity: 0, transform: `translateX(${n * 18}px)` }),
+                      show: { opacity: 1, transform: 'translateX(0px)' },
+                      exit: (n: number) => ({ opacity: 0, transform: `translateX(${-n * 18}px)` }),
+                    }}
+                    initial="enter"
+                    animate="show"
+                    exit="exit"
+                    transition={SHEET}
+                    className="absolute inset-0 grid grid-cols-7"
+                  >
+                    {cells.map((c) => {
+                      const inMonth = ymOf(c) === month
+                      const sel = c === d
+                      const isToday = c === today
+                      return (
+                        <button key={c} onClick={() => pickDay(c)} className="relative flex items-center justify-center" style={{ height: CAL_ROW }}>
+                          {sel && inMonth && <motion.span layoutId="due-day" transition={SHEET} className="absolute h-[34px] w-[34px] rounded-full bg-(--c-accent)" />}
+                          <span
+                            className={`relative text-[15px] tabular-nums ${sel && inMonth ? 'font-bold text-white' : isToday ? 'font-bold text-(--c-accent)' : inMonth ? 'font-medium text-(--c-ink)' : 'font-medium text-(--c-ink5)'}`}
+                          >
+                            {Number(c.slice(8))}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+          {view === 'ym' && (
+            <motion.div key="ym" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex flex-col">
+              <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
+                {dy}年{dm}月
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
+              </button>
+              <div className="flex flex-1 items-center gap-2">
+                <Wheel items={years} index={Math.max(0, Math.min(years.length - 1, dy - (y0 - 1)))} onChange={(i) => setYmd(y0 - 1 + i, dm, dd)} className="flex-1" />
+                <Wheel items={months} index={dm - 1} onChange={(i) => setYmd(dy, i + 1, dd)} className="flex-1" />
+                <Wheel items={mdays} index={Math.min(dd, mdays.length) - 1} onChange={(i) => setYmd(dy, dm, i + 1)} className="flex-1" />
+              </div>
+            </motion.div>
+          )}
+          {view === 'time' && (
+            <motion.div key="time" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex items-center gap-2 px-10">
+              <Wheel items={hours} index={hi} onChange={(i) => setM(i * 60 + mi * WHEEL_STEP)} className="flex-1" />
+              <span className="text-[18px] font-bold text-(--c-ink3)">:</span>
+              <Wheel items={minutes} index={mi} onChange={(i) => setM(hi * 60 + i * WHEEL_STEP)} className="flex-1" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </Sheet>
   )
 }
