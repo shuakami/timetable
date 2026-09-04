@@ -8,11 +8,11 @@ import { uid } from '../domain/store'
 import { store, useStore } from './store'
 import { nowMinutes, todayStr } from './semester'
 import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './camera'
-import { TaskPhotoImg } from './photo'
+import { PhotoViewer, TaskPhotoImg } from './photo'
 import { useImeY } from './ime'
 import {
   ActionSheet, ArrowUpIcon, BottomVeil, CAL_H, COMPOSE_RADIUS, Calendar, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
-  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, SWAP, TimeWheels, WD, addDaysStr, composeLayoutId, dockStyle, md, type ActionItem,
+  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, SWAP_LAYER, TimeWheels, WD, addDaysStr, clipText, composeLayoutId, dockStyle, md, type ActionItem,
 } from './ui'
 
 const KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
@@ -356,9 +356,10 @@ export function ComposeOverlay({
             >
               <CameraIcon size={16} stroke="var(--c-ink2)" />
             </button>
-            <Chip color={course?.color} onClick={() => void meta.pickCourse()}>{course?.name ?? '课程'}</Chip>
-            <Chip onClick={meta.pickDue}>{meta.due ? dueText(meta.due, meta.dueMinutes, today) : '截止'}</Chip>
-            <span className="flex-1" />
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <Chip color={course?.color} onClick={() => void meta.pickCourse()} shrink>{course?.name ?? '课程'}</Chip>
+              <Chip onClick={meta.pickDue}>{meta.due ? dueText(meta.due, meta.dueMinutes, today) : '截止'}</Chip>
+            </div>
             <button
               onClick={send}
               disabled={!text.trim()}
@@ -462,8 +463,10 @@ export function CameraPage({
    * 原生预览层叠在 WebView 上方，不跟页面一起动：任何切页之前都要先把它换成页面内的定格图。
    * leave(): 原生定格 → 拿到最后一帧 → <img> 解码完成 → 撤掉原生层，然后才开始推/退页。
    */
+  /* 选课程的抽屉在 WebView 里，而原生预览叠在 WebView 上：开卡期间同样换成定格帧 */
+  const [pickingCourse, setPickingCourse] = useState(false)
   const present = useIsPresent()
-  const live = granted && active && present
+  const live = granted && active && present && !pickingCourse
   const mounted = useRef(true)
   const previewOn = useRef(false)
   const frozenLoaded = useRef<(() => void) | null>(null)
@@ -521,8 +524,6 @@ export function CameraPage({
     }
   }
 
-  const [pickingCourse, setPickingCourse] = useState(false)
-
   /* 双指缩放：以抓住时的倍率为基准，按两指距离变化成比例调整 */
   const zoom = useRef(1)
   const pinch = useRef<{ base: number; dist: number; pending: boolean } | null>(null)
@@ -554,11 +555,11 @@ export function CameraPage({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </CircleBtn>
           <button
-            onClick={() => setPickingCourse(true)}
+            onClick={() => go(() => setPickingCourse(true))}
             className="flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 text-[12.5px] font-bold text-white transition-transform duration-150 active:scale-[.96]"
           >
             {course && <span className="h-[7px] w-[7px] rounded-full" style={{ background: course.color }} />}
-            {course?.name ?? '课程'}
+            {course ? clipText(course.name) : '课程'}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth="3"><path d="m6 9 6 6 6-6" /></svg>
           </button>
           <CircleBtn onClick={() => { setTorch((v) => !v); void camera.torch(!torch) }}>
@@ -844,17 +845,12 @@ function DueSheet({
         ))}
       </div>
       <div className="relative border-t border-(--c-line)" style={{ height: CAL_H }}>
-        <AnimatePresence initial={false}>
-          {timeView ? (
-            <motion.div key="time" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex items-center">
-              <TimeWheels minutes={m} onChange={setM} className="flex-1" />
-            </motion.div>
-          ) : (
-            <motion.div key="cal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0">
-              <Calendar value={d} onChange={setD} today={today} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className={`${SWAP_LAYER} flex items-center`} style={{ opacity: timeView ? 1 : 0, pointerEvents: timeView ? 'auto' : 'none' }} aria-hidden={!timeView}>
+          <TimeWheels minutes={m} onChange={setM} className="flex-1" />
+        </div>
+        <div className={SWAP_LAYER} style={{ opacity: timeView ? 0 : 1, pointerEvents: timeView ? 'none' : 'auto' }} aria-hidden={timeView}>
+          <Calendar value={d} onChange={setD} today={today} />
+        </div>
       </div>
     </Sheet>
   )
@@ -1023,7 +1019,8 @@ export function TaskDetailPage({
     })
   }, [title, note, meta.cid, meta.due, meta.dueMinutes, meta.kind])
 
-  const [menu, setMenu] = useState<null | { kind: 'task' } | { kind: 'photo'; id: string; path: string }>(null)
+  const [menu, setMenu] = useState<null | { kind: 'task' }>(null)
+  const [viewing, setViewing] = useState<{ id: string; path: string } | null>(null)
 
   const removeTask = async () => {
     await camera.remove((cur.photos ?? []).map((p) => p.path))
@@ -1062,7 +1059,7 @@ export function TaskDetailPage({
           {(cur.photos ?? []).map((p) => (
             <button
               key={p.id}
-              onClick={() => setMenu({ kind: 'photo', id: p.id, path: p.path })}
+              onClick={() => setViewing({ id: p.id, path: p.path })}
               className="h-[76px] w-[102px] flex-none overflow-hidden rounded-[12px] transition-transform duration-150 active:scale-[.96]"
             >
               <TaskPhotoImg path={p.path} className="h-full w-full" />
@@ -1110,14 +1107,14 @@ export function TaskDetailPage({
         <div className="pb-[max(22px,env(safe-area-inset-bottom))]" />
         {meta.node}
         {menu?.kind === 'task' && <ActionSheet title={cur.title || '待办'} groups={taskMenu} onClose={() => setMenu(null)} />}
-        {menu?.kind === 'photo' && (
-          <ActionSheet
-            title="照片"
-            groups={[[{ title: '删除这张', icon: ICON.trash, danger: true, onClick: () => void removePhoto(menu.id, menu.path) }]]}
-            onClose={() => setMenu(null)}
-          />
-        )}
       </div>
+      {viewing && (
+        <PhotoViewer
+          path={viewing.path}
+          onClose={() => setViewing(null)}
+          onDelete={() => void removePhoto(viewing.id, viewing.path)}
+        />
+      )}
     </Page>
   )
 }
@@ -1198,7 +1195,7 @@ export function CourseTasks({
             >
               <CameraIcon size={17} />
             </button>
-            <button onClick={onText} className="flex-1 pl-1 text-left text-[14px] font-medium text-(--c-ink4)">新待办</button>
+            <button onClick={onText} className="flex-1 pl-1 text-left text-[14px] font-medium text-(--c-ink4)">点击添加新待办</button>
           </motion.div>
         )}
       </div>

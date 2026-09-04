@@ -475,21 +475,30 @@ export const ArrowUpIcon = ({ stroke = '#fff' }: { stroke?: string }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
 )
 
-/** 胶囊标签：课程、截止、分类 */
-export function Chip({ color, children, tone = 'plain', onClick }: {
+/** 胶囊里的文字上限（字数），超出截掉加“…” */
+export const CHIP_MAX = 8
+export function clipText(s: string, max = CHIP_MAX) {
+  const chars = Array.from(s)
+  return chars.length > max ? `${chars.slice(0, max).join('')}…` : s
+}
+
+/** 胶囊标签：课程、截止、分类；文字按字数截断 */
+export function Chip({ color, children, tone = 'plain', onClick, shrink = false }: {
   color?: string
   children: React.ReactNode
   tone?: 'plain' | 'accent'
   onClick?: () => void
+  /** 放在一行里时允许被挤窄（文字省略），不把同行其他控件顶出去 */
+  shrink?: boolean
 }) {
   const Tag = onClick ? 'button' : 'span'
   return (
     <Tag
       onClick={onClick}
-      className={`inline-flex h-[30px] max-w-[160px] min-w-0 flex-none items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'} ${onClick ? 'transition-transform duration-150 active:scale-[.96]' : ''}`}
+      className={`inline-flex h-[30px] max-w-[160px] min-w-0 ${shrink ? 'shrink' : 'flex-none'} items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'} ${onClick ? 'transition-transform duration-150 active:scale-[.96]' : ''}`}
     >
       {color && <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />}
-      <span className="min-w-0 truncate">{children}</span>
+      <span className="min-w-0 truncate">{typeof children === 'string' ? clipText(children) : children}</span>
     </Tag>
   )
 }
@@ -582,6 +591,20 @@ export function closeTopSheet(): boolean {
   if (!top) return false
   top()
   return true
+}
+
+/** 全屏覆盖层（图片查看等）也接系统返回：挂进同一个栈 */
+export function useBackClose(close: () => void) {
+  const ref = useRef(close)
+  ref.current = close
+  useEffect(() => {
+    const fn = () => ref.current()
+    openSheets.push(fn)
+    return () => {
+      const i = openSheets.lastIndexOf(fn)
+      if (i >= 0) openSheets.splice(i, 1)
+    }
+  }, [])
 }
 
 const CLOSE_RATIO = 0.25
@@ -1011,6 +1034,9 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
 
 /* ---------------- 月历 / 时刻滚轮 / 日期与时刻选择卡 ---------------- */
 
+/** 同一区域内两层内容交叉淡入淡出的层：常驻合成层 + 200ms 透明度过渡 */
+export const SWAP_LAYER = 'absolute inset-0 transition-opacity duration-200 ease-out will-change-[opacity]'
+
 export const CAL_ROW = 42
 /** 月历区域固定高度：月份行 + 星期行 + 六行日期；切成年月日滚轮时也用这个高度，不跳 */
 export const CAL_H = 40 + 26 + CAL_ROW * 6
@@ -1071,11 +1097,12 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
   /* 选中日的主题色圆按行列定位、在格子间滑动；不用 layoutId，卡片推入时不会被量到半路的位置 */
   const selIdx = ymOf(d) === month ? cells.indexOf(d) : -1
 
-  /* 月历与年月日滚轮两层常驻，切换只改透明度；不在切换时新建/销毁子树，WebView 不会为新合成层闪一帧 */
+  /* 月历与年月日滚轮两层常驻且常驻合成层（will-change），切换只走 CSS 透明度过渡；
+     不挂载/卸载子树、不在动画起止建/拆层，Android WebView 不会在起止各闪一帧 */
   const cal = view === 'cal'
   return (
     <div className="relative" style={{ height: CAL_H }}>
-      <motion.div initial={false} animate={{ opacity: cal ? 1 : 0 }} transition={SWAP} className="absolute inset-0" style={{ pointerEvents: cal ? 'auto' : 'none' }} aria-hidden={!cal}>
+      <div className={SWAP_LAYER} style={{ opacity: cal ? 1 : 0, pointerEvents: cal ? 'auto' : 'none' }} aria-hidden={!cal}>
         <div className="flex h-10 items-center justify-between">
           <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={-1} /></button>
           <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
@@ -1126,8 +1153,8 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
             </motion.div>
           </AnimatePresence>
         </div>
-      </motion.div>
-      <motion.div initial={false} animate={{ opacity: cal ? 0 : 1 }} transition={SWAP} className="absolute inset-0 flex flex-col" style={{ pointerEvents: cal ? 'none' : 'auto' }} aria-hidden={cal}>
+      </div>
+      <div className={`${SWAP_LAYER} flex flex-col`} style={{ opacity: cal ? 0 : 1, pointerEvents: cal ? 'none' : 'auto' }} aria-hidden={cal}>
         <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
           {dy}年{dm}月
           <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
@@ -1137,7 +1164,7 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
           <Wheel items={months} index={dm - 1} onChange={(i) => setYmd(dy, i + 1, dd)} className="flex-1" />
           <Wheel items={mdays} index={Math.min(dd, mdays.length) - 1} onChange={(i) => setYmd(dy, dm, i + 1)} className="flex-1" />
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
@@ -1221,6 +1248,7 @@ export const ICON = {
   ban: <g><circle cx="12" cy="12" r="8.5" /><path d="m9 9 6 6M15 9l-6 6" /></g>,
   info: <g><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></g>,
   trash: <g><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13" /></g>,
+  download: <g><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 17.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-1.5" /></g>,
   camera: <g><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.2-2h5.6L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" /><circle cx="12" cy="12.5" r="3.2" /></g>,
   calendar: <g><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /></g>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,

@@ -67,6 +67,7 @@ import java.util.concurrent.Executors;
         permissions = {
                 @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
                 @Permission(alias = "photos", strings = { Manifest.permission.READ_EXTERNAL_STORAGE, "android.permission.READ_MEDIA_IMAGES" }),
+                @Permission(alias = "save", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE }),
         }
 )
 public class TtCamera extends Plugin {
@@ -579,6 +580,71 @@ public class TtCamera extends Plugin {
         JSObject o = new JSObject();
         o.put("uri", f.exists() ? Uri.fromFile(f).toString() : "");
         call.resolve(o);
+    }
+
+    /** 存到系统相册：Q+ 走 MediaStore 不需要权限，更老的系统先要 WRITE_EXTERNAL_STORAGE */
+    @PluginMethod
+    public void saveToGallery(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 29 && !has(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            requestPermissionForAlias("save", call, "saveResult");
+            return;
+        }
+        doSave(call);
+    }
+
+    @PermissionCallback
+    private void saveResult(PluginCall call) {
+        if (has(Manifest.permission.WRITE_EXTERNAL_STORAGE)) doSave(call);
+        else call.reject("denied");
+    }
+
+    private void doSave(PluginCall call) {
+        String path = call.getString("path", "");
+        File f = new File(getContext().getFilesDir(), path);
+        if (!f.exists()) {
+            call.reject("missing");
+            return;
+        }
+        io.execute(() -> {
+            ContentResolver cr = getContext().getContentResolver();
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, f.getName());
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            v.put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis() / 1000);
+            if (Build.VERSION.SDK_INT >= 29) {
+                v.put(MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/" + getContext().getString(R.string.app_name));
+                v.put(MediaStore.Images.Media.IS_PENDING, 1);
+            } else {
+                File dir = new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), getContext().getString(R.string.app_name));
+                if (!dir.exists()) dir.mkdirs();
+                v.put(MediaStore.Images.Media.DATA, new File(dir, f.getName()).getAbsolutePath());
+            }
+            Uri uri = null;
+            try {
+                uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) throw new Exception("insert");
+                try (InputStream in = new java.io.FileInputStream(f); OutputStream out = cr.openOutputStream(uri)) {
+                    if (out == null) throw new Exception("open");
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                if (Build.VERSION.SDK_INT >= 29) {
+                    android.content.ContentValues done = new android.content.ContentValues();
+                    done.put(MediaStore.Images.Media.IS_PENDING, 0);
+                    cr.update(uri, done, null, null);
+                }
+                call.resolve();
+            } catch (Exception e) {
+                if (uri != null) {
+                    try {
+                        cr.delete(uri, null, null);
+                    } catch (Exception ignored) {
+                    }
+                }
+                call.reject(e.getMessage());
+            }
+        });
     }
 
     @PluginMethod

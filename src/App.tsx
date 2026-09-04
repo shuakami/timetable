@@ -590,7 +590,7 @@ function DetailScreen({ tall }: { tall?: boolean }) {
             <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface)">
               <CameraIcon size={16} />
             </span>
-            <span className="flex-1 pl-1 text-[14px] font-medium text-(--c-ink4)">新待办</span>
+            <span className="flex-1 pl-1 text-[14px] font-medium text-(--c-ink4)">点击添加新待办</span>
           </div>
         </Card>
       </div>

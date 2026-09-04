@@ -32,6 +32,7 @@ interface TtCameraPlugin {
   listRecent(o: { limit: number; page: number }): Promise<{ items: GalleryItem[] }>
   importPicked(o: { ids: string[] }): Promise<{ items: CapturedPhoto[] }>
   resolve(o: { path: string }): Promise<{ uri: string }>
+  saveToGallery(o: { path: string }): Promise<void>
   deleteFiles(o: { paths: string[] }): Promise<void>
 }
 
@@ -222,6 +223,25 @@ export const camera = {
   /** 浏览器降级时的预览元素：相机页把它挂进取景框 */
   webPreview(): HTMLVideoElement | null {
     return webVideo
+  },
+
+  /** 存到系统相册；浏览器里直接下载 */
+  async save(path: string): Promise<boolean> {
+    if (!nativeCamera()) {
+      const src = photoSrc(path)
+      if (!src) return false
+      const a = document.createElement('a')
+      a.href = src
+      a.download = `${path.split('/').pop() ?? 'photo'}`
+      a.click()
+      return true
+    }
+    try {
+      await TtCamera.saveToGallery({ path })
+      return true
+    } catch {
+      return false
+    }
   },
 
   async remove(paths: string[]) {
