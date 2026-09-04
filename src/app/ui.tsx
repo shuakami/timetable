@@ -880,47 +880,113 @@ export function PrimaryButton({ children, onClick, disabled, onDark }: { childre
   )
 }
 
-/* 底部动作菜单：分组的圆角卡，文字在左、图标或当前值在右；危险项单独一组 */
+/* 底部选择/动作菜单：左上标题、右上圆形关闭；每行「图标 + 文案 + 右侧附注或勾」，选中项主题色；危险项红字 */
 export interface ActionItem {
   title: string
-  /** 右侧：图标（svg 内容）或当前值文字 */
+  /** 左侧图标（svg 内容） */
   icon?: React.ReactNode
+  /** 右侧灰色附注 */
   value?: string
+  selected?: boolean
   danger?: boolean
+  /** 点了不收起（多选） */
+  keepOpen?: boolean
   onClick: () => void
 }
 
-export function ActionSheet({ groups, onClose, title }: { groups: ActionItem[][]; onClose: () => void; title?: string }) {
+export function SheetClose({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface2) transition-transform duration-150 active:scale-[.92]">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+    </button>
+  )
+}
+
+export function SheetRow({ item, onPick }: { item: ActionItem; onPick: (it: ActionItem) => void }) {
+  const tone = item.danger ? 'var(--c-danger)' : item.selected ? 'var(--c-accent)' : 'var(--c-ink2)'
+  return (
+    <button onClick={() => onPick(item)} className="flex h-[52px] w-full items-center rounded-[14px] px-3 text-left transition-colors active:bg-(--c-surface2)">
+      {item.icon ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke={tone} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mr-3.5 h-[19px] w-[19px] flex-none">{item.icon}</svg>
+      ) : (
+        <span className="mr-3.5 h-[19px] w-[19px] flex-none rounded-full border-[1.8px] border-dashed border-(--c-ink5)" />
+      )}
+      <span className={`min-w-0 flex-1 truncate text-[15px] font-medium ${item.danger ? 'text-(--c-danger)' : 'text-(--c-ink)'}`}>{item.title}</span>
+      {item.value != null && <span className="ml-3 flex-none text-[14px] font-medium tabular-nums text-(--c-ink4)">{item.value}</span>}
+      {item.selected && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="ml-3 h-[16px] w-[16px] flex-none"><path d="m5 13 4.5 4.5L19 7" /></svg>
+      )}
+    </button>
+  )
+}
+
+export function ActionSheet({ groups, onClose, title }: { groups: ActionItem[][]; onClose: () => void; title: string }) {
   const dismiss = useRef<(() => void) | null>(null)
-  const pick = (fn: () => void) => {
-    fn()
-    dismiss.current?.()
+  const pick = (it: ActionItem) => {
+    it.onClick()
+    if (!it.keepOpen) dismiss.current?.()
   }
   return (
-    <Sheet onClose={onClose} dismissRef={dismiss} className="px-3 pt-1 pb-1" header={title ? <div className="truncate px-5 pt-1 pb-2 text-[12.5px] font-medium text-(--c-ink4)">{title}</div> : undefined}>
-      <div className="space-y-2.5">
-        {groups.filter((g) => g.length > 0).map((g, gi) => (
-          <div key={gi} className="overflow-hidden rounded-[18px] bg-(--c-surface2)">
-            {g.map((it, i) => (
-              <button
-                key={it.title}
-                onClick={() => pick(it.onClick)}
-                className={`flex h-[52px] w-full items-center px-4 text-left transition-colors active:bg-(--c-line) ${i > 0 ? 'border-t border-(--c-line)' : ''}`}
-              >
-                <span className={`min-w-0 flex-1 truncate text-[15px] font-medium ${it.danger ? 'text-(--c-danger)' : 'text-(--c-ink)'}`}>{it.title}</span>
-                {it.value != null && <span className="ml-3 flex-none text-[14px] font-medium tabular-nums text-(--c-ink3)">{it.value}</span>}
-                {it.icon && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke={it.danger ? 'var(--c-danger)' : 'var(--c-ink2)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="ml-3 h-[18px] w-[18px] flex-none">{it.icon}</svg>
-                )}
-                {it.icon == null && it.value != null && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="ml-1.5 h-[14px] w-[14px] flex-none"><path d="m9 5 7 7-7 7" /></svg>
-                )}
-              </button>
-            ))}
+    <Sheet onClose={onClose} dismissRef={dismiss} className="px-3 pb-2" header={<SheetHead title={title} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}>
+      {groups.filter((g) => g.length > 0).map((g, gi) => (
+        <div key={gi} className={gi > 0 ? 'mt-2 border-t border-(--c-line) pt-2' : ''}>
+          {g.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}
+        </div>
+      ))}
+    </Sheet>
+  )
+}
+
+/* 滚轮：scroll-snap 列，中间一行为选中 */
+const WHEEL_ROW = 40
+export function Wheel({ items, index, onChange, className = '' }: { items: string[]; index: number; onChange: (i: number) => void; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const timer = useRef<number | null>(null)
+  const settled = useRef(index)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el && settled.current !== index) {
+      el.scrollTop = index * WHEEL_ROW
+      settled.current = index
+    } else if (el && el.scrollTop !== index * WHEEL_ROW && timer.current == null) {
+      el.scrollTop = index * WHEEL_ROW
+    }
+  }, [index])
+
+  const onScroll = () => {
+    if (timer.current != null) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      timer.current = null
+      const el = ref.current
+      if (!el) return
+      const i = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_ROW)))
+      settled.current = i
+      if (i !== index) onChange(i)
+    }, 80)
+  }
+
+  return (
+    <div className={`relative ${className}`} style={{ height: WHEEL_ROW * 5 }}>
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-[10px] bg-(--c-surface2)" style={{ height: WHEEL_ROW }} />
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="h-full snap-y snap-mandatory overflow-y-auto [scrollbar-width:none]"
+        style={{ paddingTop: WHEEL_ROW * 2, paddingBottom: WHEEL_ROW * 2, maskImage: 'linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent)' }}
+      >
+        {items.map((t, i) => (
+          <div
+            key={i}
+            onClick={() => { if (ref.current) ref.current.scrollTo({ top: i * WHEEL_ROW, behavior: 'smooth' }) }}
+            className={`flex snap-center items-center justify-center text-[16px] tabular-nums transition-colors ${i === index ? 'font-bold text-(--c-ink)' : 'font-medium text-(--c-ink4)'}`}
+            style={{ height: WHEEL_ROW }}
+          >
+            {t}
           </div>
         ))}
       </div>
-    </Sheet>
+    </div>
   )
 }
 
@@ -957,6 +1023,9 @@ export const ICON = {
   camera: <g><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.2-2h5.6L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" /><circle cx="12" cy="12.5" r="3.2" /></g>,
   calendar: <g><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /></g>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
+  flag: <path d="M5 21V4.5M5 4.5h11l-1.5 4L18 12.5H5" />,
+  note: <g><rect x="4.5" y="3.5" width="15" height="17" rx="3" /><path d="M8.5 9h7M8.5 13h7M8.5 17h4" /></g>,
+  hourglass: <g><path d="M7 3.5h10M7 20.5h10" /><path d="M8 3.5v3.2c0 2 4 3.8 4 5.3s-4 3.3-4 5.3v3.2M16 3.5v3.2c0 2-4 3.8-4 5.3s4 3.3 4 5.3v3.2" /></g>,
   sun: <g><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" /></g>,
   book: <g><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 16.5z" /><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5z" /></g>,
 }

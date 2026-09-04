@@ -79,4 +79,19 @@
         android:maxSdkVersion="32" />
 
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <!-- Android 11+ 包可见性：自启动管理页所在的系统应用 -->
+    <queries>
+        <package android:name="com.coloros.safecenter" />
+        <package android:name="com.oplus.safecenter" />
+        <package android:name="com.oppo.safe" />
+        <package android:name="com.coloros.oppoguardelf" />
+        <package android:name="com.oplus.battery" />
+        <package android:name="com.miui.securitycenter" />
+        <package android:name="com.huawei.systemmanager" />
+        <package android:name="com.vivo.permissionmanager" />
+        <package android:name="com.iqoo.secure" />
+        <package android:name="com.meizu.safe" />
+        <package android:name="com.samsung.android.lool" />
+    </queries>
+
 </manifest>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Page, PrimaryButton, SLIDE, TopBar } from './ui'
 import { CHANNEL, exactAlarmsAllowed, notificationsAllowed, requestExactAlarms, requestNotifications } from './notify'
-import { batteryOptimizationsIgnored, openAutostartSettings, openChannelSettings, requestIgnoreBattery } from './widgets'
+import { batteryOptimizationsIgnored, nativeToast, openAutostartSettings, openChannelSettings, requestIgnoreBattery } from './widgets'
 
 type BannerState = 'pending' | 'seen' | 'done'
 
@@ -178,7 +178,9 @@ export function PermsPage({
             <Row
               label="开机自启"
               done={false}
-              onPress={() => { openAutostartSettings() }}
+              onPress={async () => {
+                if (!(await openAutostartSettings())) nativeToast('在应用信息里找「自启动」或「耗电管理」')
+              }}
               actionLabel="去设置"
             />
           </div>

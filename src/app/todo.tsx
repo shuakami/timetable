@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, useIsPresent } from 'motion/react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { animate, motion, useIsPresent, useMotionValue } from 'motion/react'
 import type { Course, Task, TaskPhoto } from '../domain/types'
 import { fmtMinutes, weekdayOf } from '../domain/dates'
 import type { Snapshot } from '../domain/engine'
@@ -11,9 +11,8 @@ import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './ca
 import { TaskPhotoImg } from './photo'
 import {
   ActionSheet, ArrowUpIcon, BottomVeil, COMPOSE_RADIUS, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
-  QuickBar, SHEET, SLIDE, StickyHead, WD, composeLayoutId, dockStyle, md, type ActionItem,
+  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, WD, Wheel, composeLayoutId, dockStyle, md, type ActionItem,
 } from './ui'
-import { hasNativePickers, nativePickDate, nativePickOption, nativePickTime } from './widgets'
 
 const KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
 const KIND_LABEL: Record<Task['kind'], string> = { homework: '作业', exam: '考试', memo: '备忘' }
@@ -50,41 +49,6 @@ function leftText(t: Task, today: string, now: number): [string, 'rose' | 'ink']
 const timeOfDay = (ms: number) => {
   const d = new Date(ms)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-/* ---------------- 选择器：Android 走系统对话框，浏览器用原生控件 ---------------- */
-
-function useHiddenPickers(onDate: (v: string) => void, onTime: (v: string) => void) {
-  const dateRef = useRef<HTMLInputElement>(null)
-  const timeRef = useRef<HTMLInputElement>(null)
-  const open = (ref: React.RefObject<HTMLInputElement | null>) => {
-    const el = ref.current
-    if (!el) return
-    if (typeof el.showPicker === 'function') el.showPicker()
-    else el.click()
-  }
-  const node = (
-    <>
-      <input
-        ref={dateRef}
-        type="date"
-        className="pointer-events-none absolute h-0 w-0 opacity-0"
-        onChange={(e) => e.target.value && onDate(e.target.value)}
-      />
-      <input
-        ref={timeRef}
-        type="time"
-        className="pointer-events-none absolute h-0 w-0 opacity-0"
-        onChange={(e) => e.target.value && onTime(e.target.value)}
-      />
-    </>
-  )
-  return { node, openDate: () => open(dateRef), openTime: () => open(timeRef) }
-}
-
-async function chooseIndex(options: string[], selected: number, title: string): Promise<number | null> {
-  if (hasNativePickers()) return nativePickOption(options, selected, title)
-  return null
 }
 
 /* ---------------- 待办列表 ---------------- */
@@ -141,7 +105,7 @@ export function TaskRow({
           <div className="mt-[5px] flex items-baseline gap-1.5 text-[12px] leading-[16px] font-medium text-(--c-ink4)">
             <span className="h-[7px] w-[7px] flex-none self-center rounded-full" style={{ background: color }} />
             <span className="truncate">{course?.name ?? KIND_LABEL[t.kind]}</span>
-            <span className="flex-none tabular-nums text-(--c-ink3)">· {right}</span>
+            <span className="flex-none tabular-nums text-(--c-ink3)">{right}</span>
           </div>
           {left && (
             <div className={`mt-1 text-[12px] font-semibold tabular-nums ${left[1] === 'rose' ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>{left[0]}</div>
@@ -177,7 +141,7 @@ function InboxRow({
               <span className="h-[7px] w-[7px] flex-none self-center rounded-full" style={{ background: course?.color ?? 'var(--c-ink5)' }} />
               <span className="truncate">{course?.name ?? KIND_LABEL[t.kind]}</span>
               <span className="flex-none tabular-nums text-(--c-ink3)">
-                · {t.capturedAt ? `${timeOfDay(t.capturedAt)} 拍下` : dueText(t.due, t.dueMinutes, today)}
+                {t.capturedAt ? `${timeOfDay(t.capturedAt)} 拍下` : dueText(t.due, t.dueMinutes, today)}
               </span>
             </div>
           </div>
@@ -198,9 +162,10 @@ function InboxRow({
 }
 
 export function TodoView({
-  snap, onOpen, onCamera, onText,
+  snap, composing, onOpen, onCamera, onText,
 }: {
   snap: Snapshot | null
+  composing: boolean
   onOpen: (t: Task) => void
   onCamera: () => void
   onText: () => void
@@ -304,7 +269,7 @@ export function TodoView({
         )}
       </div>
       <BottomVeil height={190} />
-      {state.tasks.length > 0 && <QuickBar onCamera={onCamera} onText={onText} />}
+      {state.tasks.length > 0 && !composing && <QuickBar onCamera={onCamera} onText={onText} />}
     </>
   )
 }
@@ -330,11 +295,27 @@ export function ComposeOverlay({
   const ref = useRef<HTMLTextAreaElement>(null)
   const course = state.courses.find((c) => c.id === meta.cid)
 
-  /* 胶囊长成卡片的过程中先不弹键盘，等形状到位再聚焦，动画不被视口变化打断 */
+  /* 形状与键盘同时起步，只抬一次 */
   useEffect(() => {
-    const t = window.setTimeout(() => ref.current?.focus(), SHEET.duration * 1000)
-    return () => window.clearTimeout(t)
+    ref.current?.focus({ preventScroll: true })
   }, [])
+
+  /* 键盘弹出/收起改的是窗口高度，卡片会跟着硬跳：先把它放回原处，再平滑滑到新位置 */
+  const y = useMotionValue(0)
+  const [, relayout] = useState(0)
+  useEffect(() => {
+    let last = window.innerHeight
+    const onResize = () => {
+      const d = last - window.innerHeight
+      last = window.innerHeight
+      if (Math.abs(d) < 40) return
+      y.set(y.get() + d)
+      animate(y, 0, SHEET)
+      relayout((n) => n + 1)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [y])
 
   const send = () => {
     const title = text.trim()
@@ -362,7 +343,7 @@ export function ComposeOverlay({
         layoutId={composeLayoutId(courseId)}
         transition={SHEET}
         className="absolute inset-x-3 bottom-3 px-4 pt-3.5 pb-3"
-        style={{ ...dockStyle, borderRadius: COMPOSE_RADIUS }}
+        style={{ ...dockStyle, borderRadius: COMPOSE_RADIUS, y }}
       >
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15, delay: 0.1 }}>
           <textarea
@@ -550,13 +531,7 @@ export function CameraPage({
     }
   }
 
-  const pickCourse = async () => {
-    const courses = state.courses.filter((c) => !c.removedByImport)
-    const labels = ['不关联', ...courses.map((c) => c.name)]
-    const i = await chooseIndex(labels, courses.findIndex((c) => c.id === cid) + 1, '课程')
-    if (i == null) return
-    setCid(i === 0 ? '' : courses[i - 1].id)
-  }
+  const [pickingCourse, setPickingCourse] = useState(false)
 
   /* 双指缩放：以抓住时的倍率为基准，按两指距离变化成比例调整 */
   const zoom = useRef(1)
@@ -589,7 +564,7 @@ export function CameraPage({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </CircleBtn>
           <button
-            onClick={() => void pickCourse()}
+            onClick={() => setPickingCourse(true)}
             className="flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 text-[12.5px] font-bold text-white transition-transform duration-150 active:scale-[.96]"
           >
             {course && <span className="h-[7px] w-[7px] rounded-full" style={{ background: course.color }} />}
@@ -660,6 +635,9 @@ export function CameraPage({
           </CircleBtn>
         </div>
       </div>
+      {pickingCourse && (
+        <CourseSheet courses={state.courses.filter((c) => !c.removedByImport)} cid={cid} onPick={setCid} onClose={() => setPickingCourse(false)} />
+      )}
     </Page>
   )
 }
@@ -800,39 +778,115 @@ const addDaysStr = (d: string, n: number) => {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
 
+/** 课程选择：不关联 + 各门课，课程色作图标 */
+function CourseSheet({ courses, cid, onPick, onClose }: { courses: Course[]; cid: string; onPick: (id: string) => void; onClose: () => void }) {
+  const dot = (color?: string) => <circle cx="12" cy="12" r="5" fill={color ?? 'none'} stroke={color ?? 'currentColor'} />
+  const items: ActionItem[] = [
+    { title: '不关联', selected: !cid, onClick: () => onPick('') },
+    ...courses.map((c) => ({ title: c.name, icon: dot(c.color), selected: c.id === cid, onClick: () => onPick(c.id) })),
+  ]
+  return <ActionSheet title="课程" groups={[items]} onClose={onClose} />
+}
+
+const KIND_ICON: Record<Task['kind'], React.ReactNode> = { homework: ICON.book, exam: ICON.flag, memo: ICON.note }
+
+function KindSheet({ kind, onPick, onClose }: { kind: Task['kind']; onPick: (k: Task['kind']) => void; onClose: () => void }) {
+  const items: ActionItem[] = KINDS.map((k) => ({ title: KIND_LABEL[k], icon: KIND_ICON[k], selected: k === kind, onClick: () => onPick(k) }))
+  return <ActionSheet title="分类" groups={[items]} onClose={onClose} />
+}
+
+const WHEEL_DAYS = 120
+const WHEEL_STEP = 5
+
 /**
- * 截止选择：一个底部菜单里同时给出常用的“今晚 / 明天 / 下次课前”与“日期 / 时间”两行，
- * 胶囊上显示的就是这两个值合起来的说法（今晚 23:00），不再拆成两个口径不同的胶囊。
+ * 截止选择：常用的「今晚 / 明天 / 下次课前」直接点；「自定」在同一张 sheet 里换成日期 + 时刻滚轮。
+ * 胶囊上显示的是合起来的说法（今晚 23:00），日期与时刻永远一起走。
  */
 function DueSheet({
-  due, dueMinutes, today, suggest, onPick, onDate, onTime, onClose,
+  due, dueMinutes, today, suggest, onPick, onClose,
 }: {
   due: string
   dueMinutes?: number
   today: string
   suggest: { due: string; dueMinutes: number; beforeClass: boolean } | null
   onPick: (due: string, mins?: number) => void
-  onDate: () => void
-  onTime: () => void
   onClose: () => void
 }) {
+  const dismiss = useRef<(() => void) | null>(null)
+  const [custom, setCustom] = useState(false)
+  const days = useMemo(() => Array.from({ length: WHEEL_DAYS }, (_, i) => addDaysStr(today, i)), [today])
+  const dayLabel = (d: string, i: number) => (i === 0 ? '今天' : i === 1 ? '明天' : `${md(d)} ${WD[weekdayOf(d)]}`)
+  const dayIdx0 = Math.max(0, days.indexOf(due || today))
+  const mins0 = dueMinutes ?? 23 * 60
+  const [di, setDi] = useState(dayIdx0)
+  const [hi, setHi] = useState(Math.floor(mins0 / 60))
+  const [mi, setMi] = useState(Math.round((mins0 % 60) / WHEEL_STEP) % (60 / WHEEL_STEP))
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')), [])
+  const minutes = useMemo(() => Array.from({ length: 60 / WHEEL_STEP }, (_, i) => String(i * WHEEL_STEP).padStart(2, '0')), [])
+
   const tomorrow = addDaysStr(today, 1)
+  const is = (d: string, m: number) => due === d && dueMinutes === m
   const quick: ActionItem[] = [
-    { title: '今晚', value: '23:00', icon: ICON.moon, onClick: () => onPick(today, 23 * 60) },
-    { title: '明天', value: dueMinutes != null ? fmtMinutes(dueMinutes) : '09:00', icon: ICON.sun, onClick: () => onPick(tomorrow, dueMinutes ?? 9 * 60) },
+    { title: '今晚', value: '23:00', icon: ICON.moon, selected: is(today, 23 * 60), onClick: () => onPick(today, 23 * 60) },
+    { title: '明天', value: '09:00', icon: ICON.sun, selected: is(tomorrow, 9 * 60), onClick: () => onPick(tomorrow, 9 * 60) },
   ]
   if (suggest && suggest.beforeClass) {
-    quick.push({ title: '下次课前', value: `${dueText(suggest.due, undefined, today)} ${fmtMinutes(suggest.dueMinutes)}`, icon: ICON.book, onClick: () => onPick(suggest.due, suggest.dueMinutes) })
+    quick.push({
+      title: '下次课前',
+      value: `${dueText(suggest.due, undefined, today)} ${fmtMinutes(suggest.dueMinutes)}`,
+      icon: ICON.book,
+      selected: is(suggest.due, suggest.dueMinutes),
+      onClick: () => onPick(suggest.due, suggest.dueMinutes),
+    })
   }
-  const custom: ActionItem[] = [
-    { title: '日期', value: due ? dueText(due, undefined, today) : '选择', onClick: onDate },
-    { title: '时间', value: dueMinutes != null ? fmtMinutes(dueMinutes) : '选择', onClick: onTime },
+  const presetHit = quick.some((q) => q.selected)
+  const more: ActionItem[] = [
+    {
+      title: '自定',
+      icon: ICON.calendar,
+      value: due && !presetHit ? dueText(due, dueMinutes, today) : undefined,
+      selected: !!due && !presetHit,
+      keepOpen: true,
+      onClick: () => setCustom(true),
+    },
   ]
-  const clear: ActionItem[] = due ? [{ title: '没有截止', danger: true, onClick: () => onPick('', undefined) }] : []
-  return <ActionSheet title="截止" groups={[quick, custom, clear]} onClose={onClose} />
+  const clear: ActionItem[] = due ? [{ title: '没有截止', icon: ICON.ban, danger: true, onClick: () => onPick('', undefined) }] : []
+
+  const pick = (it: ActionItem) => {
+    it.onClick()
+    if (!it.keepOpen) dismiss.current?.()
+  }
+  const confirm = () => {
+    onPick(days[di], hi * 60 + mi * WHEEL_STEP)
+    dismiss.current?.()
+  }
+
+  return (
+    <Sheet
+      onClose={onClose}
+      dismissRef={dismiss}
+      className="px-3 pb-2"
+      header={<SheetHead title={custom ? '自定截止' : '截止'} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
+      footer={custom ? <div className="px-5 pt-2"><PrimaryButton onClick={confirm}>{`${dayLabel(days[di], di)} ${hours[hi]}:${minutes[mi]}`}</PrimaryButton></div> : undefined}
+    >
+      {custom ? (
+        <div className="flex gap-2 px-2 pt-1">
+          <Wheel items={days.map(dayLabel)} index={di} onChange={setDi} className="flex-[1.6]" />
+          <Wheel items={hours} index={hi} onChange={setHi} className="flex-1" />
+          <Wheel items={minutes} index={mi} onChange={setMi} className="flex-1" />
+        </div>
+      ) : (
+        <>
+          <div>{quick.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}</div>
+          <div className="mt-2 border-t border-(--c-line) pt-2">{more.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}</div>
+          {clear.length > 0 && <div className="mt-2 border-t border-(--c-line) pt-2">{clear.map((it) => <SheetRow key={it.title} item={it} onPick={pick} />)}</div>}
+        </>
+      )}
+    </Sheet>
+  )
 }
 
-/** 课程、截止、分类的选择逻辑：三个页面共用 */
+/** 课程、截止、分类的选择逻辑：三个页面共用；三种选择都是自绘 sheet */
 function useMeta(
   initial: { cid: string; due?: string; dueMinutes?: number; kind: Task['kind'] },
   courses: Course[],
@@ -842,59 +896,35 @@ function useMeta(
   const [due, setDue] = useState(initial.due ?? '')
   const [dueMinutes, setDueMinutes] = useState<number | undefined>(initial.dueMinutes)
   const [kind, setKind] = useState<Task['kind']>(initial.kind)
-  const [sheet, setSheet] = useState(false)
+  const [sheet, setSheet] = useState<null | 'course' | 'due' | 'kind'>(null)
   const today = todayStr()
-  const fillTime = (v: string) => {
-    const [h, m] = v.split(':').map(Number)
-    setDueMinutes(h * 60 + (m || 0))
-    if (!due) setDue(today)
-  }
-  const pickers = useHiddenPickers(setDue, fillTime)
   const list = courses.filter((c) => !c.removedByImport)
-
-  const pickCourse = async () => {
-    const labels = ['不关联', ...list.map((c) => c.name)]
-    const i = await chooseIndex(labels, list.findIndex((c) => c.id === cid) + 1, '课程')
-    if (i == null) return
-    setCid(i === 0 ? '' : list[i - 1].id)
-  }
-  const pickKind = async () => {
-    const i = await chooseIndex(KINDS.map((k) => KIND_LABEL[k]), KINDS.indexOf(kind), '分类')
-    if (i == null) {
-      setKind(KINDS[(KINDS.indexOf(kind) + 1) % KINDS.length])
-      return
-    }
-    setKind(KINDS[i])
-  }
-  const pickDate = () => {
-    if (hasNativePickers()) void nativePickDate(due || today).then((v) => v && setDue(v))
-    else pickers.openDate()
-  }
-  const pickTime = () => {
-    if (hasNativePickers()) void nativePickTime(dueMinutes != null ? fmtMinutes(dueMinutes) : '23:00').then((v) => v && fillTime(v))
-    else pickers.openTime()
-  }
-  const pickDue = () => setSheet(true)
   const suggest = useMemo(() => (snap ? suggestedDue(snap, cid || undefined, today, nowMinutes()) : null), [snap, cid, today])
+  const close = () => setSheet(null)
 
   const node = (
     <>
-      {pickers.node}
-      {sheet && (
+      {sheet === 'course' && <CourseSheet courses={list} cid={cid} onPick={setCid} onClose={close} />}
+      {sheet === 'kind' && <KindSheet kind={kind} onPick={setKind} onClose={close} />}
+      {sheet === 'due' && (
         <DueSheet
           due={due}
           dueMinutes={dueMinutes}
           today={today}
           suggest={suggest}
           onPick={(d, m) => { setDue(d); setDueMinutes(m) }}
-          onDate={pickDate}
-          onTime={pickTime}
-          onClose={() => setSheet(false)}
+          onClose={close}
         />
       )}
     </>
   )
-  return { cid, setCid, due, setDue, dueMinutes, kind, pickCourse, pickKind, pickDue, node }
+  return {
+    cid, setCid, due, setDue, dueMinutes, kind,
+    pickCourse: () => setSheet('course'),
+    pickKind: () => setSheet('kind'),
+    pickDue: () => setSheet('due'),
+    node,
+  }
 }
 
 /* ---------------- 拍完：一下保存 ---------------- */
@@ -1031,10 +1061,6 @@ export function TaskDetailPage({
     store.removePhoto(cur.id, id)
   }
   const taskMenu: ActionItem[][] = [
-    [
-      { title: cur.done ? '标为未完成' : '标为完成', icon: ICON.check, onClick: () => store.editTask(cur.id, { done: !cur.done }) },
-      { title: '拍照添加', icon: ICON.camera, onClick: onCamera },
-    ],
     [{ title: '删除待办', icon: ICON.trash, danger: true, onClick: () => void removeTask() }],
   ]
 
@@ -1161,10 +1187,11 @@ export function ClassEndCard({ moment, onCamera, onText, onDismiss }: {
 /* ---------------- 课程内页：作业与备忘 ---------------- */
 
 export function CourseTasks({
-  tasks, course, onOpen, onCamera, onText,
+  tasks, course, composing, onOpen, onCamera, onText,
 }: {
   tasks: Task[]
   course: Course
+  composing: boolean
   onOpen: (t: Task) => void
   onCamera: () => void
   onText: () => void
@@ -1183,20 +1210,24 @@ export function CourseTasks({
           ))}
         </div>
       )}
-      <motion.div
-        layoutId={composeLayoutId(course.id)}
-        transition={SHEET}
-        className="mt-3.5 flex items-center gap-2 bg-(--c-surface2) p-[6px] pr-3.5"
-        style={{ borderRadius: COMPOSE_RADIUS }}
-      >
-        <button
-          onClick={onCamera}
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
-        >
-          <CameraIcon size={17} />
-        </button>
-        <button onClick={onText} className="flex-1 pl-1 text-left text-[14px] font-medium text-(--c-ink4)">新待办</button>
-      </motion.div>
+      <div className="mt-3.5 h-12">
+        {!composing && (
+          <motion.div
+            layoutId={composeLayoutId(course.id)}
+            transition={SHEET}
+            className="flex items-center gap-2 bg-(--c-surface2) p-[6px] pr-3.5"
+            style={{ borderRadius: COMPOSE_RADIUS }}
+          >
+            <button
+              onClick={onCamera}
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
+            >
+              <CameraIcon size={17} />
+            </button>
+            <button onClick={onText} className="flex-1 pl-1 text-left text-[14px] font-medium text-(--c-ink4)">新待办</button>
+          </motion.div>
+        )}
+      </div>
     </>
   )
 }

@@ -181,6 +181,57 @@ public class WidgetBridge extends Plugin {
         call.resolve(r);
     }
 
+    /** 各家 ROM 的自启动管理页；按顺序试，都不在就退到应用详情页 */
+    private static final String[][] AUTOSTART = {
+        // ColorOS（OPPO / OnePlus / realme）
+        { "com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity" },
+        { "com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity" },
+        { "com.coloros.safecenter", "com.coloros.privacypermissionsentry.PermissionTopActivity" },
+        { "com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity" },
+        { "com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity" },
+        { "com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity" },
+        { "com.oplus.battery", "com.oplus.battery.ui.activity.PowerUsageModelActivity" },
+        // MIUI / HyperOS
+        { "com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity" },
+        // EMUI / HarmonyOS
+        { "com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity" },
+        { "com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity" },
+        // vivo
+        { "com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity" },
+        { "com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager" },
+        // Flyme
+        { "com.meizu.safe", "com.meizu.safe.permission.SmartBGActivity" },
+        // Samsung
+        { "com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity" },
+    };
+
+    @PluginMethod
+    public void openAutostartSettings(PluginCall call) {
+        Activity act = getActivity();
+        if (act == null) { call.reject("no activity"); return; }
+        String pkg = act.getPackageName();
+        for (String[] c : AUTOSTART) {
+            Intent i = new Intent().setComponent(new ComponentName(c[0], c[1]))
+                .putExtra("packageName", pkg)
+                .putExtra("package_name", pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (i.resolveActivity(act.getPackageManager()) == null) continue;
+            try {
+                act.startActivity(i);
+                JSObject r = new JSObject();
+                r.put("vendor", true);
+                call.resolve(r);
+                return;
+            } catch (Exception ignored) { }
+        }
+        try {
+            act.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg)));
+        } catch (Exception ignored) { }
+        JSObject r = new JSObject();
+        r.put("vendor", false);
+        call.resolve(r);
+    }
+
     /** 打开某通知渠道的系统设置页（横幅/悬浮/锁屏在这里开），Android 8 以下退到应用通知页 */
     @PluginMethod
     public void openChannelSettings(PluginCall call) {

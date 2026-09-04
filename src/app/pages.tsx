@@ -118,13 +118,14 @@ function PageBody({ children, className = '' }: { children: React.ReactNode; cla
 /* ---------------- 课程详情（内页） ---------------- */
 
 export function CourseDetailPage({
-  course, snap, onBack, onChanges, onEdit, onCapture, onOpenTask,
+  course, snap, composing, onBack, onChanges, onEdit, onCapture, onOpenTask,
 }: {
   course: Course
   snap: Snapshot
   onBack: () => void
   onChanges: () => void
   onEdit: () => void
+  composing: boolean
   onCapture: (kind: 'camera' | 'text') => void
   onOpenTask: (t: Task) => void
 }) {
@@ -270,6 +271,7 @@ export function CourseDetailPage({
           <CourseTasks
             tasks={tasks}
             course={cur}
+            composing={composing}
             onOpen={onOpenTask}
             onCamera={() => onCapture('camera')}
             onText={() => onCapture('text')}

@@ -48,6 +48,16 @@ export function inQuiet(prefs: Prefs, at: number): boolean {
   return s < e ? m >= s && m < e : m >= s || m < e
 }
 
+/** 落在夜间不打扰里的时刻，提前到当晚不打扰开始之前 */
+export function beforeQuiet(prefs: Prefs, at: number): number {
+  if (!inQuiet(prefs, at)) return at
+  const d = new Date(at)
+  const m = d.getHours() * 60 + d.getMinutes()
+  if (m < prefs.quietStart) d.setDate(d.getDate() - 1)
+  d.setHours(0, prefs.quietStart - 1, 0, 0)
+  return d.getTime()
+}
+
 function joinBody(parts: (string | undefined)[]): string {
   return parts.filter((x) => x && x.length > 0).join('\n')
 }
@@ -146,20 +156,23 @@ export function planNotifications(
       }
       continue
     }
-    const date = addDays(t.due, -1)
-    const at = atMinutes(date, prefs.taskEveningAt)
-    if (at <= nowMs || inQuiet(prefs, at)) continue
     const dueAt = t.dueMinutes != null ? atMinutes(t.due, t.dueMinutes) : atMinutes(t.due, 23 * 60 + 59)
-    const hours = Math.max(1, Math.round((dueAt - at) / 3600000))
-    out.push({
-      id: stableId(`task:${t.id}`),
-      at,
-      group: 'task',
-      title: `${t.title} ${relDayLabel(t.due, date)}${t.dueMinutes != null ? ` ${fmtMinutes(t.dueMinutes)}` : ''} 截止`,
-      body: joinBody([cname, `还剩 ${hours} 小时`]),
-      actionTypeId: 'task',
-      taskId: t.id,
-    })
+    const ats = new Set<number>()
+    for (const lead of prefs.taskLeads) {
+      const at = beforeQuiet(prefs, dueAt - lead * 60000)
+      if (at <= nowMs || ats.has(at)) continue
+      ats.add(at)
+      const left = Math.max(1, Math.round((dueAt - at) / 60000))
+      out.push({
+        id: stableId(`task:${t.id}:${lead}`),
+        at,
+        group: 'task',
+        title: `${t.title} ${relDayLabel(t.due, fromDate(new Date(at)))}${t.dueMinutes != null ? ` ${fmtMinutes(t.dueMinutes)}` : ''} 截止`,
+        body: joinBody([cname, left >= 60 ? `还剩 ${Math.round(left / 60)} 小时` : `还剩 ${left} 分钟`]),
+        actionTypeId: 'task',
+        taskId: t.id,
+      })
+    }
   }
 
   // 上课中静音：课以外的通知不在上课时间落地

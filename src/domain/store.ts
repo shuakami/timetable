@@ -39,6 +39,8 @@ export function hydrate(s: State): State {
   if (!s.tasks) s.tasks = []
   for (const t of s.tasks) if (!t.photos) t.photos = []
   s.prefs = { ...defaultPrefs(), ...(s.prefs ?? {}) }
+  delete (s.prefs as Partial<Prefs> & { taskEveningAt?: number }).taskEveningAt
+  if (!Array.isArray(s.prefs.taskLeads)) s.prefs.taskLeads = defaultPrefs().taskLeads
   if (!(WIDGET_STYLES as readonly string[]).includes(s.prefs.widgetStyle)) s.prefs.widgetStyle = defaultPrefs().widgetStyle
   return s
 }

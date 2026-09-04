@@ -122,7 +122,7 @@ export interface Prefs {
   classLead: Minutes // 开课前提醒
   firstClassLead: Minutes // 第一节课加早提醒
   onlyChanged: boolean // 只提醒有变化的课
-  taskEveningAt: Minutes // 作业截止：前一晚几点
+  taskLeads: Minutes[] // 作业截止前多久提醒（分钟，可多个）
   examDays: number[] // 考试倒数：提前几天
   changePush: boolean // 调课与停课立刻推送
   importSummary: boolean // 导入差异汇总一条
@@ -134,12 +134,15 @@ export interface Prefs {
   widgetStyle: WidgetStyle
 }
 
+/** 作业提醒可选的提前量 */
+export const TASK_LEADS: Minutes[] = [3 * 24 * 60, 24 * 60, 8 * 60, 2 * 60, 60, 15]
+
 export function defaultPrefs(): Prefs {
   return {
     classLead: 15,
     firstClassLead: 40,
     onlyChanged: false,
-    taskEveningAt: 21 * 60,
+    taskLeads: [24 * 60, 2 * 60],
     examDays: [3, 0],
     changePush: true,
     importSummary: true,

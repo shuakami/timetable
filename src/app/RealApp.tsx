@@ -21,7 +21,7 @@ import {
 import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave } from './todo'
 import type { CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
-import { NotifPrefPage, PrefPickPage, WidgetPage, type PrefKey } from './reminder'
+import { NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { PermsPage } from './permissions'
 import { attachNotificationActions, notificationsAllowed, pushChange, requestNotifications, setNotificationRouter, syncNotifications } from './notify'
 import { nativeToast, syncWidgets } from './widgets'
@@ -1322,7 +1322,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
     ['提醒', [
       ['上课提醒', `课前 ${state.prefs.classLead} 分钟`, 'notif'],
       ['提醒与权限', '', 'perms'],
-      ['作业提醒', `截止前一晚 ${fmtMinutes(state.prefs.taskEveningAt)}`, 'notif'],
+      ['作业提醒', taskLeadsText(state.prefs.taskLeads), 'notif'],
     ]],
     ['外观', [
       ['主题', THEME_LABEL[theme], 'theme'],
@@ -1819,6 +1819,7 @@ export default function RealApp() {
             onBack={pop}
             onChanges={() => push({ k: 'changes', courseId: r.course.id })}
             onEdit={() => push({ k: 'courseEdit', course: r.course })}
+            composing={compose?.courseId === r.course.id}
             onCapture={(kind) => openCapture(kind, r.course.id)}
             onOpenTask={(t) => push({ k: 'todoDetail', task: t })}
           />
@@ -1992,6 +1993,7 @@ export default function RealApp() {
           {tab === 2 && (
             <TodoView
               snap={snap}
+              composing={compose != null && compose.courseId == null}
               onOpen={(t) => push({ k: 'todoDetail', task: t })}
               onCamera={() => push({ k: 'todoCamera' })}
               onText={() => setCompose({})}

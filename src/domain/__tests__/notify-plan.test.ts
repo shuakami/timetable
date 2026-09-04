@@ -115,19 +115,59 @@ describe('planNotifications', () => {
     expect(sum[0].title).toBe('今天 2 节课，08:00 开始')
   })
 
-  it('作业排在前一晚，考试按配置的天数排', () => {
+  it('作业按每个提前量各排一条，考试按配置的天数排', () => {
     const tasks: Task[] = [
-      { id: 't1', title: '习题册 P41–P45', kind: 'homework', due: '2026-09-02', dueMinutes: 23 * 60, courseId: 'c1', done: false, createdAt: 0 },
+      { id: 't1', title: '习题册 P41–P45', kind: 'homework', due: '2026-09-02', dueMinutes: 21 * 60, courseId: 'c1', done: false, createdAt: 0 },
       { id: 't2', title: '高数期中', kind: 'exam', due: '2026-09-04', dueMinutes: 14 * 60, courseId: 'c1', done: false, createdAt: 0 },
     ]
-    const plan = planNotifications(snap, tasks, prefs(), monday)
-    const hw = plan.find((n) => n.group === 'task')
-    expect(hw).toBeTruthy()
-    expect(new Date(hw!.at).getDate()).toBe(1)
-    expect(new Date(hw!.at).getHours()).toBe(21)
-    expect(hw!.taskId).toBe('t1')
-    expect(hw!.actionTypeId).toBe('task')
+    const plan = planNotifications(snap, tasks, prefs({ taskLeads: [24 * 60, 2 * 60] }), monday)
+    const hw = plan.filter((n) => n.group === 'task')
+    expect(hw).toHaveLength(2)
+    expect(hw.map((n) => [new Date(n.at).getDate(), new Date(n.at).getHours()])).toEqual([[1, 21], [2, 19]])
+    expect(hw[0].title).toBe('习题册 P41–P45 明天 21:00 截止')
+    expect(hw[0].body).toContain('还剩 24 小时')
+    expect(hw[1].title).toBe('习题册 P41–P45 今天 21:00 截止')
+    expect(hw[1].body).toContain('还剩 2 小时')
+    expect(hw[0].taskId).toBe('t1')
+    expect(hw[0].actionTypeId).toBe('task')
+    expect(new Set(hw.map((n) => n.id)).size).toBe(2)
     expect(plan.filter((n) => n.group === 'exam')).toHaveLength(2) // 3 天前与当天
+  })
+
+  it('没填时刻按 23:59 截止推算；不到一小时按分钟说', () => {
+    const tasks: Task[] = [{ id: 't1', title: '预习', kind: 'homework', due: '2026-09-02', done: false, createdAt: 0 }]
+    const plan = planNotifications(snap, tasks, prefs({ taskLeads: [15], quietStart: 0, quietEnd: 0 }), monday)
+    const hw = plan.filter((n) => n.group === 'task')
+    expect(hw).toHaveLength(1)
+    expect(new Date(hw[0].at).getHours()).toBe(23)
+    expect(new Date(hw[0].at).getMinutes()).toBe(44)
+    expect(hw[0].title).toBe('预习 今天 截止')
+    expect(hw[0].body).toBe('还剩 15 分钟')
+  })
+
+  it('落在夜间不打扰里的提前到当晚不打扰开始前；撞到同一时刻只留一条', () => {
+    const tasks: Task[] = [{ id: 't1', title: '实验报告', kind: 'homework', due: '2026-09-02', dueMinutes: 9 * 60, courseId: 'c1', done: false, createdAt: 0 }]
+    const plan = planNotifications(snap, tasks, prefs({ taskLeads: [2 * 60, 15] }), monday) // 07:00 与 08:45 不在夜间
+    expect(plan.filter((n) => n.group === 'task')).toHaveLength(2)
+    const night = planNotifications(snap, tasks, prefs({ taskLeads: [8 * 60, 6 * 60] }), monday) // 01:00 与 03:00 都在夜间
+    const hw = night.filter((n) => n.group === 'task')
+    expect(hw).toHaveLength(1)
+    expect(new Date(hw[0].at).getDate()).toBe(1)
+    expect(new Date(hw[0].at).getHours()).toBe(22)
+    expect(new Date(hw[0].at).getMinutes()).toBe(59)
+  })
+
+  it('已经过去的提前量不排', () => {
+    const tasks: Task[] = [{ id: 't1', title: '作业', kind: 'homework', due: '2026-08-31', dueMinutes: 12 * 60, done: false, createdAt: 0 }]
+    const plan = planNotifications(snap, tasks, prefs({ taskLeads: [24 * 60, 2 * 60], muteInClass: false }), monday)
+    const hw = plan.filter((n) => n.group === 'task')
+    expect(hw).toHaveLength(1)
+    expect(new Date(hw[0].at).getHours()).toBe(10)
+  })
+
+  it('一个提前量都不选就不提醒', () => {
+    const tasks: Task[] = [{ id: 't1', title: '作业', kind: 'homework', due: '2026-09-02', dueMinutes: 12 * 60, done: false, createdAt: 0 }]
+    expect(planNotifications(snap, tasks, prefs({ taskLeads: [] }), monday).filter((n) => n.group === 'task')).toHaveLength(0)
   })
 
   it('已完成的待办不排', () => {
@@ -137,8 +177,8 @@ describe('planNotifications', () => {
 
   it('上课中静音：落在上课时间里的待办提醒被丢掉', () => {
     const tasks: Task[] = [{ id: 't1', title: '实验报告', kind: 'homework', due: '2026-09-08', dueMinutes: 12 * 60, done: false, createdAt: 0 }]
-    const on = planNotifications(snap, tasks, prefs({ taskEveningAt: 10 * 60 + 30, muteInClass: true }), monday, 8)
-    const off = planNotifications(snap, tasks, prefs({ taskEveningAt: 10 * 60 + 30, muteInClass: false }), monday, 8)
+    const on = planNotifications(snap, tasks, prefs({ taskLeads: [24 * 60 + 90], muteInClass: true }), monday, 8)
+    const off = planNotifications(snap, tasks, prefs({ taskLeads: [24 * 60 + 90], muteInClass: false }), monday, 8)
     expect(on.filter((n) => n.group === 'task')).toHaveLength(0)
     expect(off.filter((n) => n.group === 'task')).toHaveLength(1)
   })
@@ -176,6 +216,13 @@ describe('buildWidgetData', () => {
   it('旧偏好里的小组件样式不在可选项里时回到默认', () => {
     const s = hydrate({ ...emptyState(), prefs: { ...defaultPrefs(), widgetStyle: 'timeline' as WidgetStyle } })
     expect(s.prefs.widgetStyle).toBe(defaultPrefs().widgetStyle)
+  })
+
+  it('旧偏好里的「前一晚几点」丢掉，作业提醒回到默认提前量', () => {
+    const { taskLeads: _drop, ...rest } = defaultPrefs()
+    const s = hydrate({ ...emptyState(), prefs: { ...rest, taskEveningAt: 21 * 60 } as unknown as Prefs })
+    expect(s.prefs.taskLeads).toEqual(defaultPrefs().taskLeads)
+    expect('taskEveningAt' in s.prefs).toBe(false)
   })
 
   it('没有学期时给空数据', () => {

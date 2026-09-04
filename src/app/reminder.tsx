@@ -4,7 +4,7 @@ import { store, useStore } from './store'
 import { addDays, fmtMinutes, weekOf, dateOf } from '../domain/dates'
 import { todayStr } from './semester'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
-import type { Minutes, Prefs, WidgetStyle } from '../domain/types'
+import { TASK_LEADS, type Minutes, type Prefs, type WidgetStyle } from '../domain/types'
 import { CHANNEL, exactAlarmsAllowed, notificationsAllowed, requestExactAlarms, requestNotifications, scheduleTestNotification, syncNotifications } from './notify'
 import { addWidgetToHome, nativeToast, openChannelSettings, requestIgnoreBattery, syncWidgets, widgetPinSupported } from './widgets'
 
@@ -12,19 +12,27 @@ import { addWidgetToHome, nativeToast, openChannelSettings, requestIgnoreBattery
 
 type PrefKey =
   | 'classLead' | 'firstClassLead' | 'onlyChanged'
-  | 'taskEveningAt' | 'examDays'
+  | 'taskLeads' | 'examDays'
   | 'changePush' | 'importSummary'
   | 'muteInClass' | 'quiet' | 'silentFreeDay'
 
 interface Option {
   label: string
-  patch: Partial<Prefs>
+  patch: Partial<Prefs> | ((p: Prefs) => Partial<Prefs>)
   match: (p: Prefs) => boolean
 }
 
 const mins = (m: Minutes) => fmtMinutes(m)
 
-const OPTIONS: Record<PrefKey, { title: string; options: Option[] }> = {
+export const leadLabel = (m: Minutes) => (m % 1440 === 0 ? `${m / 1440} 天` : m % 60 === 0 ? `${m / 60} 小时` : `${m} 分钟`)
+
+/** 作业提醒摘要：按提前量从大到小 */
+export function taskLeadsText(leads: Minutes[]): string {
+  if (leads.length === 0) return '不提醒'
+  return `截止前 ${[...leads].sort((a, b) => b - a).map(leadLabel).join('、')}`
+}
+
+const OPTIONS: Record<PrefKey, { title: string; sub?: string; multi?: boolean; options: Option[] }> = {
   classLead: {
     title: '开课前提醒',
     options: [5, 10, 15, 20, 30, 45].map((n) => ({
@@ -51,16 +59,15 @@ const OPTIONS: Record<PrefKey, { title: string; options: Option[] }> = {
       { label: '关', patch: { onlyChanged: false }, match: (p) => !p.onlyChanged },
     ],
   },
-  taskEveningAt: {
+  taskLeads: {
     title: '作业截止',
-    options: [
-      ...[20 * 60, 21 * 60, 22 * 60].map((m) => ({
-        label: `前一晚 ${mins(m)}`,
-        patch: { taskEveningAt: m },
-        match: (p: Prefs) => p.taskEveningAt === m,
-      })),
-      { label: '当天 08:00', patch: { taskEveningAt: 8 * 60 }, match: (p) => p.taskEveningAt === 8 * 60 },
-    ],
+    sub: '按截止时刻往前推，可选多个。落在夜间不打扰里的提前到当晚。',
+    multi: true,
+    options: TASK_LEADS.map((m) => ({
+      label: `前 ${leadLabel(m)}`,
+      patch: (p: Prefs) => ({ taskLeads: p.taskLeads.includes(m) ? p.taskLeads.filter((x) => x !== m) : [...p.taskLeads, m] }),
+      match: (p: Prefs) => p.taskLeads.includes(m),
+    })),
   },
   examDays: {
     title: '考试倒数',
@@ -113,13 +120,14 @@ const OPTIONS: Record<PrefKey, { title: string; options: Option[] }> = {
 }
 
 function valueOf(key: PrefKey, p: Prefs): string {
+  if (key === 'taskLeads') return p.taskLeads.length === 0 ? '不提醒' : [...p.taskLeads].sort((a, b) => b - a).map(leadLabel).join('、')
   const hit = OPTIONS[key].options.find((o) => o.match(p))
   return hit ? hit.label : '—'
 }
 
 const GROUPS: [string, PrefKey[]][] = [
   ['上课', ['classLead', 'firstClassLead', 'onlyChanged']],
-  ['作业与考试', ['taskEveningAt', 'examDays']],
+  ['作业与考试', ['taskLeads', 'examDays']],
   ['变更', ['changePush', 'importSummary']],
   ['安静', ['muteInClass', 'quiet', 'silentFreeDay']],
 ]
@@ -219,11 +227,11 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
 
 export function PrefPickPage({ pref, onBack }: { pref: PrefKey; onBack: () => void }) {
   const state = useStore()
-  const { title, options } = OPTIONS[pref]
+  const { title, sub, multi, options } = OPTIONS[pref]
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-[130px] [scrollbar-width:none]">
-        <TopBar title={title} onBack={onBack} />
+        <TopBar title={title} sub={sub} onBack={onBack} />
         <div className="mt-6 rounded-[18px] bg-(--c-surface) px-4">
           {options.map((o, i) => {
             const on = o.match(state.prefs)
@@ -231,9 +239,9 @@ export function PrefPickPage({ pref, onBack }: { pref: PrefKey; onBack: () => vo
               <button
                 key={o.label}
                 onClick={() => {
-                  store.setPrefs(o.patch)
+                  store.setPrefs(typeof o.patch === 'function' ? o.patch(state.prefs) : o.patch)
                   void syncNotifications()
-                  onBack()
+                  if (!multi) onBack()
                 }}
                 className={`flex w-full items-center py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}
               >
