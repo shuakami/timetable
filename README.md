@@ -72,7 +72,7 @@
 - 4 款桌面小组件：今日、下一节、两日、本周，跟随系统深浅色
 
 **Android**
-- 日期、时间、下拉选择走系统原生对话框（`Theme.DeviceDefault`，OPPO 上是 ColorOS 样式，Pixel 上是 Material You）
+- 日期、时间、下拉选择支持系统原生对话框
 - Android 13+ 主题图标（monochrome）、自适应开屏、边到边加安全区
 - 系统返回键依次关闭菜单或面板、出栈、回到「今天」、两次返回退出
 
@@ -84,7 +84,7 @@ npm ci
 npm run dev            # http://localhost:5173，浏览器直接调试 Web 端
 ```
 
-完整验证（提交前必须全绿）：
+完整验证：
 
 ```bash
 npx tsc --noEmit
