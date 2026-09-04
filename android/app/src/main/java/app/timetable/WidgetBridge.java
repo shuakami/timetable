@@ -181,6 +181,31 @@ public class WidgetBridge extends Plugin {
         call.resolve(r);
     }
 
+    /** 打开某通知渠道的系统设置页（横幅/悬浮/锁屏在这里开），Android 8 以下退到应用通知页 */
+    @PluginMethod
+    public void openChannelSettings(PluginCall call) {
+        Activity act = getActivity();
+        if (act == null) { call.reject("no activity"); return; }
+        String channelId = call.getString("channelId", "");
+        Intent i;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            i = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, act.getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
+        } else {
+            i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + act.getPackageName()));
+        }
+        try {
+            act.startActivity(i);
+        } catch (Exception e) {
+            try {
+                act.startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, act.getPackageName()));
+            } catch (Exception ignored) { }
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void ready(PluginCall call) {
         webReady = true;

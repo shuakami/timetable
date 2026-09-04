@@ -5,8 +5,8 @@ import { addDays, fmtMinutes, weekOf, dateOf } from '../domain/dates'
 import { todayStr } from './semester'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
 import type { Minutes, Prefs, WidgetStyle } from '../domain/types'
-import { exactAlarmsAllowed, notificationsAllowed, requestExactAlarms, requestNotifications, scheduleTestNotification, syncNotifications } from './notify'
-import { addWidgetToHome, nativeToast, requestIgnoreBattery, syncWidgets, widgetPinSupported } from './widgets'
+import { CHANNEL, exactAlarmsAllowed, notificationsAllowed, requestExactAlarms, requestNotifications, scheduleTestNotification, syncNotifications } from './notify'
+import { addWidgetToHome, nativeToast, openChannelSettings, requestIgnoreBattery, syncWidgets, widgetPinSupported } from './widgets'
 
 /* ---------------- 通知偏好 ---------------- */
 
@@ -142,6 +142,9 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
     ['1 分钟后发一条', '锁屏等它', async () => {
       const ok = await scheduleTestNotification(new Date(Date.now() + 60_000))
       nativeToast(ok ? '1 分钟后弹出，可以锁屏等' : '通知未开启')
+    }],
+    ['横幅弹出', '只进状态栏不弹时去开', async () => {
+      openChannelSettings(CHANNEL)
     }],
     ['电池不限制', '防止被系统杀后收不到', async () => {
       if (await requestIgnoreBattery()) nativeToast('已是不限制')

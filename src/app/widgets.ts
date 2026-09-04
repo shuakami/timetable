@@ -12,6 +12,7 @@ interface WidgetBridgePlugin {
   systemDark(): Promise<{ dark: boolean }>
   toast(o: { text: string }): Promise<void>
   requestIgnoreBatteryOptimizations(): Promise<{ ignoring: boolean }>
+  openChannelSettings(o: { channelId: string }): Promise<void>
   pickDate(o: { value: string }): Promise<{ value: string }>
   pickTime(o: { value: string }): Promise<{ value: string }>
   pickOption(o: { options: string[]; selected: number; title?: string }): Promise<{ index: number }>
@@ -74,6 +75,12 @@ export async function requestIgnoreBattery(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** 打开通知渠道的系统设置页 */
+export function openChannelSettings(channelId: string): void {
+  if (!native()) return
+  WidgetBridge.openChannelSettings({ channelId }).catch(() => undefined)
 }
 
 export function nativeToast(text: string): void {

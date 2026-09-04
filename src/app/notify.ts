@@ -7,7 +7,7 @@ import { uid } from '../domain/store'
 /* 本地通知：把 planNotifications 的结果落到系统调度上。
    每次重排先撤掉自己排过的，再整批下发，保证与课表一致。 */
 
-const CHANNEL = 'timetable'
+export const CHANNEL = 'timetable'
 const native = () => Capacitor.isNativePlatform()
 
 type Nav = 'today' | 'changes' | 'todo'
