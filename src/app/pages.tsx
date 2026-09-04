@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import type { Course, Occurrence, OverrideKind, Semester, Task, UserEntry } from '../domain/types'
+import type { Course, Occurrence, OverrideKind, Task, UserEntry } from '../domain/types'
 import { dateOf, fmtDuration, fmtMinutes, fromDate, weekdayOf } from '../domain/dates'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
 import { maskHasWeek } from '../domain/weeks'
@@ -34,28 +34,6 @@ function sortRules<T extends { weekday: number; startPeriod: number }>(rules: T[
   return [...rules].sort((a, b) => a.weekday - b.weekday || a.startPeriod - b.startPeriod)
 }
 
-/** 一条规则落到真实日期：9月14日 – 1月4日，10月5日不上 */
-function ruleDates(sem: Semester, r: { weekday: number; weeksMask: bigint }): { first: string; last: string; off: string[] } | null {
-  const on: string[] = []
-  const off: string[] = []
-  let started = false
-  for (let w = 1; w <= sem.totalWeeks; w++) {
-    const d = dateOf(sem, w, r.weekday)
-    if (maskHasWeek(r.weeksMask, w)) { on.push(d); started = true }
-    else if (started) off.push(d)
-  }
-  if (on.length === 0) return null
-  const last = on[on.length - 1]
-  return { first: on[0], last, off: off.filter((d) => d < last) }
-}
-
-function datesLabel(x: { first: string; last: string; off: string[] } | null): string {
-  if (!x) return ''
-  if (x.first === x.last) return `仅 ${md(x.first)}`
-  const span = `${md(x.first)} – ${md(x.last)}`
-  return x.off.length === 0 || x.off.length > 3 ? span : `${span}，${x.off.map(md).join('、')}不上`
-}
-
 /** 同一天前后相连、地点与周次相同的规则合并成一段：第 6–7 节 + 第 8–9 节 → 14:30 – 17:40 */
 function mergeRules<T extends { weekday: number; startPeriod: number; endPeriod: number; location?: string; weeksMask: bigint }>(rules: T[]) {
   const out: { weekday: number; startPeriod: number; endPeriod: number; location?: string; weeksMask: bigint }[] = []
@@ -70,13 +48,14 @@ function mergeRules<T extends { weekday: number; startPeriod: number; endPeriod:
   return out
 }
 
-/** 具体某天的口语化说法：今天 / 明天 / 9月7日 周一 */
+/** 具体某天的口语化说法：今天 / 明天 / 3 天后 周四 / 9月7日 周一 */
 function dayLabel(date: string, today: string): string {
   const diff = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000)
   if (diff === 0) return '今天'
   if (diff === 1) return '明天'
   if (diff === 2) return '后天'
   const wd = WD[weekdayOf(date)]
+  if (diff > 2 && diff < 14) return `${diff} 天后 ${wd}`
   return `${md(date)} ${wd}`
 }
 
@@ -430,13 +409,6 @@ export function CourseDetailPage({
                     </div>
                   )
                 })}
-              </div>
-              <div className="mt-3 space-y-1">
-                {merged.map((m, i) => (
-                  <div key={i} className="text-[12px] font-medium text-(--c-ink4)">
-                    {merged.length > 1 ? `${WD[m.weekday]}：` : ''}{datesLabel(ruleDates(sem, m))}
-                  </div>
-                ))}
               </div>
             </div>
           )}

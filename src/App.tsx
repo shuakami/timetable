@@ -535,7 +535,6 @@ function DetailScreen() {
                 )
               })}
             </div>
-            <div className="mt-3 text-[12px] font-medium text-(--c-ink4)">9月2日 – 12月18日，10月1日、10月3日不上</div>
           </div>
         </Card>
 
