@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>嘎嘎课程表：你的课表，理应如此</title>
+    <meta name="description" content="今天、周视图、待办、冲突处理、变更记录、多源导入、AI 转换、桌面小组件。Android，开源。" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png" />
+    <link rel="apple-touch-icon" href="assets/favicon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&family=Noto+Sans+SC:wght@400..700&family=Caveat:wght@500;600&display=swap"
+      rel="stylesheet"
+      referrerpolicy="no-referrer"
+    />
+    <link href="site.css" rel="stylesheet" />
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+      <defs>
+        <symbol id="i-android" viewBox="0 0 24 24">
+          <path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.637.637 0 0 0-.83.22l-1.88 3.24a11.43 11.43 0 0 0-8.94 0L5.65 5.67a.643.643 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z" />
+        </symbol>
+        <symbol id="i-github" viewBox="0 0 24 24">
+          <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+        </symbol>
+        <linearGradient id="ink-bp" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#3B8BF5" />
+          <stop offset="1" stop-color="#7C6CF0" />
+        </linearGradient>
+        <linearGradient id="ink-pb" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7C6CF0" />
+          <stop offset="1" stop-color="#3B8BF5" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <a class="skip" href="#main">跳到内容</a>
+
+    <header class="top">
+      <a class="brand" href="#">
+        <img src="assets/icon.png" alt="" width="32" height="32" />
+        <span>嘎嘎课程表</span>
+      </a>
+      <nav class="top-nav" aria-label="页面">
+        <a href="#day">一天</a>
+        <a href="#import">导入</a>
+        <a href="#term">学期</a>
+        <a href="#widgets">小组件</a>
+        <a class="gh" href="https://github.com/shuakami/timetable" aria-label="GitHub"><svg class="ico" aria-hidden="true"><use href="#i-github" /></svg></a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <!-- ============ 首屏 ============ -->
+      <section class="hero" aria-labelledby="claim">
+        <div class="hero-copy">
+          <h1 id="claim">你的课表，<br />理应如此。</h1>
+          <p class="lede">今天的课，一目了然。</p>
+          <p class="actions">
+            <a class="btn" href="https://github.com/shuakami/timetable/releases/latest"><svg class="ico" aria-hidden="true"><use href="#i-android" /></svg>下载 Android 版</a>
+            <a class="btn btn-ghost" href="https://github.com/shuakami/timetable"><svg class="ico" aria-hidden="true"><use href="#i-github" /></svg>GitHub</a>
+          </p>
+        </div>
+
+        <div class="hero-proof" aria-label="今天页面与标注">
+          <svg class="leaders" viewBox="0 0 640 600" aria-hidden="true">
+            <path class="ld ld-blue" d="M184 96 C 164 98, 150 74, 128 70" />
+            <path class="ld ld-blue" d="M456 206 C 478 202, 492 176, 512 168" />
+            <path class="ld ld-purple" d="M456 268 C 478 270, 492 280, 512 284" />
+            <path class="ld ld-purple" d="M184 404 C 164 402, 150 388, 128 386" />
+          </svg>
+          <img class="phone phone-hero" src="assets/shots/today.png" alt="今天页面：10 月 14 日周二，5 节课已上 2 节；高等数学正在上课，还剩 38 分钟；下一节数据结构在教学一楼 201。" width="375" height="812" fetchpriority="high" />
+          <p class="hand note note-a">5 节课<br />已上 2 节</p>
+          <p class="hand note note-b note-blue">上课中<br />还剩 38 分钟</p>
+          <p class="hand note note-c note-purple">下一节<br />教学一楼 201</p>
+          <p class="hand note note-d note-purple">明天 2 节<br />10:00 开始</p>
+          <img class="mascot mascot-peek" src="assets/mascot.png" alt="" width="640" height="648" />
+        </div>
+      </section>
+
+      <!-- ============ 一天 ============ -->
+      <section class="day" id="day" aria-labelledby="day-h">
+        <header class="sec-head">
+          <h2 id="day-h">该出现的时候，才出现。</h2>
+        </header>
+
+        <ol class="stops">
+          <li class="stop stop-l">
+            <figure class="stop-fig">
+              <img class="phone tilt-l" src="assets/shots/lock.png" alt="锁屏通知：今天 5 节课，08:00 第一节；下面列出今天的课程。" width="375" height="812" loading="lazy" />
+            </figure>
+            <div class="stop-text">
+              <p class="time"><span class="hand time-num">07:20</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
+              <h3>一条通知，今天全貌。</h3>
+              <p>第一节几点，今天几节。上课前 15 分钟，再提醒一次，附教室。</p>
+            </div>
+          </li>
+
+          <li class="connector" aria-hidden="true">
+            <svg viewBox="0 0 1000 120"><path class="thread" d="M250 0 C 250 90, 750 30, 750 120" /></svg>
+          </li>
+
+          <li class="stop stop-r">
+            <div class="stop-text">
+              <p class="time"><span class="hand time-num">10:00</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
+              <h3>一次长按，这一节的所有操作。</h3>
+              <p>静音、调课、换教室、往期记录。菜单在卡片下方。</p>
+            </div>
+            <figure class="stop-fig">
+              <img class="phone tilt-r" src="assets/shots/longpress.png" alt="长按高等数学课程卡片，卡片抬起，下方出现菜单：静音本节、调课、编辑等。" width="375" height="812" loading="lazy" />
+            </figure>
+          </li>
+
+          <li class="connector" aria-hidden="true">
+            <svg viewBox="0 0 1000 120"><path class="thread" d="M750 0 C 750 90, 250 30, 250 120" /></svg>
+          </li>
+
+          <li class="stop stop-l">
+            <figure class="stop-fig">
+              <img class="phone tilt-l" src="assets/shots/change.png" alt="调课差异页：重新导入后，逐条列出时间变化、教室变化和新增课程，可逐条确认。" width="375" height="812" loading="lazy" />
+            </figure>
+            <div class="stop-text">
+              <p class="time"><span class="hand time-num">11:02</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
+              <h3>重新导入，只看变化。</h3>
+              <p>时间、地点、新增课程，逐条列出。手动修改的内容，保留。</p>
+            </div>
+          </li>
+
+          <li class="connector" aria-hidden="true">
+            <svg viewBox="0 0 1000 120"><path class="thread" d="M250 0 C 250 90, 750 30, 750 120" /></svg>
+          </li>
+
+          <li class="stop stop-r">
+            <div class="stop-text">
+              <p class="time"><span class="hand time-num">14:00</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
+              <h3>冲突，并排看清。</h3>
+              <p>同一节的两门课，并排显示。保留一门，或两门都留，各自提醒。</p>
+            </div>
+            <figure class="stop-fig">
+              <img class="phone tilt-r" src="assets/shots/conflict.png" alt="课程冲突页：数据结构与大学物理在同一节并排显示，可选择只留一门。" width="375" height="812" loading="lazy" />
+            </figure>
+          </li>
+
+          <li class="connector" aria-hidden="true">
+            <svg viewBox="0 0 1000 120"><path class="thread" d="M750 0 C 750 90, 250 30, 250 120" /></svg>
+          </li>
+
+          <li class="stop stop-l">
+            <figure class="stop-fig">
+              <img class="phone tilt-l" src="assets/shots/todo.png" alt="待办页：按课程分组的作业与截止时间，今天到期的排在最前。" width="375" height="812" loading="lazy" />
+            </figure>
+            <div class="stop-text">
+              <p class="time"><span class="hand time-num">21:00</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
+              <h3>作业，跟着课程。</h3>
+              <p>截止日、提醒、完成状态，与课表同在一处。</p>
+            </div>
+          </li>
+
+          <li class="connector" aria-hidden="true">
+            <svg viewBox="0 0 1000 120"><path class="thread" d="M250 0 C 250 90, 750 30, 750 120" /></svg>
+          </li>
+
+          <li class="stop stop-r stop-last">
+            <div class="stop-text">
+              <p class="time"><span class="hand time-num cjk">全天</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
+              <h3>不打开，也看得到。</h3>
+              <p>今日、下一节、两日、本周，四款桌面小组件。课表更新，桌面同步。</p>
+            </div>
+            <figure class="stop-fig">
+              <img class="phone tilt-r" src="assets/shots/widget.png" alt="桌面上放着今日和下一节两个小组件。" width="375" height="812" loading="lazy" />
+            </figure>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============ 导入 ============ -->
+      <section class="import" id="import" aria-labelledby="import-h">
+        <header class="sec-head">
+          <h2 id="import-h">各种来源，都能导入。</h2>
+        </header>
+
+        <div class="funnel">
+          <svg class="funnel-lines" viewBox="0 0 1120 600" aria-hidden="true">
+            <path class="thread thin" d="M232 62  C 340 62, 400 300, 500 300" />
+            <path class="thread thin" d="M232 138 C 340 138, 400 300, 500 300" />
+            <path class="thread thin" d="M232 214 C 340 214, 400 300, 500 300" />
+            <path class="thread thin" d="M232 290 C 340 290, 400 300, 500 300" />
+            <path class="thread thin" d="M232 366 C 340 366, 400 300, 500 300" />
+            <path class="thread thin" d="M232 442 C 340 442, 400 300, 500 300" />
+            <path class="thread thin" d="M232 518 C 340 518, 400 300, 500 300" />
+            <path class="thread grad" d="M700 300 C 770 300, 800 320, 870 320" />
+            <path class="thread grad solid" d="M856 308 L 872 320 L 856 332" />
+          </svg>
+
+          <ul class="sources" aria-label="支持的课表来源">
+            <li class="tag"><b>教务系统</b><span>课表页面 HTML</span></li>
+            <li class="tag"><b>Excel</b><span>.xlsx</span></li>
+            <li class="tag"><b>JSON</b><span>.json</span></li>
+            <li class="tag"><b>日历</b><span>.ics</span></li>
+            <li class="tag"><b>CSV</b><span>.csv</span></li>
+            <li class="tag"><b>AI 转换</b><span>Prompt → JSON</span></li>
+            <li class="tag"><b>手动添加</b><span>逐门录入</span></li>
+          </ul>
+
+          <figure class="funnel-phone">
+            <img class="phone" src="assets/shots/airule.png" alt="让 AI 转换课表：一段可复制的 Prompt，以及粘贴 AI 输出的输入框。" width="375" height="812" loading="lazy" />
+            <figcaption class="hand hand-note">本地解析，预览后导入</figcaption>
+          </figure>
+
+          <figure class="funnel-result">
+            <img class="phone" src="assets/shots/today.png" alt="导入完成后回到今天页面。" width="375" height="812" loading="lazy" />
+            <figcaption class="hand hand-note note-purple">回到「今天」</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ============ 学期 ============ -->
+      <section class="term" id="term" aria-labelledby="term-h">
+        <header class="sec-head">
+          <h2 id="term-h">每一周，各有不同。</h2>
+        </header>
+
+        <div class="ruler">
+          <svg class="ruler-line" viewBox="0 0 1120 90" aria-hidden="true">
+            <path class="thread solid ink" d="M8 46 C 300 40, 700 52, 1112 44" />
+            <g class="ticks">
+              <path d="M62 46 v-12" /><path d="M118 46 v-8" /><path d="M174 46 v-8" /><path d="M230 46 v-8" /><path d="M286 46 v-12" />
+              <path d="M342 46 v-8" /><path d="M398 46 v-8" /><path d="M454 46 v-8" /><path d="M510 46 v-8" /><path d="M566 46 v-12" />
+              <path d="M622 46 v-8" /><path d="M678 46 v-8" /><path d="M734 46 v-8" /><path d="M790 46 v-8" /><path d="M846 46 v-12" />
+              <path d="M902 46 v-8" /><path d="M958 46 v-8" /><path d="M1014 46 v-8" /><path d="M1070 46 v-12" />
+            </g>
+            <g class="tick-labels hand">
+              <text x="62" y="22" text-anchor="middle">1</text>
+              <text x="286" y="22" text-anchor="middle">5</text>
+              <text x="566" y="22" text-anchor="middle">10</text>
+              <text x="846" y="22" text-anchor="middle">15</text>
+              <text x="1070" y="22" text-anchor="middle">20</text>
+            </g>
+            <path class="thread drop" d="M286 50 C 286 70, 250 70, 250 90" />
+            <path class="thread drop" d="M398 50 C 398 76, 470 60, 470 90" />
+            <path class="thread drop" d="M1014 50 C 1014 82, 818 58, 818 90" />
+            <path class="thread drop" d="M1104 50 C 1104 70, 1030 70, 1030 90" />
+          </svg>
+
+          <ul class="term-shots">
+            <li>
+              <img class="phone" src="assets/shots/vacation.png" alt="假期周：显示当前是国庆假期，课表暂停。" width="375" height="812" loading="lazy" />
+              <p class="hand hand-note"><span class="wk">第 5 周</span>假期</p>
+            </li>
+            <li>
+              <img class="phone" src="assets/shots/freeday.png" alt="今天没有课：显示下一次上课的时间。" width="375" height="812" loading="lazy" />
+              <p class="hand hand-note"><span class="wk">周六</span>无课</p>
+            </li>
+            <li>
+              <img class="phone" src="assets/shots/examweek.png" alt="考试周：课表顶部标注考试周，列出考试安排。" width="375" height="812" loading="lazy" />
+              <p class="hand hand-note"><span class="wk">第 19 周</span>考试周</p>
+            </li>
+            <li>
+              <img class="phone" src="assets/shots/outofterm.png" alt="超出学期：提示当前日期已在学期范围之外。" width="375" height="812" loading="lazy" />
+              <p class="hand hand-note"><span class="wk">第 21 周</span>学期外</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ============ 小组件 ============ -->
+      <section class="widgets" id="widgets" aria-labelledby="widgets-h">
+        <header class="sec-head">
+          <h2 id="widgets-h">四款桌面小组件。</h2>
+        </header>
+
+        <div class="widget-board">
+          <figure class="w w-today">
+            <img src="assets/widgets/today.png" alt="今日小组件：14 周二，高等数学 10:00 教三 302，数据结构 14:00 教一 201。" width="486" height="486" loading="lazy" />
+            <figcaption class="hand hand-note">今日</figcaption>
+          </figure>
+          <figure class="w w-two">
+            <img src="assets/widgets/two_days.png" alt="两日小组件：今天和明天的课程并排。" width="1029" height="486" loading="lazy" />
+            <figcaption class="hand hand-note">两日</figcaption>
+          </figure>
+          <figure class="w w-next">
+            <img src="assets/widgets/next.png" alt="下一节小组件：15 分钟后，高等数学（下），教三 302，王立群。" width="486" height="486" loading="lazy" />
+            <figcaption class="hand hand-note">下一节</figcaption>
+          </figure>
+          <figure class="w w-week">
+            <img src="assets/widgets/week.png" alt="本周小组件：第 7 周，周一至周五的课程网格，今天高亮。" width="1029" height="678" loading="lazy" />
+            <figcaption class="hand hand-note">本周</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ============ 开始 ============ -->
+      <section class="start" aria-labelledby="start-h">
+        <div class="start-copy">
+          <img class="mascot mascot-big" src="assets/mascot.png" alt="嘎嘎课程表吉祥物" width="640" height="648" />
+          <h2 id="start-h">开始，只要两步。</h2>
+          <p class="actions">
+            <a class="btn" href="https://github.com/shuakami/timetable/releases/latest"><svg class="ico" aria-hidden="true"><use href="#i-android" /></svg>下载 Android 版</a>
+            <a class="btn btn-ghost" href="https://github.com/shuakami/timetable"><svg class="ico" aria-hidden="true"><use href="#i-github" /></svg>GitHub</a>
+          </p>
+          <svg class="doodle doodle-arrow-up" viewBox="0 0 100 92" aria-hidden="true">
+            <path class="dash" d="M12 86 C 30 82, 46 64, 45 10" />
+            <path d="M35 19 L 45 8 L 55 17" />
+          </svg>
+        </div>
+        <ol class="onboard">
+          <li><img class="phone" src="assets/shots/onboard-0.png" alt="引导第一页：嘎嘎课程表，你的课表，理应如此。开始按钮。" width="375" height="812" loading="lazy" /></li>
+          <li><img class="phone" src="assets/shots/onboard-1.png" alt="引导第二页：开学日期，选择 8 月 31 日周一。" width="375" height="812" loading="lazy" /></li>
+          <li><img class="phone" src="assets/shots/onboard-2.png" alt="引导第三页：课表来源列表，包括让 AI 转换、JSON、教务系统、Excel、日历、CSV、手动添加。" width="375" height="812" loading="lazy" /></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p class="foot-l"><img src="assets/icon.png" alt="" width="20" height="20" /><span>嘎嘎课程表</span><span>GPL-3.0</span><a href="https://github.com/shuakami/timetable" aria-label="GitHub"><svg class="ico" aria-hidden="true"><use href="#i-github" /></svg></a></p>
+      <p class="stack"><span>React 18</span><span>Vite</span><span>Capacitor 8</span><span>SQLite</span></p>
+    </footer>
+  </body>
+</html>
