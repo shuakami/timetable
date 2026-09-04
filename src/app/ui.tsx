@@ -475,14 +475,14 @@ export const ArrowUpIcon = ({ stroke = '#fff' }: { stroke?: string }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
 )
 
-/** 胶囊里的文字上限（字数），超出截掉加“…” */
+/** 课程名放进胶囊时的字数上限，超出截掉加“…” */
 export const CHIP_MAX = 8
 export function clipText(s: string, max = CHIP_MAX) {
   const chars = Array.from(s)
   return chars.length > max ? `${chars.slice(0, max).join('')}…` : s
 }
 
-/** 胶囊标签：课程、截止、分类；文字按字数截断 */
+/** 胶囊标签：课程、截止、分类 */
 export function Chip({ color, children, tone = 'plain', onClick, shrink = false }: {
   color?: string
   children: React.ReactNode
@@ -498,7 +498,7 @@ export function Chip({ color, children, tone = 'plain', onClick, shrink = false 
       className={`inline-flex h-[30px] max-w-[160px] min-w-0 ${shrink ? 'shrink' : 'flex-none'} items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'} ${onClick ? 'transition-transform duration-150 active:scale-[.96]' : ''}`}
     >
       {color && <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />}
-      <span className="min-w-0 truncate">{typeof children === 'string' ? clipText(children) : children}</span>
+      <span className="min-w-0 truncate">{children}</span>
     </Tag>
   )
 }

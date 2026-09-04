@@ -357,7 +357,7 @@ export function ComposeOverlay({
               <CameraIcon size={16} stroke="var(--c-ink2)" />
             </button>
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <Chip color={course?.color} onClick={() => void meta.pickCourse()} shrink>{course?.name ?? '课程'}</Chip>
+              <Chip color={course?.color} onClick={() => void meta.pickCourse()} shrink>{course ? clipText(course.name) : '课程'}</Chip>
               <Chip onClick={meta.pickDue}>{meta.due ? dueText(meta.due, meta.dueMinutes, today) : '截止'}</Chip>
             </div>
             <button
@@ -756,7 +756,7 @@ function MetaChips({
   const course = state.courses.find((c) => c.id === cid)
   return (
     <div className="flex flex-wrap gap-2">
-      <Chip color={course?.color} onClick={onCourse}>{course?.name ?? '课程'}</Chip>
+      <Chip color={course?.color} onClick={onCourse}>{course ? clipText(course.name) : '课程'}</Chip>
       <Chip onClick={onDue}>{due ? dueText(due, dueMinutes, today) : '截止'}</Chip>
       <Chip onClick={onKind}>{KIND_LABEL[kind]}</Chip>
     </div>
