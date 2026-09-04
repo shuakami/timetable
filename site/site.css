@@ -142,7 +142,8 @@ body {
 }
 
 img,
-svg {
+svg,
+picture {
   display: block;
 }
 
@@ -262,7 +263,10 @@ ol {
   text-decoration: none;
   font-weight: 500;
   font-size: 15px;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.18s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+.btn:active {
+  transform: scale(0.97);
 }
 .btn .ico {
   width: 18px;
