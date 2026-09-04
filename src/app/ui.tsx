@@ -493,15 +493,21 @@ export function Chip({ color, children, tone = 'plain', onClick }: {
   )
 }
 
-/** 快速记录胶囊：相机 + 一句话，压在底栏上面 */
-export function QuickBar({ onCamera, onText, placeholder = '新待办' }: {
+/** 快速记录胶囊：相机 + 一句话，压在底栏上面；点文字后这个胶囊本身长成输入卡（共享 layoutId） */
+export const COMPOSE_RADIUS = 26
+export function composeLayoutId(courseId?: string) {
+  return courseId ? `compose-${courseId}` : 'compose'
+}
+
+export function QuickBar({ onCamera, onText, placeholder = '新待办', layoutId = composeLayoutId() }: {
   onCamera: () => void
   onText: () => void
   placeholder?: string
+  layoutId?: string
 }) {
   return (
     <div className="absolute inset-x-4 bottom-[92px] z-[9]">
-      <div className="flex items-center gap-2 rounded-full p-[6px] pr-3.5" style={dockStyle}>
+      <motion.div layoutId={layoutId} transition={SHEET} className="flex items-center gap-2 p-[6px] pr-3.5" style={{ ...dockStyle, borderRadius: COMPOSE_RADIUS }}>
         <button
           onClick={onCamera}
           className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-(--c-surface2) transition-transform duration-150 active:scale-[.92]"
@@ -509,7 +515,7 @@ export function QuickBar({ onCamera, onText, placeholder = '新待办' }: {
           <CameraIcon />
         </button>
         <button onClick={onText} className="flex-1 pl-1 text-left text-[15px] font-medium text-(--c-ink4)">{placeholder}</button>
-      </div>
+      </motion.div>
     </div>
   )
 }
@@ -874,6 +880,50 @@ export function PrimaryButton({ children, onClick, disabled, onDark }: { childre
   )
 }
 
+/* 底部动作菜单：分组的圆角卡，文字在左、图标或当前值在右；危险项单独一组 */
+export interface ActionItem {
+  title: string
+  /** 右侧：图标（svg 内容）或当前值文字 */
+  icon?: React.ReactNode
+  value?: string
+  danger?: boolean
+  onClick: () => void
+}
+
+export function ActionSheet({ groups, onClose, title }: { groups: ActionItem[][]; onClose: () => void; title?: string }) {
+  const dismiss = useRef<(() => void) | null>(null)
+  const pick = (fn: () => void) => {
+    fn()
+    dismiss.current?.()
+  }
+  return (
+    <Sheet onClose={onClose} dismissRef={dismiss} className="px-3 pt-1 pb-1" header={title ? <div className="truncate px-5 pt-1 pb-2 text-[12.5px] font-medium text-(--c-ink4)">{title}</div> : undefined}>
+      <div className="space-y-2.5">
+        {groups.filter((g) => g.length > 0).map((g, gi) => (
+          <div key={gi} className="overflow-hidden rounded-[18px] bg-(--c-surface2)">
+            {g.map((it, i) => (
+              <button
+                key={it.title}
+                onClick={() => pick(it.onClick)}
+                className={`flex h-[52px] w-full items-center px-4 text-left transition-colors active:bg-(--c-line) ${i > 0 ? 'border-t border-(--c-line)' : ''}`}
+              >
+                <span className={`min-w-0 flex-1 truncate text-[15px] font-medium ${it.danger ? 'text-(--c-danger)' : 'text-(--c-ink)'}`}>{it.title}</span>
+                {it.value != null && <span className="ml-3 flex-none text-[14px] font-medium tabular-nums text-(--c-ink3)">{it.value}</span>}
+                {it.icon && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke={it.danger ? 'var(--c-danger)' : 'var(--c-ink2)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="ml-3 h-[18px] w-[18px] flex-none">{it.icon}</svg>
+                )}
+                {it.icon == null && it.value != null && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="ml-1.5 h-[14px] w-[14px] flex-none"><path d="m9 5 7 7-7 7" /></svg>
+                )}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
 export function PopHead({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="px-3.5 pt-1 pb-2.5">
@@ -904,4 +954,9 @@ export const ICON = {
   ban: <g><circle cx="12" cy="12" r="8.5" /><path d="m9 9 6 6M15 9l-6 6" /></g>,
   info: <g><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></g>,
   trash: <g><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13" /></g>,
+  camera: <g><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.2-2h5.6L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" /><circle cx="12" cy="12.5" r="3.2" /></g>,
+  calendar: <g><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /></g>,
+  moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
+  sun: <g><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" /></g>,
+  book: <g><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 16.5z" /><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5z" /></g>,
 }

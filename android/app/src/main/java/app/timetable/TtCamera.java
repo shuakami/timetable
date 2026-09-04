@@ -24,6 +24,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.camera.core.CameraSelector;
@@ -160,6 +161,12 @@ public class TtCamera extends Plugin {
         getActivity().runOnUiThread(() -> {
             try {
                 ViewGroup root = (ViewGroup) getBridge().getWebView().getParent();
+                // 上一次没 stop 干净（比如 freeze 后直接重开）：拆掉重建，保证从透明淡入
+                if (frame != null) {
+                    if (frame.getParent() != null) ((ViewGroup) frame.getParent()).removeView(frame);
+                    frame = null;
+                    previewView = null;
+                }
                 if (frame == null) {
                     previewView = new PreviewView(getContext());
                     previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
@@ -238,28 +245,57 @@ public class TtCamera extends Plugin {
     }
 
     /**
-     * 收起预览：先把当前画面定格成一张图交给页面，页面用它填在取景框里，
-     * 之后的切页动画就全在 WebView 内完成，原生层消失时不会看到空洞。
+     * 定格：当前画面立刻换成一张静态图盖在预览上（同一帧内完成），相机随即解绑；
+     * 编码成 JPEG 交给页面的工作放到后台线程，不占 UI 线程。原生层此时仍在，
+     * 页面拿到图、画好之后再调 stop() 撤掉，两边像素一致，看不到交接。
      */
     @PluginMethod
-    public void stop(PluginCall call) {
+    public void freeze(PluginCall call) {
         getActivity().runOnUiThread(() -> {
-            JSObject o = new JSObject();
+            Bitmap b = null;
             if (previewView != null && frame != null && frame.getAlpha() > 0f) {
                 try {
-                    Bitmap b = previewView.getBitmap();
-                    if (b != null) {
-                        int max = 720;
-                        if (b.getWidth() > max) {
-                            b = Bitmap.createScaledBitmap(b, max, Math.round(b.getHeight() * (float) max / b.getWidth()), true);
-                        }
-                        ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                        b.compress(Bitmap.CompressFormat.JPEG, 82, bo);
-                        o.put("frozen", "data:image/jpeg;base64," + android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP));
-                    }
+                    b = previewView.getBitmap();
                 } catch (Exception ignored) {
                 }
             }
+            if (b != null && frame != null) {
+                ImageView still = new ImageView(getContext());
+                still.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                still.setImageBitmap(b);
+                frame.addView(still, 1, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            if (provider != null) provider.unbindAll();
+            capture = null;
+            camera = null;
+            if (b == null) {
+                call.resolve(new JSObject());
+                return;
+            }
+            final Bitmap src = b;
+            io.execute(() -> {
+                JSObject o = new JSObject();
+                try {
+                    Bitmap s = src;
+                    int max = 720;
+                    if (s.getWidth() > max) {
+                        s = Bitmap.createScaledBitmap(s, max, Math.round(s.getHeight() * (float) max / s.getWidth()), true);
+                    }
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    s.compress(Bitmap.CompressFormat.JPEG, 80, bo);
+                    o.put("frozen", "data:image/jpeg;base64," + android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP));
+                } catch (Exception ignored) {
+                }
+                call.resolve(o);
+            });
+        });
+    }
+
+    /** 撤掉原生层。没 freeze 过也可以直接调，等价于立刻收起。 */
+    @PluginMethod
+    public void stop(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
             if (provider != null) provider.unbindAll();
             if (frame != null && frame.getParent() != null) {
                 ((ViewGroup) frame.getParent()).removeView(frame);
@@ -268,7 +304,7 @@ public class TtCamera extends Plugin {
             previewView = null;
             capture = null;
             camera = null;
-            call.resolve(o);
+            call.resolve();
         });
     }
 

@@ -23,7 +23,8 @@ interface TtCameraPlugin {
   checkPermissions(): Promise<{ camera: PermissionStatus; photos: PermissionStatus }>
   requestPermission(o: { kind: 'camera' | 'photos' }): Promise<{ status: PermissionStatus }>
   start(o: { position: 'back' | 'front'; x: number; y: number; width: number; height: number; delay: number }): Promise<{ position: 'back' | 'front' }>
-  stop(): Promise<{ frozen?: string }>
+  freeze(): Promise<{ frozen?: string }>
+  stop(): Promise<void>
   switchCamera(): Promise<{ position: 'back' | 'front' }>
   setTorch(o: { on: boolean }): Promise<void>
   setZoom(o: { ratio: number }): Promise<{ ratio: number }>
@@ -137,14 +138,33 @@ export const camera = {
     await TtCamera.start({ position, ...rect, delay })
   },
 
-  /** 收起预览；原生会把最后一帧定格成 data URL 还回来，页面填在取景框里接上 */
-  async stop(): Promise<string | null> {
+  /**
+   * 定格：预览立刻静止，最后一帧以 data URL 返回，页面填在取景框里；
+   * 原生层还在，等页面画好后再 stop()，接缝上不会露出空洞。
+   */
+  async freeze(): Promise<string | null> {
+    if (!nativeCamera()) {
+      if (!webVideo || !webVideo.videoWidth) return null
+      const w = 720
+      const h = Math.round(webVideo.videoHeight * (w / webVideo.videoWidth))
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')?.drawImage(webVideo, 0, 0, w, h)
+      webStop()
+      return canvas.toDataURL('image/jpeg', 0.8)
+    }
+    const r = await TtCamera.freeze()
+    return r?.frozen ?? null
+  },
+
+  /** 撤掉预览层 */
+  async stop(): Promise<void> {
     if (!nativeCamera()) {
       webStop()
-      return null
+      return
     }
-    const r = await TtCamera.stop()
-    return r?.frozen ?? null
+    await TtCamera.stop()
   },
 
   async switchCamera(): Promise<'back' | 'front'> {

@@ -10,8 +10,8 @@ import { nowMinutes, todayStr } from './semester'
 import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './camera'
 import { TaskPhotoImg } from './photo'
 import {
-  ArrowUpIcon, BottomVeil, CameraIcon, Chip, EmptyBlock, FADE, Page, PrimaryButton,
-  QuickBar, SHEET, SLIDE, StickyHead, WD, md,
+  ActionSheet, ArrowUpIcon, BottomVeil, COMPOSE_RADIUS, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
+  QuickBar, SHEET, SLIDE, StickyHead, WD, composeLayoutId, dockStyle, md, type ActionItem,
 } from './ui'
 import { hasNativePickers, nativePickDate, nativePickOption, nativePickTime } from './widgets'
 
@@ -128,26 +128,28 @@ export function TaskRow({
   return (
     <div className={`flex items-start rounded-[14px] px-3.5 py-3 ${tone === 'surface' ? 'bg-(--c-surface)' : 'bg-(--c-surface2)'} ${t.done ? 'opacity-45' : ''}`}>
       <Check done={t.done} color={course?.color ?? 'var(--c-accent)'} onClick={() => store.editTask(t.id, { done: !t.done })} />
-      <button onClick={onOpen} className="ml-3 min-w-0 flex-1 text-left">
-        <div className="flex items-center gap-1.5">
-          <span className={`truncate text-[14px] font-bold tracking-[-.01em] ${t.inbox ? 'text-(--c-ink3)' : 'text-(--c-ink)'} ${t.done ? 'line-through' : ''}`}>
-            {t.title || '板书'}
-          </span>
-          {t.kind === 'exam' && (
-            <span className="flex-none rounded-[5px] bg-(--c-rose-soft) px-1.5 py-[2px] text-[10px] font-extrabold text-(--c-rose)">考试</span>
+      <button onClick={onOpen} className="ml-3 flex min-w-0 flex-1 items-start text-left">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className={`truncate text-[14px] font-bold tracking-[-.01em] ${t.inbox ? 'text-(--c-ink3)' : 'text-(--c-ink)'} ${t.done ? 'line-through' : ''}`}>
+              {t.title || '板书'}
+            </span>
+            {t.kind === 'exam' && (
+              <span className="flex-none rounded-[5px] bg-(--c-rose-soft) px-1.5 py-[2px] text-[10px] font-extrabold text-(--c-rose)">考试</span>
+            )}
+          </div>
+          <div className="mt-[5px] flex items-baseline gap-1.5 text-[12px] leading-[16px] font-medium text-(--c-ink4)">
+            <span className="h-[7px] w-[7px] flex-none self-center rounded-full" style={{ background: color }} />
+            <span className="truncate">{course?.name ?? KIND_LABEL[t.kind]}</span>
+            <span className="flex-none tabular-nums text-(--c-ink3)">· {right}</span>
+          </div>
+          {left && (
+            <div className={`mt-1 text-[12px] font-semibold tabular-nums ${left[1] === 'rose' ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>{left[0]}</div>
           )}
+          {t.note && !left && <div className="mt-1 truncate text-[12px] font-medium text-(--c-ink3)">{t.note}</div>}
         </div>
-        <div className="mt-[5px] flex items-baseline gap-1.5 text-[12px] leading-[16px] font-medium text-(--c-ink4)">
-          <span className="h-[7px] w-[7px] flex-none self-center rounded-full" style={{ background: color }} />
-          <span className="truncate">{course?.name ?? KIND_LABEL[t.kind]}</span>
-          <span className="ml-auto flex-none pl-2 tabular-nums text-(--c-ink3)">{right}</span>
-        </div>
-        {left && (
-          <div className={`mt-1 text-[12px] font-semibold tabular-nums ${left[1] === 'rose' ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>{left[0]}</div>
-        )}
-        {t.note && !left && <div className="mt-1 truncate text-[12px] font-medium text-(--c-ink3)">{t.note}</div>}
+        {photo && <TaskPhotoImg path={photo.path} className="ml-3 h-[56px] w-[56px] flex-none rounded-[10px]" />}
       </button>
-      {photo && <TaskPhotoImg path={photo.path} className="ml-3 h-[56px] w-[56px] flex-none rounded-[10px]" />}
     </div>
   )
 }
@@ -168,15 +170,18 @@ function InboxRow({
     <div className="flex items-start rounded-[14px] bg-(--c-surface) px-3.5 py-3">
       <Check done={t.done} color={course?.color ?? 'var(--c-accent)'} onClick={() => store.editTask(t.id, { done: !t.done })} />
       <div className="ml-3 min-w-0 flex-1">
-        <button onClick={onOpen} className="block w-full text-left">
-          <div className="truncate text-[14px] font-bold tracking-[-.01em] text-(--c-ink3)">{t.title || '板书'}</div>
-          <div className="mt-[5px] flex items-baseline gap-1.5 text-[12px] leading-[16px] font-medium text-(--c-ink4)">
-            <span className="h-[7px] w-[7px] flex-none self-center rounded-full" style={{ background: course?.color ?? 'var(--c-ink5)' }} />
-            <span className="truncate">{course?.name ?? KIND_LABEL[t.kind]}</span>
-            <span className="ml-auto flex-none pl-2 tabular-nums text-(--c-ink3)">
-              {t.capturedAt ? `${timeOfDay(t.capturedAt)} 拍下` : dueText(t.due, t.dueMinutes, today)}
-            </span>
+        <button onClick={onOpen} className="flex w-full items-start text-left">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[14px] font-bold tracking-[-.01em] text-(--c-ink3)">{t.title || '板书'}</div>
+            <div className="mt-[5px] flex items-baseline gap-1.5 text-[12px] leading-[16px] font-medium text-(--c-ink4)">
+              <span className="h-[7px] w-[7px] flex-none self-center rounded-full" style={{ background: course?.color ?? 'var(--c-ink5)' }} />
+              <span className="truncate">{course?.name ?? KIND_LABEL[t.kind]}</span>
+              <span className="flex-none tabular-nums text-(--c-ink3)">
+                · {t.capturedAt ? `${timeOfDay(t.capturedAt)} 拍下` : dueText(t.due, t.dueMinutes, today)}
+              </span>
+            </div>
           </div>
+          {photo && <TaskPhotoImg path={photo.path} className="ml-3 h-[56px] w-[56px] flex-none rounded-[10px]" />}
         </button>
         {suggest && suggest.beforeClass && (
           <button
@@ -188,7 +193,6 @@ function InboxRow({
           </button>
         )}
       </div>
-      {photo && <TaskPhotoImg path={photo.path} className="ml-3 h-[56px] w-[56px] flex-none rounded-[10px]" />}
     </div>
   )
 }
@@ -305,7 +309,7 @@ export function TodoView({
   )
 }
 
-/* ---------------- 文字：胶囊展开成一段话 ---------------- */
+/* ---------------- 文字：胶囊本身长成一段话 ---------------- */
 
 export function ComposeOverlay({
   snap, courseId, onClose, onCamera,
@@ -320,32 +324,17 @@ export function ComposeOverlay({
   const now = nowMinutes()
   const ctx = useMemo(() => (snap ? captureContext(snap, today, now) : null), [snap, today, now])
   const [text, setText] = useState('')
-  const [cid, setCid] = useState(courseId ?? ctx?.courseId ?? '')
-  const guess = useMemo(() => (snap ? suggestedDue(snap, cid || undefined, today, now) : null), [snap, cid, today, now])
-  const [due, setDue] = useState(guess?.due ?? '')
-  const [dueMinutes, setDueMinutes] = useState<number | undefined>(guess?.dueMinutes)
+  const cid0 = courseId ?? ctx?.courseId ?? ''
+  const guess = useMemo(() => (snap ? suggestedDue(snap, cid0 || undefined, today, now) : null), [snap, cid0, today, now])
+  const meta = useMeta({ cid: cid0, due: guess?.due, dueMinutes: guess?.dueMinutes, kind: 'homework' }, state.courses, snap)
   const ref = useRef<HTMLTextAreaElement>(null)
-  const course = state.courses.find((c) => c.id === cid)
+  const course = state.courses.find((c) => c.id === meta.cid)
 
+  /* 胶囊长成卡片的过程中先不弹键盘，等形状到位再聚焦，动画不被视口变化打断 */
   useEffect(() => {
-    ref.current?.focus()
+    const t = window.setTimeout(() => ref.current?.focus(), SHEET.duration * 1000)
+    return () => window.clearTimeout(t)
   }, [])
-
-  const pickers = useHiddenPickers(
-    (v) => setDue(v),
-    (v) => {
-      const [h, m] = v.split(':').map(Number)
-      setDueMinutes(h * 60 + (m || 0))
-    },
-  )
-
-  const pickCourse = async () => {
-    const courses = state.courses.filter((c) => !c.removedByImport)
-    const labels = ['不关联', ...courses.map((c) => c.name)]
-    const i = await chooseIndex(labels, courses.findIndex((c) => c.id === cid) + 1, '课程')
-    if (i == null) return
-    setCid(i === 0 ? '' : courses[i - 1].id)
-  }
 
   const send = () => {
     const title = text.trim()
@@ -353,10 +342,10 @@ export function ComposeOverlay({
     store.addTask({
       id: uid(),
       title,
-      kind: 'homework',
-      courseId: cid || undefined,
-      due: due || undefined,
-      dueMinutes,
+      kind: meta.kind,
+      courseId: meta.cid || undefined,
+      due: meta.due || undefined,
+      dueMinutes: meta.dueMinutes,
       done: false,
       createdAt: Date.now(),
       photos: [],
@@ -367,16 +356,15 @@ export function ComposeOverlay({
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={FADE} className="absolute inset-0 z-[38]">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={FADE} className="absolute inset-0 z-[50]">
       <button onClick={onClose} className="absolute inset-0 bg-(--c-bg)/55" />
       <motion.div
-        initial={{ transform: 'translateY(16px)' }}
-        animate={{ transform: 'translateY(0px)' }}
-        exit={{ transform: 'translateY(16px)' }}
+        layoutId={composeLayoutId(courseId)}
         transition={SHEET}
-        className="absolute inset-x-3 bottom-3 will-change-transform"
+        className="absolute inset-x-3 bottom-3 px-4 pt-3.5 pb-3"
+        style={{ ...dockStyle, borderRadius: COMPOSE_RADIUS }}
       >
-        <div className="rounded-[26px] px-4 pt-3.5 pb-3" style={{ background: 'var(--c-dock)', border: '1px solid var(--c-dock-line)', boxShadow: 'var(--c-dock-shadow)' }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15, delay: 0.1 }}>
           <textarea
             ref={ref}
             rows={1}
@@ -398,10 +386,8 @@ export function ComposeOverlay({
             >
               <CameraIcon size={16} stroke="var(--c-ink2)" />
             </button>
-            <Chip color={course?.color} onClick={() => void pickCourse()}>{course?.name ?? '课程'}</Chip>
-            <Chip onClick={hasNativePickers() ? () => void nativePickDate(due || today).then((v) => v && setDue(v)) : pickers.openDate}>
-              {due ? dueText(due, dueMinutes, today) : '截止'}
-            </Chip>
+            <Chip color={course?.color} onClick={() => void meta.pickCourse()}>{course?.name ?? '课程'}</Chip>
+            <Chip onClick={meta.pickDue}>{meta.due ? dueText(meta.due, meta.dueMinutes, today) : '截止'}</Chip>
             <span className="flex-1" />
             <button
               onClick={send}
@@ -411,9 +397,9 @@ export function ComposeOverlay({
               <ArrowUpIcon />
             </button>
           </div>
-          {pickers.node}
-        </div>
+        </motion.div>
       </motion.div>
+      {meta.node}
     </motion.div>
   )
 }
@@ -440,6 +426,9 @@ function layoutRect(el: HTMLElement) {
   }
   return { x, y, width: el.offsetWidth, height: el.offsetHeight }
 }
+
+/** 相机页在栈顶时，系统返回键先走这里把预览定格收起，再出栈 */
+export const cameraLeave: { current: (() => Promise<void>) | null } = { current: null }
 
 export function CameraPage({
   snap, courseId, active = true, onBack, onPicker, onShot,
@@ -476,6 +465,7 @@ export function CameraPage({
     if (el && video.current) {
       el.className = 'h-full w-full object-cover'
       video.current.replaceChildren(el)
+      setFrozen(null)
     }
   }
 
@@ -497,35 +487,66 @@ export function CameraPage({
     }
   }, [])
 
-  /* 原生预览层叠在 WebView 上方：进页就开始预热，页面被盖住或开始退场就定格收起 */
+  /*
+   * 原生预览层叠在 WebView 上方，不跟页面一起动：任何切页之前都要先把它换成页面内的定格图。
+   * leave(): 原生定格 → 拿到最后一帧 → <img> 解码完成 → 撤掉原生层，然后才开始推/退页。
+   */
   const present = useIsPresent()
   const live = granted && active && present
   const mounted = useRef(true)
+  const previewOn = useRef(false)
+  const frozenLoaded = useRef<(() => void) | null>(null)
   useEffect(() => () => { mounted.current = false }, [])
+
+  const leave = async () => {
+    if (!previewOn.current) return
+    previewOn.current = false
+    const f = await camera.freeze()
+    if (f && mounted.current) {
+      await new Promise<void>((ok) => {
+        const t = window.setTimeout(ok, 400)
+        frozenLoaded.current = () => { window.clearTimeout(t); ok() }
+        setFrozen(f)
+      })
+    }
+    await camera.stop()
+  }
+
   useEffect(() => {
-    const freeze = () => camera.stop().then((f) => { if (mounted.current && f) setFrozen(f) })
     if (!live) {
-      void freeze()
+      if (previewOn.current) void leave()
       return
     }
     let alive = true
+    previewOn.current = true
+    setBusy(false)
     void startPreview().catch(() => { if (alive) setDenied(true) })
     return () => {
       alive = false
-      void freeze()
+      if (previewOn.current) void leave()
     }
   }, [live])
+
+  useEffect(() => {
+    cameraLeave.current = leave
+    return () => { cameraLeave.current = null }
+  }, [])
+
+  const go = (next: () => void) => {
+    if (busy) return
+    setBusy(true)
+    void leave().then(() => { next(); if (mounted.current) setBusy(false) })
+  }
 
   const shoot = async () => {
     if (busy) return
     setBusy(true)
     try {
       const photo = await camera.capture()
-      const f = await camera.stop()
-      if (f) setFrozen(f)
+      await leave()
       onShot([photo], cid || undefined)
     } catch {
-      setBusy(false)
+      if (mounted.current) setBusy(false)
     }
   }
 
@@ -564,7 +585,7 @@ export function CameraPage({
     <Page className="bg-transparent">
       <div className="absolute inset-0 flex flex-col">
         <div className="flex flex-none items-center justify-between bg-black px-4 pt-12 pb-4">
-          <CircleBtn onClick={onBack}>
+          <CircleBtn onClick={() => go(onBack)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </CircleBtn>
           <button
@@ -590,7 +611,14 @@ export function CameraPage({
             onTouchCancel={onTouchEnd}
           >
             <div ref={video} className="absolute inset-0 overflow-hidden rounded-[24px] bg-black [&>video]:h-full [&>video]:w-full [&>video]:object-cover" />
-            {frozen && <img src={frozen} alt="" className="pointer-events-none absolute inset-0 h-full w-full rounded-[24px] object-cover" />}
+            {frozen && (
+              <img
+                src={frozen}
+                alt=""
+                onLoad={() => { frozenLoaded.current?.(); frozenLoaded.current = null }}
+                className="pointer-events-none absolute inset-0 h-full w-full rounded-[24px] object-cover"
+              />
+            )}
             <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ boxShadow: '0 0 0 200vmax #000' }} />
             <div className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.25), transparent 30%, transparent 75%, rgba(0,0,0,.35))' }} />
             {['left-5 top-5 border-l-2 border-t-2 rounded-tl-[8px]', 'right-5 top-5 border-r-2 border-t-2 rounded-tr-[8px]', 'left-5 bottom-5 border-l-2 border-b-2 rounded-bl-[8px]', 'right-5 bottom-5 border-r-2 border-b-2 rounded-br-[8px]'].map((c) => (
@@ -612,7 +640,7 @@ export function CameraPage({
         </div>
 
         <div className="flex flex-none items-center justify-between bg-black px-9 pt-6 pb-10">
-          <button onClick={onPicker} className="h-[46px] w-[46px] overflow-hidden rounded-[12px] ring-2 ring-white/25 transition-transform duration-150 active:scale-[.94]">
+          <button onClick={() => go(onPicker)} className="h-[46px] w-[46px] overflow-hidden rounded-[12px] ring-2 ring-white/25 transition-transform duration-150 active:scale-[.94]">
             {thumb ? (
               <img src={thumb.thumb} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -744,7 +772,7 @@ export function PickerPage({ onBack, onDone }: { onBack: () => void; onDone: (ph
 /* ---------------- 胶囊组：课程、截止、分类 ---------------- */
 
 function MetaChips({
-  cid, due, dueMinutes, kind, today, onCourse, onDue, onTime, onKind,
+  cid, due, dueMinutes, kind, today, onCourse, onDue, onKind,
 }: {
   cid: string
   due?: string
@@ -753,7 +781,6 @@ function MetaChips({
   today: string
   onCourse: () => void
   onDue: () => void
-  onTime: () => void
   onKind: () => void
 }) {
   const state = useStore()
@@ -762,22 +789,67 @@ function MetaChips({
     <div className="flex flex-wrap gap-2">
       <Chip color={course?.color} onClick={onCourse}>{course?.name ?? '课程'}</Chip>
       <Chip onClick={onDue}>{due ? dueText(due, dueMinutes, today) : '截止'}</Chip>
-      {due && <Chip onClick={onTime}>{dueMinutes != null ? fmtMinutes(dueMinutes) : '时间'}</Chip>}
       <Chip onClick={onKind}>{KIND_LABEL[kind]}</Chip>
     </div>
   )
 }
 
+const addDaysStr = (d: string, n: number) => {
+  const x = new Date(`${d}T00:00:00`)
+  x.setDate(x.getDate() + n)
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * 截止选择：一个底部菜单里同时给出常用的“今晚 / 明天 / 下次课前”与“日期 / 时间”两行，
+ * 胶囊上显示的就是这两个值合起来的说法（今晚 23:00），不再拆成两个口径不同的胶囊。
+ */
+function DueSheet({
+  due, dueMinutes, today, suggest, onPick, onDate, onTime, onClose,
+}: {
+  due: string
+  dueMinutes?: number
+  today: string
+  suggest: { due: string; dueMinutes: number; beforeClass: boolean } | null
+  onPick: (due: string, mins?: number) => void
+  onDate: () => void
+  onTime: () => void
+  onClose: () => void
+}) {
+  const tomorrow = addDaysStr(today, 1)
+  const quick: ActionItem[] = [
+    { title: '今晚', value: '23:00', icon: ICON.moon, onClick: () => onPick(today, 23 * 60) },
+    { title: '明天', value: dueMinutes != null ? fmtMinutes(dueMinutes) : '09:00', icon: ICON.sun, onClick: () => onPick(tomorrow, dueMinutes ?? 9 * 60) },
+  ]
+  if (suggest && suggest.beforeClass) {
+    quick.push({ title: '下次课前', value: `${dueText(suggest.due, undefined, today)} ${fmtMinutes(suggest.dueMinutes)}`, icon: ICON.book, onClick: () => onPick(suggest.due, suggest.dueMinutes) })
+  }
+  const custom: ActionItem[] = [
+    { title: '日期', value: due ? dueText(due, undefined, today) : '选择', onClick: onDate },
+    { title: '时间', value: dueMinutes != null ? fmtMinutes(dueMinutes) : '选择', onClick: onTime },
+  ]
+  const clear: ActionItem[] = due ? [{ title: '没有截止', danger: true, onClick: () => onPick('', undefined) }] : []
+  return <ActionSheet title="截止" groups={[quick, custom, clear]} onClose={onClose} />
+}
+
 /** 课程、截止、分类的选择逻辑：三个页面共用 */
-function useMeta(initial: { cid: string; due?: string; dueMinutes?: number; kind: Task['kind'] }, courses: Course[]) {
+function useMeta(
+  initial: { cid: string; due?: string; dueMinutes?: number; kind: Task['kind'] },
+  courses: Course[],
+  snap: Snapshot | null,
+) {
   const [cid, setCid] = useState(initial.cid)
   const [due, setDue] = useState(initial.due ?? '')
   const [dueMinutes, setDueMinutes] = useState<number | undefined>(initial.dueMinutes)
   const [kind, setKind] = useState<Task['kind']>(initial.kind)
-  const pickers = useHiddenPickers(setDue, (v) => {
+  const [sheet, setSheet] = useState(false)
+  const today = todayStr()
+  const fillTime = (v: string) => {
     const [h, m] = v.split(':').map(Number)
     setDueMinutes(h * 60 + (m || 0))
-  })
+    if (!due) setDue(today)
+  }
+  const pickers = useHiddenPickers(setDue, fillTime)
   const list = courses.filter((c) => !c.removedByImport)
 
   const pickCourse = async () => {
@@ -794,20 +866,35 @@ function useMeta(initial: { cid: string; due?: string; dueMinutes?: number; kind
     }
     setKind(KINDS[i])
   }
-  const pickDue = () => {
-    if (hasNativePickers()) void nativePickDate(due || todayStr()).then((v) => v && setDue(v))
+  const pickDate = () => {
+    if (hasNativePickers()) void nativePickDate(due || today).then((v) => v && setDue(v))
     else pickers.openDate()
   }
   const pickTime = () => {
-    if (hasNativePickers()) {
-      void nativePickTime(dueMinutes != null ? fmtMinutes(dueMinutes) : '23:00').then((v) => {
-        if (!v) return
-        const [h, m] = v.split(':').map(Number)
-        setDueMinutes(h * 60 + (m || 0))
-      })
-    } else pickers.openTime()
+    if (hasNativePickers()) void nativePickTime(dueMinutes != null ? fmtMinutes(dueMinutes) : '23:00').then((v) => v && fillTime(v))
+    else pickers.openTime()
   }
-  return { cid, setCid, due, setDue, dueMinutes, kind, pickCourse, pickKind, pickDue, pickTime, node: pickers.node }
+  const pickDue = () => setSheet(true)
+  const suggest = useMemo(() => (snap ? suggestedDue(snap, cid || undefined, today, nowMinutes()) : null), [snap, cid, today])
+
+  const node = (
+    <>
+      {pickers.node}
+      {sheet && (
+        <DueSheet
+          due={due}
+          dueMinutes={dueMinutes}
+          today={today}
+          suggest={suggest}
+          onPick={(d, m) => { setDue(d); setDueMinutes(m) }}
+          onDate={pickDate}
+          onTime={pickTime}
+          onClose={() => setSheet(false)}
+        />
+      )}
+    </>
+  )
+  return { cid, setCid, due, setDue, dueMinutes, kind, pickCourse, pickKind, pickDue, node }
 }
 
 /* ---------------- 拍完：一下保存 ---------------- */
@@ -828,7 +915,7 @@ export function ReviewPage({
   const ctx = useMemo(() => (snap ? captureContext(snap, today, now) : null), [snap, today, now])
   const cid0 = courseId ?? ctx?.courseId ?? ''
   const guess = useMemo(() => (snap ? suggestedDue(snap, cid0 || undefined, today, now) : null), [snap, cid0, today, now])
-  const meta = useMeta({ cid: cid0, due: guess?.due, dueMinutes: guess?.dueMinutes, kind: 'homework' }, state.courses)
+  const meta = useMeta({ cid: cid0, due: guess?.due, dueMinutes: guess?.dueMinutes, kind: 'homework' }, state.courses, snap)
   const [title, setTitle] = useState('')
   const capturedCourse = state.courses.find((c) => c.id === ctx?.courseId)
 
@@ -887,7 +974,6 @@ export function ReviewPage({
             today={today}
             onCourse={() => void meta.pickCourse()}
             onDue={meta.pickDue}
-            onTime={meta.pickTime}
             onKind={() => void meta.pickKind()}
           />
         </div>
@@ -915,7 +1001,7 @@ export function TaskDetailPage({
   const state = useStore()
   const cur = state.tasks.find((t) => t.id === task.id) ?? task
   const today = todayStr()
-  const meta = useMeta({ cid: cur.courseId ?? '', due: cur.due, dueMinutes: cur.dueMinutes, kind: cur.kind }, state.courses)
+  const meta = useMeta({ cid: cur.courseId ?? '', due: cur.due, dueMinutes: cur.dueMinutes, kind: cur.kind }, state.courses, snap)
   const [title, setTitle] = useState(cur.title)
   const [note, setNote] = useState(cur.note ?? '')
   const capturedCourse = state.courses.find((c) => c.id === cur.capturedCourseId)
@@ -933,13 +1019,24 @@ export function TaskDetailPage({
     })
   }, [title, note, meta.cid, meta.due, meta.dueMinutes, meta.kind])
 
+  const [menu, setMenu] = useState<null | { kind: 'task' } | { kind: 'photo'; id: string; path: string }>(null)
+
   const removeTask = async () => {
-    const i = await chooseIndex(['删除'], -1, cur.title || '待办')
-    if (i !== 0) return
     await camera.remove((cur.photos ?? []).map((p) => p.path))
     store.removeTask(cur.id)
     onBack()
   }
+  const removePhoto = async (id: string, path: string) => {
+    await camera.remove([path])
+    store.removePhoto(cur.id, id)
+  }
+  const taskMenu: ActionItem[][] = [
+    [
+      { title: cur.done ? '标为未完成' : '标为完成', icon: ICON.check, onClick: () => store.editTask(cur.id, { done: !cur.done }) },
+      { title: '拍照添加', icon: ICON.camera, onClick: onCamera },
+    ],
+    [{ title: '删除待办', icon: ICON.trash, danger: true, onClick: () => void removeTask() }],
+  ]
 
   return (
     <Page>
@@ -948,7 +1045,7 @@ export function TaskDetailPage({
           <button onClick={onBack} className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.4"><path d="M15 19 8 12l7-7" /></svg>
           </button>
-          <button onClick={() => void removeTask()} className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]">
+          <button onClick={() => setMenu({ kind: 'task' })} className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]">
             <svg width="16" height="16" viewBox="0 0 24 24" style={{ fill: 'var(--c-ink)' }}><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
           </button>
         </div>
@@ -965,13 +1062,8 @@ export function TaskDetailPage({
           {(cur.photos ?? []).map((p) => (
             <button
               key={p.id}
-              onClick={() => void (async () => {
-                const i = await chooseIndex(['删除这张'], -1, '照片')
-                if (i !== 0) return
-                await camera.remove([p.path])
-                store.removePhoto(cur.id, p.id)
-              })()}
-              className="h-[76px] w-[102px] flex-none overflow-hidden rounded-[12px]"
+              onClick={() => setMenu({ kind: 'photo', id: p.id, path: p.path })}
+              className="h-[76px] w-[102px] flex-none overflow-hidden rounded-[12px] transition-transform duration-150 active:scale-[.96]"
             >
               <TaskPhotoImg path={p.path} className="h-full w-full" />
             </button>
@@ -993,7 +1085,6 @@ export function TaskDetailPage({
             today={today}
             onCourse={() => void meta.pickCourse()}
             onDue={meta.pickDue}
-            onTime={meta.pickTime}
             onKind={() => void meta.pickKind()}
           />
         </div>
@@ -1018,6 +1109,14 @@ export function TaskDetailPage({
 
         <div className="pb-[max(22px,env(safe-area-inset-bottom))]" />
         {meta.node}
+        {menu?.kind === 'task' && <ActionSheet title={cur.title || '待办'} groups={taskMenu} onClose={() => setMenu(null)} />}
+        {menu?.kind === 'photo' && (
+          <ActionSheet
+            title="照片"
+            groups={[[{ title: '删除这张', icon: ICON.trash, danger: true, onClick: () => void removePhoto(menu.id, menu.path) }]]}
+            onClose={() => setMenu(null)}
+          />
+        )}
       </div>
     </Page>
   )
@@ -1084,7 +1183,12 @@ export function CourseTasks({
           ))}
         </div>
       )}
-      <div className="mt-3.5 flex items-center gap-2 rounded-full bg-(--c-surface2) p-[6px] pr-3.5">
+      <motion.div
+        layoutId={composeLayoutId(course.id)}
+        transition={SHEET}
+        className="mt-3.5 flex items-center gap-2 bg-(--c-surface2) p-[6px] pr-3.5"
+        style={{ borderRadius: COMPOSE_RADIUS }}
+      >
         <button
           onClick={onCamera}
           className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
@@ -1092,7 +1196,7 @@ export function CourseTasks({
           <CameraIcon size={17} />
         </button>
         <button onClick={onText} className="flex-1 pl-1 text-left text-[14px] font-medium text-(--c-ink4)">新待办</button>
-      </div>
+      </motion.div>
     </>
   )
 }

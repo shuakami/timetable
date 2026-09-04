@@ -18,7 +18,7 @@ import {
   ChangePage, ConflictPage, CourseDetailPage, CourseEditPage, EditSessionPage,
   ManualAddPage,
 } from './pages'
-import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView } from './todo'
+import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave } from './todo'
 import type { CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { NotifPrefPage, PrefPickPage, WidgetPage, type PrefKey } from './reminder'
@@ -1721,15 +1721,18 @@ export default function RealApp() {
   )
 
   const push = (r: Route) => { setMenu(null); setStack((s) => [...s, r]) }
-  /* 拍完/选完：给已有待办直接加照片，新待办进确认页；相机与相册不留在栈里 */
+  /*
+   * 拍完/选完：给已有待办直接加照片并退回；新待办把确认页推在相机上方。
+   * 相机留在栈里：确认页从右侧盖上去，底下是定格的取景框；重拍就是退回去，不会出现一页退一页进交叉。
+   */
+  const notShot = (r: Route) => r.k !== 'todoCamera' && r.k !== 'todoPicker' && r.k !== 'todoReview'
   const onPhotos = (photos: CapturedPhoto[], courseId?: string, taskId?: string) => {
-    const shot = (r: Route) => r.k !== 'todoCamera' && r.k !== 'todoPicker'
     if (taskId) {
       store.addPhotos(taskId, photos.map((p) => ({ id: uid(), path: p.path, w: p.width, h: p.height, takenAt: Date.now() })))
-      setStack((s) => s.filter(shot))
+      setStack((s) => s.filter(notShot))
       return
     }
-    setStack((s) => [...s.filter(shot), { k: 'todoReview', photos, courseId }])
+    setStack((s) => [...s, { k: 'todoReview', photos, courseId }])
   }
   const openCapture = (kind: 'camera' | 'text', courseId?: string) => {
     if (kind === 'camera') push({ k: 'todoCamera', courseId })
@@ -1779,7 +1782,12 @@ export default function RealApp() {
     if (menu) { setMenu(null); return true }
     if (compose) { setCompose(null); return true }
     if (closeTopSheet()) return true
-    if (stack.length > 0) { setStack((s) => s.slice(0, -1)); return true }
+    if (stack.length > 0) {
+      const top = stack[stack.length - 1]
+      if (top.k === 'todoCamera' && cameraLeave.current) void cameraLeave.current().then(pop)
+      else setStack((s) => s.slice(0, -1))
+      return true
+    }
     if (showOnboard && !onboardUnder) return onboardBack.current()
     if (searching) { setSearching(false); return true }
     if (tab !== 0) { setTab(0); return true }
@@ -1865,7 +1873,7 @@ export default function RealApp() {
             photos={r.photos}
             courseId={r.courseId}
             onBack={pop}
-            onRetake={() => setStack((s) => [...s.slice(0, -1), { k: 'todoCamera', courseId: r.courseId }])}
+            onRetake={() => setStack((s) => (s.some((x) => x.k === 'todoCamera') ? s.filter((x) => x.k !== 'todoPicker' && x.k !== 'todoReview') : [...s.filter(notShot), { k: 'todoCamera', courseId: r.courseId }]))}
             onSaved={() => setStack([])}
           />
         )

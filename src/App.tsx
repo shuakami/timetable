@@ -984,7 +984,7 @@ function Todo2Row({ t }: { t: Todo2 }) {
         <div className="mt-[5px] flex items-center gap-1.5 text-[12px] font-medium text-(--c-ink4)">
           <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: t.color }} />
           <span className="truncate">{t.course}</span>
-          <span className="ml-auto flex-none pl-2 tabular-nums text-(--c-ink3)">{t.due}</span>
+          <span className="flex-none tabular-nums text-(--c-ink3)">· {t.due}</span>
         </div>
         {t.left && (
           <div className={`mt-1 text-[12px] font-semibold tabular-nums ${t.leftTone === 'rose' ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>{t.left}</div>
