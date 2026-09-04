@@ -402,5 +402,25 @@
       <p class="foot-l"><img src="assets/icon.png" alt="嘎嘎课程表图标" width="20" height="20" /><span>嘎嘎课程表</span><span>GPL-3.0</span><a href="https://github.com/shuakami/timetable" aria-label="GitHub"><svg class="ico" aria-hidden="true"><use href="#i-github" /></svg></a></p>
       <p class="stack"><span>React 18</span><span>Vite</span><span>Capacitor 8</span><span>SQLite</span></p>
     </footer>
+    <script src="assets/lenis.min.js"></script>
+    <script>
+      const lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+      document.querySelectorAll('a[href^="#"]').forEach((a) => {
+        const href = a.getAttribute("href");
+        if (href.length < 2) return;
+        const target = document.querySelector(href);
+        if (target) {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            lenis.scrollTo(target, { offset: -12 });
+          });
+        }
+      });
+      function raf(time) {
+        lenis.raf(time);
+        requestAnimationFrame(raf);
+      }
+      requestAnimationFrame(raf);
+    </script>
   </body>
 </html>
