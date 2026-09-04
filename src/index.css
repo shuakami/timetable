@@ -171,19 +171,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 原生相机开着时：页面整体透明，只有相机页可见，取景框透出下面的预览层 */
-html[data-camera],
-html[data-camera] body {
-  background: transparent;
-}
-html[data-camera] #root > * {
-  visibility: hidden;
-}
-html[data-camera] [data-camera-page],
-html[data-camera] [data-camera-page] * {
-  visibility: visible;
-}
-
 /* 界面文字不参与选择：长按卡片时不会误触发系统的选词与放大镜 */
 body {
   -webkit-user-select: none;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { motion, useIsPresent } from 'motion/react'
 import type { Course, Task, TaskPhoto } from '../domain/types'
 import { fmtMinutes, weekdayOf } from '../domain/dates'
 import type { Snapshot } from '../domain/engine'
@@ -11,7 +11,7 @@ import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './ca
 import { TaskPhotoImg } from './photo'
 import {
   ArrowUpIcon, BottomVeil, CameraIcon, Chip, EmptyBlock, FADE, Page, PrimaryButton,
-  QuickBar, SHEET, StickyHead, WD, md,
+  QuickBar, SHEET, SLIDE, StickyHead, WD, md,
 } from './ui'
 import { hasNativePickers, nativePickDate, nativePickOption, nativePickTime } from './widgets'
 
@@ -424,11 +424,24 @@ const CircleBtn = ({ children, onClick, size = 36 }: { children: React.ReactNode
   </button>
 )
 
+/** 取景区在页面里的布局位置：用 offset 链累加，不受推入动画的 transform 影响 */
+function layoutRect(el: HTMLElement) {
+  let x = 0
+  let y = 0
+  for (let e: HTMLElement | null = el; e; e = e.offsetParent as HTMLElement | null) {
+    x += e.offsetLeft
+    y += e.offsetTop
+  }
+  return { x, y, width: el.offsetWidth, height: el.offsetHeight }
+}
+
 export function CameraPage({
-  snap, courseId, onBack, onPicker, onShot,
+  snap, courseId, active = true, onBack, onPicker, onShot,
 }: {
   snap: Snapshot | null
   courseId?: string
+  /** 上面压了别的页（如相册）时为 false：收起原生预览，回来再开 */
+  active?: boolean
   onBack: () => void
   onPicker: () => void
   onShot: (photos: CapturedPhoto[], cid?: string) => void
@@ -439,6 +452,7 @@ export function CameraPage({
   const ctx = useMemo(() => (snap ? captureContext(snap, today, now) : null), [snap, today, now])
   const [cid, setCid] = useState(courseId ?? ctx?.courseId ?? '')
   const [denied, setDenied] = useState(false)
+  const [granted, setGranted] = useState(false)
   const [torch, setTorch] = useState(false)
   const [thumb, setThumb] = useState<GalleryItem | null>(null)
   const [busy, setBusy] = useState(false)
@@ -447,9 +461,8 @@ export function CameraPage({
   const course = state.courses.find((c) => c.id === cid)
 
   const startPreview = async () => {
-    const box = frame.current?.getBoundingClientRect()
-    if (!box) return
-    await camera.start('back', { x: box.left, y: box.top, width: box.width, height: box.height })
+    if (!frame.current) return
+    await camera.start('back', layoutRect(frame.current))
     const el = camera.webPreview()
     if (el && video.current) {
       el.className = 'h-full w-full object-cover'
@@ -459,7 +472,6 @@ export function CameraPage({
 
   useEffect(() => {
     let alive = true
-    if (nativeCamera()) document.documentElement.dataset.camera = '1'
     void (async () => {
       const status = await camera.request('camera')
       if (!alive) return
@@ -467,26 +479,40 @@ export function CameraPage({
         setDenied(true)
         return
       }
-      try {
-        await startPreview()
-      } catch {
-        setDenied(true)
-      }
+      setGranted(true)
       const items = await camera.listRecent(0, 1)
       if (alive) setThumb(items[0] ?? null)
     })()
     return () => {
       alive = false
-      delete document.documentElement.dataset.camera
-      void camera.stop()
     }
   }, [])
+
+  /* 原生预览层叠在 WebView 上方：页面被盖住或开始退场就立刻撤掉，不等卸载 */
+  const present = useIsPresent()
+  const live = granted && active && present
+  useEffect(() => {
+    if (!live) {
+      void camera.stop()
+      return
+    }
+    let alive = true
+    const t = window.setTimeout(() => {
+      void startPreview().catch(() => { if (alive) setDenied(true) })
+    }, SLIDE.duration * 1000)
+    return () => {
+      alive = false
+      window.clearTimeout(t)
+      void camera.stop()
+    }
+  }, [live])
 
   const shoot = async () => {
     if (busy) return
     setBusy(true)
     try {
       const photo = await camera.capture()
+      await camera.stop()
       onShot([photo], cid || undefined)
     } catch {
       setBusy(false)
@@ -503,7 +529,7 @@ export function CameraPage({
 
   return (
     <Page className="bg-transparent">
-      <div data-camera-page className="absolute inset-0 flex flex-col">
+      <div className="absolute inset-0 flex flex-col">
         <div className="flex flex-none items-center justify-between bg-black px-4 pt-12 pb-4">
           <CircleBtn onClick={onBack}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -523,7 +549,7 @@ export function CameraPage({
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div ref={frame} className="absolute inset-y-0 inset-x-2 rounded-[24px]">
-            <div ref={video} className="absolute inset-0 overflow-hidden rounded-[24px] [&>video]:h-full [&>video]:w-full [&>video]:object-cover" />
+            <div ref={video} className="absolute inset-0 overflow-hidden rounded-[24px] bg-black [&>video]:h-full [&>video]:w-full [&>video]:object-cover" />
             <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ boxShadow: '0 0 0 200vmax #000' }} />
             <div className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.25), transparent 30%, transparent 75%, rgba(0,0,0,.35))' }} />
             {['left-5 top-5 border-l-2 border-t-2 rounded-tl-[8px]', 'right-5 top-5 border-r-2 border-t-2 rounded-tr-[8px]', 'left-5 bottom-5 border-l-2 border-b-2 rounded-bl-[8px]', 'right-5 bottom-5 border-r-2 border-b-2 rounded-br-[8px]'].map((c) => (
@@ -534,7 +560,7 @@ export function CameraPage({
                 <div className="text-[15px] font-bold text-white">相机未开启</div>
                 <div className="mt-2 text-[12.5px] font-medium text-white/60">在系统设置里允许相机，即可拍下板书</div>
                 <button
-                  onClick={() => void camera.request('camera').then((s) => { if (s === 'granted') { setDenied(false); void startPreview() } })}
+                  onClick={() => void camera.request('camera').then((s) => { if (s === 'granted') { setDenied(false); setGranted(true) } })}
                   className="mt-4 flex h-[34px] items-center rounded-full bg-white px-4 text-[13px] font-bold text-black"
                 >
                   重试

@@ -1849,6 +1849,7 @@ export default function RealApp() {
             key={key}
             snap={snap}
             courseId={r.courseId}
+            active={i === stack.length - 1}
             onBack={pop}
             onPicker={() => push({ k: 'todoPicker', courseId: r.courseId, taskId: r.taskId })}
             onShot={(photos, cid) => onPhotos(photos, cid, r.taskId)}

@@ -9,7 +9,12 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
-import android.graphics.drawable.ColorDrawable;
+import android.graphics.Canvas;
+import android.graphics.LinearGradient;
+import android.graphics.Outline;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Shader;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
@@ -17,6 +22,7 @@ import android.util.Size;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -51,7 +57,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 相机与相册：CameraX 预览挂在 WebView 后面，页面只在取景区留透明洞。
+ * 相机与相册：CameraX 预览叠在 WebView 上方的取景区，页面自己画四周的黑底与控件。
  * 拍摄直接写应用私有目录，缩略图走 ContentResolver.loadThumbnail，图片字节不经过 JS。
  */
 @CapacitorPlugin(
@@ -65,14 +71,14 @@ public class TtCamera extends Plugin {
 
     private static final String DIR = "task-photos";
 
+    /** 取景容器：叠在 WebView 上方、圆角裁切，里面是预览 + 四角标记 */
+    private FrameLayout frame;
     private PreviewView previewView;
     private ProcessCameraProvider provider;
     private ImageCapture capture;
     private androidx.camera.core.Camera camera;
     private int lensFacing = CameraSelector.LENS_FACING_BACK;
     private ExecutorService io;
-    private int webViewBg = Color.TRANSPARENT;
-    private boolean webViewBgSaved = false;
 
     @Override
     public void load() {
@@ -150,14 +156,28 @@ public class TtCamera extends Plugin {
         getActivity().runOnUiThread(() -> {
             try {
                 ViewGroup root = (ViewGroup) getBridge().getWebView().getParent();
-                if (previewView == null) {
+                if (frame == null) {
                     previewView = new PreviewView(getContext());
-                    // TextureView 走普通视图层级，能被上层透明 WebView 透出；SurfaceView 会被窗口底色盖住
                     previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
                     previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
-                    root.addView(previewView, 0);
+                    frame = new FrameLayout(getContext());
+                    frame.setClickable(false);
+                    frame.setFocusable(false);
+                    frame.addView(previewView, new FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                    frame.addView(new FrameOverlay(getContext()), new FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                    final float radius = dp(24);
+                    frame.setOutlineProvider(new ViewOutlineProvider() {
+                        @Override
+                        public void getOutline(View v, Outline outline) {
+                            outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radius);
+                        }
+                    });
+                    frame.setClipToOutline(true);
+                    root.addView(frame);
                 }
-                ViewGroup.LayoutParams lp = previewView.getLayoutParams();
+                ViewGroup.LayoutParams lp = frame.getLayoutParams();
                 lp.width = w > 0 ? w : ViewGroup.LayoutParams.MATCH_PARENT;
                 lp.height = h > 0 ? h : ViewGroup.LayoutParams.MATCH_PARENT;
                 if (lp instanceof ViewGroup.MarginLayoutParams) {
@@ -168,14 +188,7 @@ public class TtCamera extends Plugin {
                 } else if (lp instanceof FrameLayout.LayoutParams) {
                     ((FrameLayout.LayoutParams) lp).gravity = Gravity.TOP | Gravity.START;
                 }
-                previewView.setLayoutParams(lp);
-
-                if (!webViewBgSaved) {
-                    View wv = getBridge().getWebView();
-                    webViewBgSaved = true;
-                    webViewBg = wv.getBackground() instanceof ColorDrawable ? ((ColorDrawable) wv.getBackground()).getColor() : Color.TRANSPARENT;
-                }
-                getBridge().getWebView().setBackgroundColor(Color.TRANSPARENT);
+                frame.setLayoutParams(lp);
 
                 bindCamera(call);
             } catch (Exception e) {
@@ -213,13 +226,13 @@ public class TtCamera extends Plugin {
     public void stop(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             if (provider != null) provider.unbindAll();
-            if (previewView != null && previewView.getParent() != null) {
-                ((ViewGroup) previewView.getParent()).removeView(previewView);
+            if (frame != null && frame.getParent() != null) {
+                ((ViewGroup) frame.getParent()).removeView(frame);
             }
+            frame = null;
             previewView = null;
             capture = null;
             camera = null;
-            if (webViewBgSaved) getBridge().getWebView().setBackgroundColor(webViewBg);
             call.resolve();
         });
     }
@@ -239,6 +252,54 @@ public class TtCamera extends Plugin {
         }
         camera.getCameraControl().enableTorch(on);
         call.resolve();
+    }
+
+    /** 取景框上的四角标记与上下渐变，和页面里的样式一致 */
+    private final class FrameOverlay extends View {
+        private final Paint corner = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint shade = new Paint();
+        private final Path path = new Path();
+
+        FrameOverlay(Context ctx) {
+            super(ctx);
+            corner.setStyle(Paint.Style.STROKE);
+            corner.setStrokeWidth(dp(2));
+            corner.setColor(Color.argb(204, 255, 255, 255));
+            corner.setStrokeCap(Paint.Cap.BUTT);
+            corner.setStrokeJoin(Paint.Join.ROUND);
+            setClickable(false);
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int ow, int oh) {
+            shade.setShader(new LinearGradient(0, 0, 0, h,
+                    new int[] { Color.argb(64, 0, 0, 0), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(89, 0, 0, 0) },
+                    new float[] { 0f, .3f, .75f, 1f }, Shader.TileMode.CLAMP));
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            int w = getWidth();
+            int h = getHeight();
+            c.drawRect(0, 0, w, h, shade);
+            float in = dp(5) + dp(1);
+            float len = dp(24);
+            float r = dp(8);
+            drawCorner(c, in, in, 1, 1, len, r);
+            drawCorner(c, w - in, in, -1, 1, len, r);
+            drawCorner(c, in, h - in, 1, -1, len, r);
+            drawCorner(c, w - in, h - in, -1, -1, len, r);
+        }
+
+        /** 以 (x, y) 为角点，sx/sy 指向框内的方向，画一段带圆角的 L 形 */
+        private void drawCorner(Canvas c, float x, float y, int sx, int sy, float len, float r) {
+            path.reset();
+            path.moveTo(x, y + sy * len);
+            path.lineTo(x, y + sy * r);
+            path.quadTo(x, y, x + sx * r, y);
+            path.lineTo(x + sx * len, y);
+            c.drawPath(path, corner);
+        }
     }
 
     /* ---------------- 拍摄 ---------------- */
