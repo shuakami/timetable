@@ -109,6 +109,8 @@
 
 html {
   scroll-behavior: auto;
+  scrollbar-color: var(--ink-3) var(--paper);
+  scrollbar-width: thin;
 }
 
 html.lenis,
@@ -139,6 +141,24 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   color-scheme: light dark;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper);
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid var(--paper);
+  border-radius: 999px;
+  background: var(--ink-3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-2);
 }
 
 img,
@@ -617,6 +637,52 @@ section {
   transform: rotate(2deg);
 }
 
+/* ============ 随手记 ============ */
+.flow {
+  position: relative;
+  margin-top: 64px;
+}
+.flow-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+.flow-shots {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  justify-items: center;
+}
+.flow-shots li {
+  width: 71.4%;
+  display: grid;
+  row-gap: 14px;
+  justify-items: center;
+}
+.flow-shots .phone {
+  border-radius: 20px;
+}
+.flow-shots li:nth-child(odd) .phone {
+  transform: rotate(-1.2deg);
+}
+.flow-shots li:nth-child(even) .phone {
+  transform: rotate(1.2deg);
+}
+.flow-shots .step {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.3;
+  margin-bottom: 2px;
+  color: var(--ink-3);
+}
+.flow-shots .hand-note {
+  font-size: 14px;
+  text-align: center;
+}
+
 /* ============ 学期 ============ */
 .ruler {
   margin-top: 56px;
@@ -965,6 +1031,17 @@ section {
   }
   .funnel-result .phone {
     transform: none;
+  }
+
+  .flow-line {
+    display: none;
+  }
+  .flow-shots {
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 16px;
+  }
+  .flow-shots li {
+    width: auto;
   }
 
   .ruler-line {

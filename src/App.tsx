@@ -11,9 +11,9 @@ const C = {
 
 /* ---------------- shared ---------------- */
 
-function Phone({ children }: { children: React.ReactNode }) {
+function Phone({ children, tall }: { children: React.ReactNode; tall?: boolean }) {
   return (
-    <div className="relative flex h-[812px] w-[375px] flex-col overflow-hidden rounded-[40px] bg-(--c-bg)">
+    <div data-phone className={`relative flex w-[375px] flex-col overflow-hidden rounded-[40px] bg-(--c-bg) ${tall ? 'min-h-[812px] pb-8' : 'h-[812px]'}`}>
       {children}
     </div>
   )
@@ -482,10 +482,10 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   return <div className={`rounded-[20px] bg-(--c-surface) p-5 ${className}`}>{children}</div>
 }
 
-function DetailScreen() {
+function DetailScreen({ tall }: { tall?: boolean }) {
   return (
-    <Phone>
-      <div className="flex-1 space-y-3 overflow-hidden px-4 pt-12">
+    <Phone tall={tall}>
+      <div className={`flex-1 space-y-3 px-4 pt-12 ${tall ? '' : 'overflow-hidden'}`}>
         <div className="flex items-center justify-between px-1">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--c-surface)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4"><path d="M15 19 8 12l7-7" /></svg>
@@ -558,25 +558,39 @@ function DetailScreen() {
         </Card>
 
         <Card>
-          <div className="flex items-center justify-between">
+          <div className="flex items-baseline justify-between">
             <span className="text-[14px] font-bold text-(--c-ink)">作业与备忘</span>
-            <span className="text-[12px] font-semibold text-(--c-accent)">添加</span>
+            <span className="text-[11.5px] font-semibold tabular-nums text-(--c-ink4)">3 项</span>
           </div>
-          <div className="mt-1">
-            <div className="flex items-baseline justify-between border-b border-(--c-line2) py-3">
-              <div>
-                <div className="text-[14px] font-semibold text-(--c-ink)">习题册 P41–P45 曲面积分</div>
-                <div className="mt-1 text-[12px] font-medium text-(--c-ink4)">第 6 章，纸质提交</div>
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center rounded-[14px] bg-(--c-bg) p-2.5">
+              <div className="mr-3 h-[44px] w-[58px] flex-none overflow-hidden rounded-[9px]"><Board className="h-full w-full" zoom={0.28} /></div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13.5px] font-semibold text-(--c-ink)">板书</div>
+                <div className="mt-[3px] text-[11.5px] font-medium text-(--c-ink4)">今天 09:38 拍下</div>
               </div>
-              <span className="flex-none text-[12px] font-bold text-(--c-accent)">周四截止</span>
+              <span className="ml-2 flex h-[26px] flex-none items-center rounded-full bg-(--c-accent-soft) px-2.5 text-[11px] font-bold text-(--c-accent)">周四 课前</span>
             </div>
-            <div className="flex items-baseline justify-between py-3">
-              <div>
-                <div className="text-[14px] font-semibold text-(--c-ink)">期中考试，覆盖 1–5 章</div>
-                <div className="mt-1 text-[12px] font-medium text-(--c-ink4)">可带计算器</div>
+            <div className="flex items-center rounded-[14px] bg-(--c-bg) px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13.5px] font-semibold text-(--c-ink)">习题册 P41–P45 第 3、5、7 题</div>
+                <div className="mt-[3px] text-[11.5px] font-medium text-(--c-ink4)">作业，纸质提交</div>
               </div>
-              <span className="flex-none text-[12px] font-semibold text-(--c-ink4)">第 9 周</span>
+              <span className="ml-2 flex h-[26px] flex-none items-center rounded-full bg-(--c-accent-soft) px-2.5 text-[11px] font-bold text-(--c-accent)">今晚 23:00</span>
             </div>
+            <div className="flex items-center rounded-[14px] bg-(--c-bg) px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13.5px] font-semibold text-(--c-ink)">期中考试 1–5 章</div>
+                <div className="mt-[3px] text-[11.5px] font-medium text-(--c-ink4)">考试，可带计算器</div>
+              </div>
+              <span className="ml-2 flex-none text-[11.5px] font-semibold text-(--c-ink4)">第 9 周</span>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-2 rounded-full bg-(--c-bg) p-[5px] pr-3">
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface)">
+              <CameraIcon size={16} />
+            </span>
+            <span className="flex-1 pl-1 text-[14px] font-medium text-(--c-ink4)">新待办</span>
           </div>
         </Card>
       </div>
@@ -895,6 +909,467 @@ function TodoScreen() {
         style={{ background: 'var(--c-fade)' }}
       />
       <Nav active={2} />
+    </Phone>
+  )
+}
+
+/* ---------------- 07b todo v2：先记下，再整理 ---------------- */
+
+const CameraIcon = ({ size = 18, stroke = 'var(--c-ink)' }: { size?: number; stroke?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
+    <path d="M4 9a2.5 2.5 0 0 1 2.5-2.5H8l1.1-1.7c.3-.5.8-.8 1.4-.8h3c.6 0 1.1.3 1.4.8L16 6.5h1.5A2.5 2.5 0 0 1 20 9v7.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z" />
+    <circle cx="12" cy="12.6" r="3.1" />
+  </svg>
+)
+
+const ArrowUp = ({ stroke = '#fff' }: { stroke?: string }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+)
+
+/* 板书：相机取景、照片缩略图共用一块假图 */
+function Board({ className = '', zoom = 1, tilt, top = 0 }: { className?: string; zoom?: number; tilt?: boolean; top?: number }) {
+  return (
+    <div className={`relative overflow-hidden ${className}`} style={{ background: 'linear-gradient(160deg,#33524A 0%,#243E36 55%,#1E352E 100%)' }}>
+      <div className="absolute inset-0 opacity-50" style={{ background: 'radial-gradient(60% 45% at 30% 40%, rgba(255,255,255,.10), transparent 70%), radial-gradient(40% 40% at 80% 90%, rgba(255,255,255,.08), transparent 70%)' }} />
+      <div
+        className="absolute left-0 top-0 h-[300px] w-[420px] origin-top-left px-9 py-7 text-white/85"
+        style={{ zoom, top, transform: tilt ? 'perspective(600px) rotateY(-4deg) rotateX(2deg) scale(1.04)' : undefined }}
+      >
+        <div className="text-[13px] font-medium tracking-[.06em] text-white/50">§8.3 第二型曲面积分</div>
+        <div className="mt-5 inline-block border-b-2 border-white/70 pb-0.5 text-[24px] font-bold tracking-[.12em]">作业</div>
+        <div className="mt-4 -rotate-[.6deg] text-[22px] font-semibold tracking-[.03em]">习题册 P41 – P45</div>
+        <div className="mt-2 rotate-[.4deg] text-[20px] font-medium tracking-[.03em]">第 3、5、7 题</div>
+        <div className="mt-5 -rotate-[.5deg] text-[18px] font-medium tracking-[.04em] text-white/70">下周一 课前交 ！</div>
+      </div>
+    </div>
+  )
+}
+
+type Todo2 = {
+  title: string
+  course: string
+  color: string
+  due: string
+  left?: string
+  leftTone?: 'rose' | 'ink'
+  exam?: boolean
+  photo?: boolean
+  suggest?: string
+}
+
+const todo2Groups: [string, Todo2[]][] = [
+  ['待整理', [
+    { title: '板书', course: '大学英语（三）', color: C.eng, due: '09:38 拍下', photo: true, suggest: '下次课前，周四 08:00' },
+  ]],
+  ['今天', [
+    { title: '习题册 P41–P45 第 3、5、7 题', course: '高等数学（下）', color: C.math, due: '今晚 23:00', left: '还剩 11 小时', leftTone: 'rose', photo: true },
+    { title: '实验报告：单摆测重力加速度', course: '大学物理', color: C.phy, due: '课上交 14:00', left: '带纸质版' },
+  ]],
+  ['这周', [
+    { title: '期中考试 1–5 章', course: '线性代数', color: C.la, due: '周五 14:00', left: '3 天后', exam: true },
+    { title: '第 4 次上机：红黑树插入', course: '数据结构', color: C.ds, due: '周六 23:59', photo: true },
+    { title: '背完 Unit 6 词表', course: '大学英语（三）', color: C.eng, due: '周日' },
+  ]],
+]
+
+function Todo2Row({ t }: { t: Todo2 }) {
+  return (
+    <div className="flex items-start rounded-[14px] bg-(--c-surface) px-3.5 py-3">
+      <span className="mt-[2px] h-[17px] w-[17px] flex-none rounded-[6px] border-[1.6px] border-(--c-ink5)" />
+      <div className="ml-3 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className={`truncate text-[14px] font-bold tracking-[-.01em] ${t.suggest ? 'text-(--c-ink3)' : 'text-(--c-ink)'}`}>{t.title}</span>
+          {t.exam && <span className="flex-none rounded-[5px] bg-(--c-rose-soft) px-1.5 py-[2px] text-[10px] font-extrabold text-(--c-rose)">考试</span>}
+        </div>
+        <div className="mt-[5px] flex items-center gap-1.5 text-[12px] font-medium text-(--c-ink4)">
+          <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: t.color }} />
+          <span className="truncate">{t.course}</span>
+          <span className="ml-auto flex-none pl-2 tabular-nums text-(--c-ink3)">{t.due}</span>
+        </div>
+        {t.left && (
+          <div className={`mt-1 text-[12px] font-semibold tabular-nums ${t.leftTone === 'rose' ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>{t.left}</div>
+        )}
+        {t.suggest && (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-(--c-accent-soft) px-2.5 py-[5px] text-[11.5px] font-bold text-(--c-accent)">
+            {t.suggest}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m9 5 7 7-7 7" /></svg>
+          </div>
+        )}
+      </div>
+      {t.photo && <Board className="ml-3 h-[56px] w-[56px] flex-none rounded-[10px]" zoom={0.2} />}
+    </div>
+  )
+}
+
+function Todo2List() {
+  return (
+    <div className="flex-1 overflow-hidden pt-12">
+      <div className="px-5">
+        <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">待办</h1>
+        <div className="mt-2 flex items-center gap-2.5 text-[12.5px] font-semibold text-(--c-ink3)">
+          <span>今天 2 项</span>
+          <span className="h-3 w-px bg-(--c-line)" />
+          <span>这周 3 项</span>
+          <span className="h-3 w-px bg-(--c-line)" />
+          <span className="text-(--c-ink4)">1 项待整理</span>
+        </div>
+      </div>
+      <div className="mt-6 px-5">
+        {todo2Groups.map(([g, list]) => (
+          <div key={g} className="mb-5">
+            <div className="flex items-baseline justify-between px-0.5">
+              <span className="text-[13px] font-extrabold tracking-[-.01em] text-(--c-ink)">{g}</span>
+              <span className="text-[11.5px] font-semibold tabular-nums text-(--c-ink4)">{list.length} 项</span>
+            </div>
+            <div className="mt-2.5 space-y-2">{list.map((t) => <Todo2Row key={t.title + t.course} t={t} />)}</div>
+          </div>
+        ))}
+        <div className="flex items-center justify-between px-0.5 py-1">
+          <span className="text-[13px] font-extrabold tracking-[-.01em] text-(--c-ink4)">已完成 4 项</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4"><path d="m9 5 7 7-7 7" /></svg>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* 底部胶囊：相机 + 一句话，压在 Nav 上面 */
+function Composer() {
+  return (
+    <div className="absolute inset-x-4 bottom-[92px] z-[9]">
+      <div className="flex items-center gap-2 rounded-full p-[6px] pr-3.5" style={dockStyle}>
+        <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-(--c-surface2)"><CameraIcon /></span>
+        <span className="flex-1 pl-1 text-[15px] font-medium text-(--c-ink4)">新待办</span>
+      </div>
+    </div>
+  )
+}
+
+function Todo2Screen() {
+  return (
+    <Phone>
+      <Todo2List />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[7] h-[190px]" style={{ background: 'var(--c-fade)' }} />
+      <Composer />
+      <Nav active={2} />
+    </Phone>
+  )
+}
+
+/* iOS 风格键盘占位 */
+function Keyboard() {
+  const Key = ({ w = 32, dark, children }: { w?: number; dark?: boolean; children?: React.ReactNode }) => (
+    <span
+      className={`flex h-[42px] items-center justify-center rounded-[6px] text-[16px] font-medium text-(--c-ink) ${dark ? 'bg-[#ACB1BA]' : 'bg-white'}`}
+      style={{ width: w, boxShadow: '0 1px 0 rgba(0,0,0,.25)' }}
+    >{children}</span>
+  )
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-[8] bg-[#D1D4DA] px-[3px] pt-2 pb-[38px]">
+      <div className="flex justify-center gap-[6px]">{'qwertyuiop'.split('').map((k) => <Key key={k}>{k}</Key>)}</div>
+      <div className="mt-[11px] flex justify-center gap-[6px]">{'asdfghjkl'.split('').map((k) => <Key key={k}>{k}</Key>)}</div>
+      <div className="mt-[11px] flex justify-center gap-[6px]">
+        <Key w={42} dark>⇧</Key>
+        {'zxcvbnm'.split('').map((k) => <Key key={k}>{k}</Key>)}
+        <Key w={42} dark>⌫</Key>
+      </div>
+      <div className="mt-[11px] flex justify-center gap-[6px]">
+        <Key w={90} dark><span className="text-[14px]">123</span></Key>
+        <Key w={182}><span className="text-[14px]">空格</span></Key>
+        <Key w={90} dark><span className="text-[14px]">换行</span></Key>
+      </div>
+      <div className="mx-auto mt-4 h-[5px] w-[134px] rounded-full bg-(--c-ink)/85" />
+    </div>
+  )
+}
+
+function Chip2({ color, children, tone = 'plain' }: { color?: string; children: React.ReactNode; tone?: 'plain' | 'accent' }) {
+  return (
+    <span className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'}`}>
+      {color && <span className="h-[7px] w-[7px] rounded-full" style={{ background: color }} />}
+      {children}
+    </span>
+  )
+}
+
+/* 点开胶囊：键盘顶上来，胶囊展开成一段话 + 默认带上的课程/截止 */
+function Todo2ComposeScreen() {
+  return (
+    <Phone>
+      <Todo2List />
+      <div className="absolute inset-0 z-[7] bg-(--c-bg)/55" />
+      <div className="absolute inset-x-3 bottom-[288px] z-[9]">
+        <div className="rounded-[26px] px-4 pt-3.5 pb-3" style={dockStyle}>
+          <div className="text-[16px] leading-[1.4] font-semibold tracking-[-.01em] text-(--c-ink)">
+            习题册 P41–P45 第 3、5、7 题
+            <span className="ml-[1px] inline-block h-[19px] w-[2px] translate-y-[4px] rounded-full bg-(--c-accent)" />
+          </div>
+          <div className="mt-3 flex items-center gap-1.5">
+            <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-(--c-surface2)"><CameraIcon size={16} stroke="var(--c-ink2)" /></span>
+            <Chip2 color={C.math}>高等数学（下）</Chip2>
+            <Chip2>周四 课前</Chip2>
+            <span className="flex-1" />
+            <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-(--c-accent)"><ArrowUp /></span>
+          </div>
+        </div>
+      </div>
+      <Keyboard />
+    </Phone>
+  )
+}
+
+/* 相机：黑底、取景框、圆快门；课程默认带上，顶部可换 */
+function Todo2CameraScreen() {
+  return (
+    <Phone>
+      <div className="absolute inset-0 bg-black" />
+      <div className="relative flex flex-1 flex-col pt-12">
+        <div className="flex items-center justify-between px-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 text-[12.5px] font-bold text-white">
+            <span className="h-[7px] w-[7px] rounded-full" style={{ background: C.math }} />
+            高等数学（下）
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth="3"><path d="m6 9 6 6 6-6" /></svg>
+          </span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>
+          </span>
+        </div>
+
+        <div className="relative mx-2 mt-4 flex-1 overflow-hidden rounded-[24px]">
+          <Board className="h-full w-full" zoom={0.9} tilt top={150} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.25), transparent 30%, transparent 75%, rgba(0,0,0,.35))' }} />
+          {['left-5 top-5 border-l-2 border-t-2 rounded-tl-[8px]', 'right-5 top-5 border-r-2 border-t-2 rounded-tr-[8px]', 'left-5 bottom-5 border-l-2 border-b-2 rounded-bl-[8px]', 'right-5 bottom-5 border-r-2 border-b-2 rounded-br-[8px]'].map((c) => (
+            <span key={c} className={`absolute h-6 w-6 border-white/80 ${c}`} />
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between px-9 pt-6 pb-10">
+          <Board className="h-[46px] w-[46px] rounded-[12px] ring-2 ring-white/25" zoom={0.17} />
+          <span className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-[3.5px] border-white">
+            <span className="h-[62px] w-[62px] rounded-full bg-white" />
+          </span>
+          <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-white/12">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9" /><path d="M4 20v-5h5M20 4v5h-5" /></svg>
+          </span>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+/* 相册：黑底网格、多选、底部添加 */
+function Todo2PickerScreen() {
+  const tiles: ('board' | 'board2' | 'paper' | 'desk' | 'screen' | 'dark')[] = [
+    'board', 'paper', 'board2',
+    'screen', 'desk', 'paper',
+    'board2', 'dark', 'screen',
+    'paper', 'board', 'desk',
+    'screen', 'paper', 'board2',
+  ]
+  const selected: Record<number, number> = { 0: 1, 2: 2 }
+  const bg: Record<string, string> = {
+    paper: 'repeating-linear-gradient(180deg, #F4F1EA 0 22px, #D9D4C8 22px 23px)',
+    desk: 'linear-gradient(150deg,#C9B49A,#8E7658)',
+    screen: 'linear-gradient(180deg,#FFFFFF,#ECEDF1)',
+    dark: 'linear-gradient(180deg,#2A2E38,#12141A)',
+  }
+  return (
+    <Phone>
+      <div className="absolute inset-0 bg-black" />
+      <div className="relative flex flex-1 flex-col pt-12">
+        <div className="flex items-center justify-between px-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 text-[12.5px] font-bold text-white">
+            最近项目
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth="3"><path d="m6 9 6 6 6-6" /></svg>
+          </span>
+          <span className="w-9" />
+        </div>
+
+        <div className="mt-4 grid flex-1 grid-cols-3 gap-[3px] overflow-hidden px-[3px] content-start">
+          {tiles.map((k, i) => {
+            const n = selected[i]
+            return (
+              <div key={i} className="relative aspect-square overflow-hidden rounded-[6px]">
+                {k === 'board' || k === 'board2'
+                  ? <Board className="h-full w-full" zoom={0.3} tilt={k === 'board2'} top={k === 'board2' ? -20 : 0} />
+                  : <div className="h-full w-full" style={{ background: bg[k] }} />}
+                {k === 'screen' && <div className="absolute inset-x-3 top-4 space-y-2"><div className="h-2 w-2/3 rounded bg-[#1B1C20]/80" /><div className="h-1.5 w-full rounded bg-[#1B1C20]/25" /><div className="h-1.5 w-5/6 rounded bg-[#1B1C20]/25" /><div className="h-1.5 w-1/2 rounded bg-[#1B1C20]/25" /></div>}
+                {n
+                  ? <span className="absolute inset-0 rounded-[6px] ring-[2.5px] ring-inset ring-(--c-accent)" style={{ background: 'rgba(79,91,213,.18)' }} />
+                  : <span className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full border-[1.5px] border-white/80" style={{ background: 'rgba(0,0,0,.25)' }} />}
+                {n && <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-(--c-accent) text-[11px] font-extrabold text-white">{n}</span>}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="px-5 pt-3 pb-8">
+          <div className="rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">添加 2 张</div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+function BackCircle() {
+  return (
+    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4"><path d="M15 19 8 12l7-7" /></svg>
+    </div>
+  )
+}
+
+/* 拍完：一张图 + 默认带上的东西，一下保存 */
+function Todo2ReviewScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col overflow-hidden px-5 pt-12">
+        <div className="flex items-center justify-between">
+          <BackCircle />
+          <span className="flex h-9 items-center rounded-full bg-(--c-surface) px-4 text-[13px] font-bold text-(--c-ink)">重拍</span>
+        </div>
+
+        <div className="relative mt-4 h-[250px] overflow-hidden rounded-[20px]">
+          <Board className="h-full w-full" zoom={0.8} tilt />
+        </div>
+
+        <div className="mt-5 text-[17px] font-semibold text-(--c-ink5)">名称</div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Chip2 color={C.math}>高等数学（下）</Chip2>
+          <Chip2>周四 08:00 课前</Chip2>
+          <Chip2>作业</Chip2>
+          <Chip2 tone="accent">＋</Chip2>
+        </div>
+
+
+        <div className="flex-1" />
+        <div className="pb-8">
+          <div className="rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">保存</div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+/* 详情：标题 + 照片 + 几个胶囊，没有表单 */
+function Todo2DetailScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col overflow-hidden px-5 pt-12">
+        <div className="flex items-center justify-between">
+          <BackCircle />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--c-ink)"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+          </div>
+        </div>
+
+        <h1 className="mt-5 text-[22px] leading-[1.3] font-extrabold tracking-[-.02em] text-(--c-ink)">习题册 P41–P45 第 3、5、7 题</h1>
+
+        <div className="mt-4 flex gap-2.5">
+          <Board className="h-[76px] w-[102px] rounded-[12px]" zoom={0.3} />
+          <Board className="h-[76px] w-[102px] rounded-[12px]" zoom={0.26} tilt />
+          <span className="flex h-[76px] w-[76px] items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-(--c-ink5)"><CameraIcon stroke="var(--c-ink4)" /></span>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Chip2 color={C.math}>高等数学（下）</Chip2>
+          <Chip2>今晚 23:00</Chip2>
+          <Chip2>作业</Chip2>
+          <Chip2>前一晚 21:00 提醒</Chip2>
+          <Chip2 tone="accent">＋</Chip2>
+        </div>
+
+        <div className="mt-4 rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+          <div className="text-[14px] leading-[1.5] font-medium text-(--c-ink)">第 7 题要用高斯公式，带上上次的习题册。</div>
+        </div>
+
+
+        <div className="flex-1" />
+        <div className="pb-8">
+          <div className="rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">完成</div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+/* 空状态：两个圆形按钮，拍照为主 */
+function Todo2EmptyScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col overflow-hidden pt-12">
+        <div className="px-5">
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">待办</h1>
+        </div>
+        <div className="flex flex-1 flex-col justify-center pb-24">
+          <EmptyBlock
+            kind="todo"
+            title="没有待办"
+            desc="作业、考试与日常备忘。在这里随手记下，件件有着落。"
+            actions={['拍板书', '文字']}
+            icons={[<CameraIcon key="c" size={15} stroke="#fff" />]}
+          />
+        </div>
+      </div>
+      <Nav active={2} />
+    </Phone>
+  )
+}
+
+/* 下课那一刻：今天页时间线里，刚结束的课下面直接给出入口 */
+function Todo2ClassEndScreen() {
+  const list = days[todayIndex].courses.map((c): Course => (
+    c.name === '高等数学（下）' ? { ...c, state: 'past' } : c
+  ))
+  return (
+    <Phone>
+      <div className="flex-1 overflow-hidden pt-12">
+        <div className="px-5">
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">10月14日 <span className="font-bold text-(--c-ink4)">周二</span></h1>
+          <div className="mt-2 flex items-center gap-2.5 text-[12.5px] font-semibold text-(--c-ink3)">
+            <span>第 7 周</span>
+            <span className="h-3 w-px bg-(--c-line)" />
+            <span>单周</span>
+            <span className="h-3 w-px bg-(--c-line)" />
+            <span>5 节课<span className="text-(--c-ink4)">，剩 3 节</span></span>
+          </div>
+        </div>
+
+        <div className="mt-6 px-5">
+          {list.map((c) => (
+            <React.Fragment key={c.name + c.start}>
+              <CourseRow c={c} />
+              {c.name === '高等数学（下）' && (
+                <div className="-mt-4 flex">
+                  <div className="w-11 flex-none" />
+                  <div className="ml-3 w-[2px] flex-none self-stretch bg-(--c-accent)" />
+                  <div className="flex-1 pb-7 pl-4">
+                    <div className="rounded-[16px] bg-(--c-surface) p-3.5">
+                      <div className="text-[14px] font-bold tracking-[-.01em] text-(--c-ink)">刚下课，这节课有作业吗？</div>
+                      <div className="mt-2.5 flex gap-1.5">
+                        <span className="flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-full bg-(--c-ink) text-[12.5px] font-bold text-(--c-bg)"><CameraIcon size={15} stroke="var(--c-bg)" />拍板书</span>
+                        <span className="flex h-[34px] flex-1 items-center justify-center rounded-full bg-(--c-surface2) text-[12.5px] font-bold text-(--c-ink)">文字</span>
+                        <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-(--c-surface2)">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink3)" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[7] h-[150px]" style={{ background: 'var(--c-fade)' }} />
+      <Nav active={0} />
     </Phone>
   )
 }
@@ -1389,22 +1864,57 @@ function WidgetScreen2() {
 
 /* ---------------- empty & error states ---------------- */
 
-function EmptyArt({ kind }: { kind: 'free' | 'none' }) {
+type EmptyKind = 'free' | 'none' | 'todo' | 'term' | 'holiday' | 'search'
+
+function EmptyArt({ kind }: { kind: EmptyKind }) {
+  const art: Record<EmptyKind, React.ReactNode> = {
+    free: (
+      <>
+        <rect x="6" y="9" width="36" height="32" rx="5" />
+        <path d="M6 18h36M15 5v7M33 5v7" />
+        <path d="m17 30 5 5 9-9" />
+      </>
+    ),
+    none: (
+      <>
+        <rect x="6" y="9" width="36" height="32" rx="5" strokeDasharray="4 3.5" />
+        <path d="M6 18h36M15 5v7M33 5v7" />
+        <path d="M24 24v10M19 29h10" />
+      </>
+    ),
+    todo: (
+      <>
+        <rect x="6" y="10" width="36" height="26" rx="4" />
+        <path d="M6 30l10-9 8 7 6-5 12 10" />
+        <circle cx="32" cy="18" r="3" />
+        <path d="M14 42h20" />
+      </>
+    ),
+    term: (
+      <>
+        <path d="M10 8h22l8 8v24a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" />
+        <path d="M32 8v8h8" />
+        <path d="m18 28 4 4 8-8" />
+      </>
+    ),
+    holiday: (
+      <>
+        <circle cx="24" cy="20" r="7" />
+        <path d="M24 5v4M24 31v4M9 20h4M35 20h4M13.4 9.4l2.8 2.8M31.8 27.8l2.8 2.8M13.4 30.6l2.8-2.8M31.8 12.2l2.8-2.8" />
+        <path d="M6 42c6-5 12-5 18 0s12 5 18 0" />
+      </>
+    ),
+    search: (
+      <>
+        <circle cx="21" cy="21" r="12" />
+        <path d="m30 30 11 11" />
+        <path d="M16 21h10" />
+      </>
+    ),
+  }
   return (
-    <svg viewBox="0 0 40 40" fill="none" className="h-[40px] w-[40px]">
-      {kind === 'free' ? (
-        <>
-          <rect x="5" y="9" width="30" height="26" rx="7" stroke="#DEDFE4" strokeWidth="1.6" />
-          <path d="M13 6v5M27 6v5" stroke="#DEDFE4" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M14 22.5 18 26.5l8-8" stroke="#B9BFEC" strokeWidth="1.8" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          <rect x="5" y="9" width="30" height="26" rx="7" stroke="#DEDFE4" strokeWidth="1.6" strokeDasharray="3.5 3.5" />
-          <path d="M13 6v5M27 6v5" stroke="#DEDFE4" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M20 17v9M15.5 21.5h9" stroke="#C9CBD2" strokeWidth="1.8" strokeLinecap="round" />
-        </>
-      )}
+    <svg viewBox="0 0 48 48" fill="none" stroke="var(--c-ink3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-[52px] w-[52px]">
+      {art[kind]}
     </svg>
   )
 }
@@ -1414,20 +1924,32 @@ function EmptyBlock({
   title,
   desc,
   actions,
+  icons,
+  className = 'px-8',
+  onSurface,
 }: {
-  kind: 'free' | 'none'
+  kind: EmptyKind
   title: string
   desc?: string
   actions: string[]
+  icons?: React.ReactNode[]
+  className?: string
+  onSurface?: boolean
 }) {
   return (
-    <div className="flex flex-col items-center px-8 text-center">
+    <div className={`flex flex-col ${className}`}>
       <EmptyArt kind={kind} />
-      <div className="mt-4 text-[17px] font-extrabold tracking-[-.02em] text-(--c-ink)">{title}</div>
-      {desc && <div className="mt-2 text-[13px] leading-[1.6] font-medium text-(--c-ink4)">{desc}</div>}
-      <div className="mt-5 flex items-center gap-5">
+      <div className="mt-6 text-[17px] font-extrabold tracking-[-.01em] text-(--c-ink)">{title}</div>
+      {desc && <div className="mt-2 text-[13.5px] leading-[1.55] font-medium text-(--c-ink3)">{desc}</div>}
+      <div className="mt-5 flex items-center gap-2">
         {actions.map((a, i) => (
-          <span key={a} className={`text-[13px] font-bold ${i === 0 ? 'text-(--c-accent)' : 'text-(--c-ink3)'}`}>{a}</span>
+          <span
+            key={a}
+            className={`flex h-[34px] items-center gap-1.5 rounded-full text-[13px] font-bold ${i === 0 ? 'bg-(--c-accent) text-white' : `${onSurface ? 'bg-(--c-surface2)' : 'bg-(--c-surface)'} text-(--c-ink)`} ${icons?.[i] ? 'pl-3 pr-3.5' : 'px-3.5'}`}
+          >
+            {icons?.[i]}
+            {a}
+          </span>
         ))}
       </div>
     </div>
@@ -1448,9 +1970,13 @@ function FreeDayScreen() {
             <span className="text-(--c-ink4)">没有课</span>
           </div>
         </div>
-        <div className="mt-12">
-          <EmptyBlock kind="free" title="今天没有课" actions={['看本周课表', '去待办']} />
-        </div>
+        <EmptyBlock
+          className="mt-14 px-8"
+          kind="free"
+          title="今天没有课，好耶"
+          desc="周末到了，不如去做点感兴趣的事，出去走走。"
+          actions={['本周课表', '待办']}
+        />
 
         <div className="mt-10 px-5">
           <div className="px-1 text-[12px] font-bold tracking-[-.01em] text-(--c-ink4)">下一节</div>
@@ -1480,15 +2006,15 @@ function NoDataScreen() {
       <div className="flex-1 overflow-hidden pt-12">
         <div className="px-5">
           <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">10月14日 <span className="font-bold text-(--c-ink4)">周二</span></h1>
-          <div className="mt-2 text-[12.5px] font-semibold text-(--c-ink4)">还没有课表</div>
+          <div className="mt-2 text-[12.5px] font-semibold text-(--c-ink4)">暂无课表</div>
         </div>
-        <div className="mt-14">
-          <EmptyBlock
-            kind="none"
-            title="还没有课表"
-            actions={['导入课表', '手动添加']}
-          />
-        </div>
+        <EmptyBlock
+          className="mt-24 px-8"
+          kind="none"
+          title="让课表就位"
+          desc="一键导入，或是手动创建。随后的日程追踪与准时提醒，皆会为你准备就绪。"
+          actions={['导入课表', '手动添加']}
+        />
       </div>
       <Nav active={0} />
     </Phone>
@@ -1800,6 +2326,7 @@ function WeekShell({
   strip,
   children,
   footer,
+  band,
 }: {
   week: string
   right: string
@@ -1808,6 +2335,7 @@ function WeekShell({
   strip: [string, string][]
   children: React.ReactNode
   footer?: React.ReactNode
+  band?: React.ReactNode
 }) {
   const tone = rightTone === 'amber' ? '#C29155' : rightTone === 'indigo' ? '#4F5BD5' : '#8A8E97'
   return (
@@ -1833,6 +2361,7 @@ function WeekShell({
               ))}
             </div>
 
+            {band && <div className="mt-1.5 ml-8">{band}</div>}
             <div className="relative mt-2">
               {[0, 84, 168, 252, 336, 420, 504].map((t) => (
                 <div key={t} className="absolute right-0 left-8 h-px bg-(--c-line2)" style={{ top: t + 6 }} />
@@ -1855,27 +2384,56 @@ function WeekShell({
   )
 }
 
+function WeekBand({ tone, title, meta }: { tone: 'gray' | 'amber'; title: string; meta: string }) {
+  const c = tone === 'amber' ? '#C29155' : '#8A8E97'
+  return (
+    <div className="flex items-center gap-2 rounded-[8px] px-2.5 py-[6px]" style={{ background: tint(c, 12) }}>
+      <i className="h-[14px] w-[3px] flex-none rounded-full" style={{ background: c }} />
+      <span className="text-[11.5px] font-bold" style={{ color: `color-mix(in srgb, ${c} 85%, var(--c-ink-mix))` }}>{title}</span>
+      <span className="ml-auto text-[10.5px] font-semibold" style={{ color: c }}>{meta}</span>
+    </div>
+  )
+}
+
+function GhostEvent({ name, color, top, h }: { name: string; color: string; top: number; h: number }) {
+  return (
+    <div
+      className="absolute inset-x-0 overflow-hidden rounded-[9px] border-[1.5px] border-dashed px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
+      style={{ top, height: h, borderColor: tint(color, 45), color: `color-mix(in srgb, ${color} 70%, var(--c-ink-mix))` }}
+    >
+      <span className="opacity-70">{name}</span>
+      <div className="mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60">停课</div>
+    </div>
+  )
+}
+
+function FloatPills({ actions }: { actions: string[] }) {
+  return (
+    <div className="absolute inset-x-0 bottom-[100px] z-[9] flex justify-center gap-2">
+      {actions.map((a, i) => (
+        <span
+          key={a}
+          className={`flex h-[36px] items-center rounded-full px-4 text-[13px] font-bold ${i === 0 ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}
+          style={dockStyle}
+        >
+          {a}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function OutOfTermScreen() {
   return (
     <WeekShell
       week="第 21 周"
-      right="超出学期"
+      right="学期外"
       month="1月"
       strip={[['19', '周一'], ['20', '周二'], ['21', '周三'], ['22', '周四'], ['23', '周五'], ['24', '周六']]}
-      footer={
-        <div className="absolute inset-x-4 bottom-[104px] z-[9] rounded-[1.5rem] px-4 py-3.5" style={dockStyle}>
-          <div className="text-[14px] font-bold text-(--c-ink)">秋季学期只有 20 周</div>
-          <div className="mt-1 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">到 1 月 18 日结束，第 21 周起没有安排。</div>
-          <div className="mt-3.5 flex items-center justify-between">
-            <span className="text-[13px] font-bold text-(--c-ink3)">导入下学期</span>
-            <span className="text-[13px] font-bold text-(--c-accent)">回到第 7 周</span>
-          </div>
-        </div>
-      }
+      band={<WeekBand tone="gray" title="学期已结束" meta="秋季学期 20 周，止于 1月18日" />}
+      footer={<FloatPills actions={['回到本周', '准备下学期']} />}
     >
-      <div className="absolute inset-x-0 top-[150px] flex flex-col items-center">
-        <div className="text-[12.5px] font-semibold text-(--c-ink5)">学期已结束</div>
-      </div>
+      <span />
     </WeekShell>
   )
 }
@@ -1888,30 +2446,16 @@ function VacationScreen() {
       month="10月"
       rightTone="amber"
       strip={[['1', '周三'], ['2', '周四'], ['3', '周五'], ['4', '周六'], ['5', '周日'], ['6', '周一']]}
-      footer={
-        <div className="absolute inset-x-4 bottom-[104px] z-[9] rounded-[1.5rem] px-4 py-3.5" style={dockStyle}>
-          <div className="text-[14px] font-bold text-(--c-ink)">10月1日–10月7日 放假</div>
-          <div className="mt-1 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">假期占周次，下一周仍为第 6 周、双周。</div>
-          <div className="mt-3 space-y-1.5">
-            {([
-              ['高等数学（下）', '周四 1–2 节，停课'],
-              ['数据结构', '周五 5–6 节，停课'],
-            ] as [string, string][]).map(([n, s]) => (
-              <div key={n} className="flex items-baseline justify-between">
-                <span className="text-[12.5px] font-semibold text-(--c-ink2) line-through">{n}</span>
-                <span className="text-[11.5px] font-medium text-(--c-ink4)">{s}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3.5 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-(--c-ink4)">假期来自规则设置</span>
-            <span className="text-[13px] font-bold text-(--c-accent)">跳到 10月8日</span>
-          </div>
-        </div>
-      }
+      band={<WeekBand tone="amber" title="国庆假期" meta="10月1日–10月7日，停课 2 节" />}
+      footer={<FloatPills actions={['前往 10月8日']} />}
     >
-      <div className="absolute inset-x-0 top-[150px] flex flex-col items-center">
-        <div className="text-[12.5px] font-semibold text-(--c-ink5)">假期，没有课</div>
+      <div className="flex h-full gap-[5px]">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="relative flex-1">
+            {i === 1 && <GhostEvent name="高等数学（下）" color={C.math} top={0} h={70} />}
+            {i === 2 && <GhostEvent name="数据结构" color={C.ds} top={252} h={70} />}
+          </div>
+        ))}
       </div>
     </WeekShell>
   )
@@ -2173,6 +2717,32 @@ function SearchScreen() {
   )
 }
 
+function SearchEmptyScreen() {
+  return (
+    <Phone>
+      <div className="flex-1 overflow-hidden px-4 pt-12">
+        <div className="flex items-center rounded-full bg-(--c-surface) px-4 py-2.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink4)" strokeWidth="2.2" className="mr-2.5 flex-none"><circle cx="11" cy="11" r="7" /><path d="m16.5 16.5 4 4" /></svg>
+          <span className="text-[14px] font-medium text-(--c-ink)">线代考试</span>
+          <i className="ml-[1px] h-[15px] w-[1.5px] bg-(--c-accent)" />
+          <span className="ml-auto flex-none text-[12.5px] font-medium text-(--c-ink3)">取消</span>
+        </div>
+        <div className="mt-8 text-center text-[12.5px] font-medium text-(--c-ink4)">未找到“线代考试”</div>
+        <div className="mt-4 overflow-hidden rounded-[14px] bg-(--c-surface) p-1">
+          <div className="flex items-center rounded-[10px] px-2.5 py-2.5">
+            <i className="mr-3 h-[26px] w-[3px] flex-none rounded-full bg-(--c-accent)" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13.5px] font-semibold text-(--c-ink)">新建待办“线代考试”</div>
+              <div className="mt-[2px] text-[11.5px] font-medium text-(--c-ink4)">线性代数，考试</div>
+            </div>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4" className="ml-2 flex-none"><path d="m9 5 7 7-7 7" /></svg>
+          </div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
 /* ---------------- long press quick menu ---------------- */
 
 const pressMenu: [React.ReactNode, string, string][] = [
@@ -2283,6 +2853,16 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['link', '链接添加规则', () => <LinkScreen />],
   ['airule', 'AI 生成规则', () => <AiRuleScreen />],
   ['todo', '待办', () => <TodoScreen />],
+  ['todo2', '待办 · 重做', () => <Todo2Screen />],
+  ['todo2-compose', '待办 · 写一句', () => <Todo2ComposeScreen />],
+  ['todo2-camera', '待办 · 拍板书', () => <Todo2CameraScreen />],
+  ['todo2-picker', '待办 · 相册', () => <Todo2PickerScreen />],
+  ['todo2-review', '待办 · 拍完', () => <Todo2ReviewScreen />],
+  ['todo2-detail', '待办 · 详情', () => <Todo2DetailScreen />],
+  ['todo2-empty', '待办 · 空', () => <Todo2EmptyScreen />],
+  ['search-empty', '搜索 · 空', () => <SearchEmptyScreen />],
+  ['detail-todo', '课程详情 · 作业与备忘', () => <DetailScreen tall />],
+  ['todo2-classend', '今天 · 刚下课', () => <Todo2ClassEndScreen />],
   ['me', '我的', () => <MeScreen />],
   ['lock', '锁屏', () => <LockScreen />],
   ['notif', '通知偏好', () => <NotifPrefScreen />],

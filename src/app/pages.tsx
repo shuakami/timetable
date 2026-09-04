@@ -12,6 +12,7 @@ import {
   StickyHead, TextAction, TextInput, TopBar, WD, WD_SHORT, md, tint,
   DateInput, TimeInput, SelectInput,
 } from './ui'
+import { CourseTasks } from './todo'
 
 /** 格式化手机号：138 **** 1234 */
 function formatPhone(phone: string): string {
@@ -114,194 +115,18 @@ function PageBody({ children, className = '' }: { children: React.ReactNode; cla
   )
 }
 
-/* ---------------- 待办 ---------------- */
-
-export function TodoView({ onCourse, onEdit }: { onCourse: (c: Course) => void; onEdit: (t: Task | null) => void }) {
-  const state = useStore()
-  const today = todayStr()
-  const weekEnd = useMemo(() => {
-    const d = new Date(`${today}T00:00:00`)
-    d.setDate(d.getDate() + 7)
-    return d.toISOString().slice(0, 10)
-  }, [today])
-
-  const colorOf = (t: Task) => state.courses.find((c) => c.id === t.courseId)?.color ?? '#8A8E97'
-  const courseOf = (t: Task) => state.courses.find((c) => c.id === t.courseId)
-
-  const open = state.tasks.filter((t) => !t.done)
-  const groups: [string, string, Task[]][] = [
-    ['今天到期', '', open.filter((t) => t.due === today)],
-    ['这一周', '', open.filter((t) => t.due && t.due > today && t.due <= weekEnd)],
-    ['以后', '', open.filter((t) => t.due && t.due > weekEnd)],
-    ['没有截止', '', open.filter((t) => !t.due)],
-    ['已完成', `${state.tasks.length - open.length} 项`, state.tasks.filter((t) => t.done)],
-  ]
-  const dueToday = open.filter((t) => t.due === today).length
-  const thisWeek = open.filter((t) => t.due && t.due <= weekEnd).length
-  return (
-    <>
-      <div className="flex-1 overflow-y-auto pb-[150px] [scrollbar-width:none]">
-        <StickyHead className="px-5">
-          <div className="flex items-start justify-between">
-            <h1 className="text-[26px] font-extrabold tracking-[-.02em]">待办</h1>
-            <button
-              onClick={() => onEdit(null)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
-            >
-              <svg viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink2)' }} strokeWidth="2.2" strokeLinecap="round" className="h-[16px] w-[16px]"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
-          </div>
-          <div className="mt-2 flex items-center gap-2.5 text-[12.5px] font-semibold text-(--c-ink3)">
-            <span>本周 {thisWeek} 项</span>
-            <span className="h-3 w-px bg-(--c-line)" />
-            <span>{dueToday} 项今天到期</span>
-            <span className="h-3 w-px bg-(--c-line)" />
-            <span className="text-(--c-ink5)">已完成 {state.tasks.length - open.length} 项</span>
-          </div>
-        </StickyHead>
-
-        {state.tasks.length === 0 ? (
-          <div className="mt-16">
-            <EmptyBlock kind="free" title="无待办" actions={[['添加', () => onEdit(null)]]} />
-          </div>
-        ) : (
-          <div className="mt-6 px-5">
-            {groups.filter(([, , l]) => l.length > 0).map(([g, count, list]) => (
-              <div key={g} className="mb-5">
-                <div className="flex items-baseline justify-between px-0.5">
-                  <span className="text-[13px] font-extrabold tracking-[-.01em]">{g}</span>
-                  {count && <span className="text-[11.5px] font-semibold tabular-nums text-(--c-ink5)">{count}</span>}
-                </div>
-                <div className="mt-2.5 space-y-2">
-                  {list.map((t) => {
-                    const color = colorOf(t)
-                    const course = courseOf(t)
-                    const late = !t.done && t.due && t.due < today
-                    return (
-                      <div key={t.id} className={`flex overflow-hidden rounded-[14px] bg-(--c-surface) px-3.5 py-3 ${t.done ? 'opacity-45' : ''}`}>
-                        <button onClick={() => store.editTask(t.id, { done: !t.done })} className="mt-[3px] mr-3 flex-none">
-                          <span
-                            className="flex h-[17px] w-[17px] items-center justify-center rounded-[6px] border-[1.8px] transition-colors"
-                            style={{ borderColor: t.done ? color : 'var(--c-line)', background: t.done ? color : 'transparent' }}
-                          >
-                            {t.done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-surface)' }} strokeWidth="3.6"><path d="m6 12.5 4 4 8-9" /></svg>}
-                          </span>
-                        </button>
-                        <button onClick={() => onEdit(t)} className="flex-1 text-left">
-                          <div className="flex items-start justify-between">
-                            <span className={`text-[14px] leading-[1.3] font-bold tracking-[-.01em] ${t.done ? 'line-through' : ''}`}>{t.title}</span>
-                            {t.kind === 'exam' && <span className="ml-2 flex-none rounded-[6px] bg-(--c-rose-soft) px-1.5 py-[2px] text-[10px] font-bold text-(--c-rose)">考试</span>}
-                          </div>
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <i className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />
-                            <span className="text-[11.5px] font-semibold text-(--c-ink3)">{course?.name ?? TASK_LABEL[t.kind]}</span>
-                            <span className="text-[11.5px] font-medium tabular-nums text-(--c-ink5)">
-                              {t.due ? `${md(t.due)}${t.dueMinutes != null ? ` ${fmtMinutes(t.dueMinutes)}` : ''}` : '无截止'}
-                              {t.location ? `　${t.location}` : ''}
-                            </span>
-                          </div>
-                          {(late || t.note) && (
-                            <div className={`mt-1.5 text-[11.5px] font-bold tabular-nums ${late ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>
-                              {late ? '已过截止' : t.note}
-                            </div>
-                          )}
-                        </button>
-                        {course && (
-                          <button onClick={() => onCourse(course)} className="ml-2 flex-none self-center pl-1">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink5)' }} strokeWidth="2.4" strokeLinecap="round"><path d="m9 5 7 7-7 7" /></svg>
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <BottomVeil height={150} />
-    </>
-  )
-}
-
-/* 待办编辑（内页） */
-export function TaskEditorPage({ task, courseId, onClose }: { task: Task | null; courseId?: string; onClose: () => void }) {
-  const state = useStore()
-  const [title, setTitle] = useState(task?.title ?? '')
-  const [kind, setKind] = useState(TASK_KINDS.indexOf(task?.kind ?? 'homework'))
-  const [cid, setCid] = useState(task?.courseId ?? courseId ?? '')
-  const [due, setDue] = useState(task?.due ?? '')
-  const [time, setTime] = useState(task?.dueMinutes != null ? fmtMinutes(task.dueMinutes) : '')
-  const [loc, setLoc] = useState(task?.location ?? '')
-  const [note, setNote] = useState(task?.note ?? '')
-  const courses = state.courses.filter((c) => !c.removedByImport)
-
-  const save = () => {
-    const [h, m] = time.split(':').map(Number)
-    const patch = {
-      title: title.trim(),
-      kind: TASK_KINDS[kind],
-      courseId: cid || undefined,
-      due: due || undefined,
-      dueMinutes: time && !Number.isNaN(h) ? h * 60 + (m || 0) : undefined,
-      location: loc.trim() || undefined,
-      note: note.trim() || undefined,
-    }
-    if (task) store.editTask(task.id, patch)
-    else store.addTask({ id: uid(), done: false, createdAt: Date.now(), ...patch })
-    onClose()
-  }
-
-  return (
-    <Page>
-      <PageBody>
-        <TopBar title={task ? '编辑待办' : '添加待办'} onBack={onClose} />
-        <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">类型</div>
-        <div className="mt-2.5"><Chips items={TASK_KINDS.map((k) => TASK_LABEL[k])} active={kind} onPick={setKind} /></div>
-
-        <div className="mt-4 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
-          <Field k="名称"><TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如 习题册 P41–P45" /></Field>
-          <Field k="课程">
-            <SelectInput value={cid} onChange={setCid} title="课程" options={[['', '不关联'], ...courses.map((c): [string, string] => [c.id, c.name])]} />
-          </Field>
-          <Field k="截止"><DateInput value={due} onChange={setDue} /></Field>
-          <Field k="时间"><TimeInput value={time} onChange={setTime} /></Field>
-          {TASK_KINDS[kind] === 'exam' && <Field k="地点"><TextInput value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="考场、座位" /></Field>}
-          <Field k="备注"><TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="可选" /></Field>
-        </div>
-
-        {task && (
-          <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
-            <button
-              onClick={() => { store.removeTask(task.id); onClose() }}
-              className="w-full px-4 py-3.5 text-left text-[13.5px] font-bold text-(--c-rose) transition-colors active:bg-(--c-bg)"
-            >
-              删除
-            </button>
-          </div>
-        )}
-      </PageBody>
-
-      <PageFooter>
-        <PrimaryButton disabled={!title.trim()} onClick={save}>{task ? '保存' : '添加'}</PrimaryButton>
-      </PageFooter>
-    </Page>
-  )
-}
-
 /* ---------------- 课程详情（内页） ---------------- */
 
 export function CourseDetailPage({
-  course, snap, onBack, onChanges, onEdit, onAddTask, onEditTask,
+  course, snap, onBack, onChanges, onEdit, onCapture, onOpenTask,
 }: {
   course: Course
   snap: Snapshot
   onBack: () => void
   onChanges: () => void
   onEdit: () => void
-  onAddTask: () => void
-  onEditTask: (t: Task) => void
+  onCapture: (kind: 'camera' | 'text') => void
+  onOpenTask: (t: Task) => void
 }) {
   const state = useStore()
   const cur = state.courses.find((c) => c.id === course.id) ?? course
@@ -442,31 +267,13 @@ export function CourseDetailPage({
         </Card>
 
         <Card>
-          <div className="flex items-center justify-between">
-            <span className="text-[14px] font-bold text-(--c-ink)">作业与备忘</span>
-            <TextAction onClick={onAddTask}>添加</TextAction>
-          </div>
-          {tasks.length === 0 ? (
-            <div className="mt-3 text-[12.5px] font-medium text-(--c-ink4)">还没有作业或备忘</div>
-          ) : (
-            <div className="mt-1">
-              {tasks.map((t, i) => (
-                <button
-                  key={t.id}
-                  onClick={() => onEditTask(t)}
-                  className={`flex w-full items-baseline justify-between py-3 text-left ${i < tasks.length - 1 ? 'border-b border-(--c-surface2)' : ''} ${t.done ? 'opacity-45' : ''}`}
-                >
-                  <div className="min-w-0">
-                    <div className={`text-[14px] font-semibold text-(--c-ink) ${t.done ? 'line-through' : ''}`}>{t.title}</div>
-                    {t.note && <div className="mt-1 text-[12px] font-medium text-(--c-ink4)">{t.note}</div>}
-                  </div>
-                  <span className={`ml-3 flex-none text-[12px] font-bold ${t.due && t.due <= today && !t.done ? 'text-(--c-rose)' : 'text-(--c-ink4)'}`}>
-                    {t.due ? md(t.due) : TASK_LABEL[t.kind]}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          <CourseTasks
+            tasks={tasks}
+            course={cur}
+            onOpen={onOpenTask}
+            onCamera={() => onCapture('camera')}
+            onText={() => onCapture('text')}
+          />
         </Card>
 
         <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">

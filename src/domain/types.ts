@@ -85,6 +85,14 @@ export interface UserEntry {
   createdAt: number
 }
 
+export interface TaskPhoto {
+  id: string
+  path: string // 应用私有目录下的相对路径
+  w: number
+  h: number
+  takenAt: number
+}
+
 export interface Task {
   id: string
   courseId?: string
@@ -98,6 +106,12 @@ export interface Task {
   seat?: string
   done: boolean
   createdAt: number
+  photos?: TaskPhoto[]
+  /** 只有照片、还没有名称 */
+  inbox?: boolean
+  /** 记录时正在上或刚结束的课 */
+  capturedCourseId?: string
+  capturedAt?: number
 }
 
 export const WIDGET_STYLES = ['today', 'next', 'twoDays', 'week'] as const

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useTransform } from 'motion/react'
 import { App as CapApp } from '@capacitor/app'
 import type { Course, Occurrence, Semester, Task, OverrideKind, WidgetStyle } from '../domain/types'
@@ -16,8 +16,11 @@ import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
 import Onboarding, { currentWeek } from './Onboarding'
 import {
   ChangePage, ConflictPage, CourseDetailPage, CourseEditPage, EditSessionPage,
-  ManualAddPage, TaskEditorPage, TodoView,
+  ManualAddPage,
 } from './pages'
+import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView } from './todo'
+import type { CapturedPhoto } from './camera'
+import { justEndedClass } from '../domain/next-class'
 import { NotifPrefPage, PrefPickPage, WidgetPage, type PrefKey } from './reminder'
 import { PermsPage } from './permissions'
 import { attachNotificationActions, notificationsAllowed, pushChange, requestNotifications, setNotificationRouter, syncNotifications } from './notify'
@@ -347,7 +350,7 @@ function CalendarSheet({ snap, mode, anchor, onPick, onClose }: { snap: Snapshot
 /* ---------------- 今天（跨日连续时间线） ---------------- */
 
 function TodayView({
-  snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, liftKey,
+  snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, onCapture, liftKey,
 }: {
   snap: Snapshot
   anchor: string
@@ -357,6 +360,7 @@ function TodayView({
   onSearch: () => void
   onImport: () => void
   onManual: () => void
+  onCapture: (kind: 'camera' | 'text', courseId?: string) => void
   liftKey?: string
 }) {
   const today = todayStr()
@@ -428,6 +432,12 @@ function TodayView({
   const remain = anchor === today ? head.filter((o) => o.end > now && o.status !== 'cancelled').length : head.length
   const inTerm = week >= 1 && week <= snap.semester.totalWeeks
   const nothingAtAll = snap.courses.length === 0 && snap.entries.length === 0
+  /* 刚下课那一刻：时间线里那节课下面直接给出记录入口 */
+  const ended = useMemo(() => justEndedClass(snap, today, now), [snap, today, now])
+  const [endHidden, setEndHidden] = useState<string[]>([])
+  const endKey = ended ? `${ended.date}-${ended.courseId}-${ended.start}` : ''
+  const showEnd = ended && !endHidden.includes(endKey)
+  const weekend = weekdayOf(anchor) >= 6
 
   return (
     <>
@@ -451,7 +461,7 @@ function TodayView({
             {head.length > 0 ? (
               <span>{head.length} 节课{anchor === today && <span className="text-(--c-ink5)">，剩 {remain} 节</span>}</span>
             ) : (
-              <span className="text-(--c-ink5)">{nothingAtAll ? '无课表' : '无课程'}</span>
+              <span className="text-(--c-ink5)">{nothingAtAll ? '暂无课表' : '今天没有课'}</span>
             )}
           </div>
         </StickyHead>
@@ -459,11 +469,21 @@ function TodayView({
 
         {nothingAtAll ? (
           <div className="mt-16">
-            <EmptyBlock kind="none" title="无课表" actions={[['导入课表', onImport], ['手动添加', onManual]]} />
+            <EmptyBlock
+              kind="none"
+              title="让课表就位"
+              desc="一键导入，或是手动创建。随后的日程追踪与准时提醒，皆会为你准备就绪。"
+              actions={[['导入课表', onImport], ['手动添加', onManual]]}
+            />
           </div>
         ) : head.length === 0 && days.length === 1 ? (
           <div className="mt-14">
-            <EmptyBlock kind="free" title="无课程" actions={[['手动添加', onManual]]} />
+            <EmptyBlock
+              kind="free"
+              title="今天没有课，好耶"
+              desc={weekend ? '周末到了，不如去做点感兴趣的事，出去走走。' : '不如去做点感兴趣的事，出去走走。'}
+              actions={[['手动添加', onManual]]}
+            />
           </div>
         ) : (
           <div className="mt-6 px-5">
@@ -493,7 +513,8 @@ function TodayView({
                   const nowOn = isToday && o.start <= now && now < o.end
                   const pct = ((now - o.start) / Math.max(1, o.end - o.start)) * 100
                   return (
-                    <div key={o.key} className="relative -mx-3 w-[calc(100%+24px)] rounded-[18px]">
+                    <Fragment key={o.key}>
+                    <div className="relative -mx-3 w-[calc(100%+24px)] rounded-[18px]">
                     <button
                       {...pressProps(() => onPick(o), (r, el) => onMenu(o, r, el))}
                       className={`flex w-full px-3 py-2 text-left transition-transform duration-150 ${liftKey === o.key ? '' : 'active:scale-[.985]'}`}
@@ -538,6 +559,15 @@ function TodayView({
                       </div>
                     </button>
                     </div>
+                    {showEnd && ended && day.date === ended.date && o.courseId === ended.courseId && o.start === ended.start && (
+                      <ClassEndCard
+                        moment={ended}
+                        onCamera={() => onCapture('camera', ended.courseId)}
+                        onText={() => onCapture('text', ended.courseId)}
+                        onDismiss={() => setEndHidden((s) => [...s, endKey])}
+                      />
+                    )}
+                    </Fragment>
                   )
                 })}
               </div>
@@ -1583,7 +1613,10 @@ type Route =
   | { k: 'session'; occ: Occurrence }
   | { k: 'conflict'; occ: Occurrence }
   | { k: 'changes'; courseId?: string }
-  | { k: 'task'; task: Task | null; courseId?: string }
+  | { k: 'todoDetail'; task: Task }
+  | { k: 'todoCamera'; courseId?: string; taskId?: string }
+  | { k: 'todoPicker'; courseId?: string; taskId?: string }
+  | { k: 'todoReview'; photos: CapturedPhoto[]; courseId?: string }
   | { k: 'manual' }
   | { k: 'import' }
   | { k: 'importRun'; ruleId: string; text?: string }
@@ -1629,6 +1662,7 @@ export default function RealApp() {
   const [stack, setStack] = useState<Route[]>([])
   const [menu, setMenu] = useState<{ occ: Occurrence; anchor: Rect; ghost: Ghost } | null>(null)
   const [searching, setSearching] = useState(false)
+  const [compose, setCompose] = useState<{ courseId?: string } | null>(null)
   const [, tick] = useState(0)
 
   useEffect(() => {
@@ -1687,6 +1721,20 @@ export default function RealApp() {
   )
 
   const push = (r: Route) => { setMenu(null); setStack((s) => [...s, r]) }
+  /* 拍完/选完：给已有待办直接加照片，新待办进确认页；相机与相册不留在栈里 */
+  const onPhotos = (photos: CapturedPhoto[], courseId?: string, taskId?: string) => {
+    const shot = (r: Route) => r.k !== 'todoCamera' && r.k !== 'todoPicker'
+    if (taskId) {
+      store.addPhotos(taskId, photos.map((p) => ({ id: uid(), path: p.path, w: p.width, h: p.height, takenAt: Date.now() })))
+      setStack((s) => s.filter(shot))
+      return
+    }
+    setStack((s) => [...s.filter(shot), { k: 'todoReview', photos, courseId }])
+  }
+  const openCapture = (kind: 'camera' | 'text', courseId?: string) => {
+    if (kind === 'camera') push({ k: 'todoCamera', courseId })
+    else setCompose({ courseId })
+  }
   const pop = () => setStack((s) => s.slice(0, -1))
   const backToTimetable = () => { setStack([]); setTab(0) }
   const openCourseById = (id: string) => {
@@ -1729,6 +1777,7 @@ export default function RealApp() {
   const onboardBack = useRef<() => boolean>(() => false)
   backRef.current = () => {
     if (menu) { setMenu(null); return true }
+    if (compose) { setCompose(null); return true }
     if (closeTopSheet()) return true
     if (stack.length > 0) { setStack((s) => s.slice(0, -1)); return true }
     if (showOnboard && !onboardUnder) return onboardBack.current()
@@ -1762,8 +1811,8 @@ export default function RealApp() {
             onBack={pop}
             onChanges={() => push({ k: 'changes', courseId: r.course.id })}
             onEdit={() => push({ k: 'courseEdit', course: r.course })}
-            onAddTask={() => push({ k: 'task', task: null, courseId: r.course.id })}
-            onEditTask={(t) => push({ k: 'task', task: t })}
+            onCapture={(kind) => openCapture(kind, r.course.id)}
+            onOpenTask={(t) => push({ k: 'todoDetail', task: t })}
           />
         )
       case 'courseEdit':
@@ -1784,8 +1833,41 @@ export default function RealApp() {
         return <ConflictPage key={key} occ={r.occ} snap={snap} onBack={pop} onCourse={openCourseById} />
       case 'changes':
         return <ChangePage key={key} courseId={r.courseId} onBack={pop} />
-      case 'task':
-        return <TaskEditorPage key={key} task={r.task} courseId={r.courseId} onClose={pop} />
+      case 'todoDetail':
+        return (
+          <TaskDetailPage
+            key={key}
+            task={r.task}
+            snap={snap}
+            onBack={pop}
+            onCamera={() => push({ k: 'todoCamera', courseId: r.task.courseId, taskId: r.task.id })}
+          />
+        )
+      case 'todoCamera':
+        return (
+          <CameraPage
+            key={key}
+            snap={snap}
+            courseId={r.courseId}
+            onBack={pop}
+            onPicker={() => push({ k: 'todoPicker', courseId: r.courseId, taskId: r.taskId })}
+            onShot={(photos, cid) => onPhotos(photos, cid, r.taskId)}
+          />
+        )
+      case 'todoPicker':
+        return <PickerPage key={key} onBack={pop} onDone={(photos) => onPhotos(photos, r.courseId, r.taskId)} />
+      case 'todoReview':
+        return (
+          <ReviewPage
+            key={key}
+            snap={snap}
+            photos={r.photos}
+            courseId={r.courseId}
+            onBack={pop}
+            onRetake={() => setStack((s) => [...s.slice(0, -1), { k: 'todoCamera', courseId: r.courseId }])}
+            onSaved={() => setStack([])}
+          />
+        )
       case 'manual':
         return <ManualAddPage key={key} snap={snap} onBack={pop} />
       case 'import':
@@ -1884,6 +1966,7 @@ export default function RealApp() {
               onSearch={() => setSearching(true)}
               onImport={() => push({ k: 'import' })}
               onManual={() => push({ k: 'manual' })}
+              onCapture={openCapture}
             />
           )}
           {tab === 1 && (
@@ -1899,8 +1982,10 @@ export default function RealApp() {
           )}
           {tab === 2 && (
             <TodoView
-              onCourse={(c) => push({ k: 'course', course: c })}
-              onEdit={(t) => push({ k: 'task', task: t })}
+              snap={snap}
+              onOpen={(t) => push({ k: 'todoDetail', task: t })}
+              onCamera={() => push({ k: 'todoCamera' })}
+              onText={() => setCompose({})}
             />
           )}
           {tab === 3 && <MeView onPage={(p) => push({ k: p } as Route)} />}
@@ -1924,6 +2009,18 @@ export default function RealApp() {
               onPickCourse={(c) => push({ k: 'course', course: c })}
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {compose && (
+          <ComposeOverlay
+            key="compose"
+            snap={snap}
+            courseId={compose.courseId}
+            onClose={() => setCompose(null)}
+            onCamera={() => { const cid = compose.courseId; setCompose(null); push({ k: 'todoCamera', courseId: cid }) }}
+          />
         )}
       </AnimatePresence>
 

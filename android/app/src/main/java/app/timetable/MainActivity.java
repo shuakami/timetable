@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         final long start = SystemClock.uptimeMillis();
         splash.setKeepOnScreenCondition(() -> !WidgetBridge.webReady && SystemClock.uptimeMillis() - start < SPLASH_MAX_MS);
         registerPlugin(WidgetBridge.class);
+        registerPlugin(TtCamera.class);
         super.onCreate(savedInstanceState);
         ThemeApply.applySaved(this, getBridge().getWebView());
     }

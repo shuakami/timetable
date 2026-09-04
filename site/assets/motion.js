@@ -207,6 +207,18 @@
     });
   })();
 
+  /* ---------- 随手记：四步之间的线 ---------- */
+  (function flow() {
+    var root = document.querySelector(".flow");
+    if (!root) return;
+    var lineCover = penPath(root.querySelector(".flow-line .thread"));
+    if (!lineCover) return;
+
+    once(root, "top 70%", function () {
+      stroke(gsap.timeline(), lineCover, 0, 1.6, "none");
+    });
+  })();
+
   /* ---------- 学期：尺子 ---------- */
   (function ruler() {
     var root = document.querySelector(".ruler");

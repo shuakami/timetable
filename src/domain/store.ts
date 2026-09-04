@@ -1,5 +1,5 @@
 import type {
-  Course, ImportBatch, Override, Semester, SessionRule, UserEntry, ChangeEntry, Task, Prefs,
+  Course, ImportBatch, Override, Semester, SessionRule, UserEntry, ChangeEntry, Task, TaskPhoto, Prefs,
 } from './types'
 import { WIDGET_STYLES, defaultPrefs } from './types'
 import type { Snapshot } from './engine'
@@ -37,6 +37,7 @@ export function hydrate(s: State): State {
   for (const r of s.rules) r.weeksMask = BigInt(r.weeksMask as unknown as string)
   if (!s.savedRules || s.savedRules.length === 0) s.savedRules = [...BUILTIN_RULES]
   if (!s.tasks) s.tasks = []
+  for (const t of s.tasks) if (!t.photos) t.photos = []
   s.prefs = { ...defaultPrefs(), ...(s.prefs ?? {}) }
   if (!(WIDGET_STYLES as readonly string[]).includes(s.prefs.widgetStyle)) s.prefs.widgetStyle = defaultPrefs().widgetStyle
   return s
@@ -169,6 +170,18 @@ export class Store {
   removeTask(id: string) {
     this.state = { ...this.state, tasks: this.state.tasks.filter((t) => t.id !== id) }
     this.commit()
+  }
+
+  addPhotos(taskId: string, photos: TaskPhoto[]) {
+    this.editTask(taskId, {
+      photos: [...(this.state.tasks.find((t) => t.id === taskId)?.photos ?? []), ...photos],
+    })
+  }
+
+  removePhoto(taskId: string, photoId: string) {
+    const t = this.state.tasks.find((x) => x.id === taskId)
+    if (!t) return
+    this.editTask(taskId, { photos: (t.photos ?? []).filter((p) => p.id !== photoId) })
   }
 
   setCourseHidden(courseId: string, hidden: boolean) {

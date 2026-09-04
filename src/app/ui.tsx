@@ -375,39 +375,190 @@ export function Row({ title, desc, right, onClick, danger, active }: { title: st
   )
 }
 
-export function EmptyArt({ kind }: { kind: 'free' | 'none' }) {
+export type EmptyKind = 'free' | 'none' | 'todo' | 'term' | 'holiday' | 'search'
+
+export function EmptyArt({ kind }: { kind: EmptyKind }) {
+  const art: Record<EmptyKind, React.ReactNode> = {
+    free: (
+      <>
+        <rect x="6" y="9" width="36" height="32" rx="5" />
+        <path d="M6 18h36M15 5v7M33 5v7" />
+        <path d="m17 30 5 5 9-9" />
+      </>
+    ),
+    none: (
+      <>
+        <rect x="6" y="9" width="36" height="32" rx="5" strokeDasharray="4 3.5" />
+        <path d="M6 18h36M15 5v7M33 5v7" />
+        <path d="M24 24v10M19 29h10" />
+      </>
+    ),
+    todo: (
+      <>
+        <rect x="6" y="10" width="36" height="26" rx="4" />
+        <path d="M6 30l10-9 8 7 6-5 12 10" />
+        <circle cx="32" cy="18" r="3" />
+        <path d="M14 42h20" />
+      </>
+    ),
+    term: (
+      <>
+        <path d="M10 8h22l8 8v24a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" />
+        <path d="M32 8v8h8" />
+        <path d="m18 28 4 4 8-8" />
+      </>
+    ),
+    holiday: (
+      <>
+        <circle cx="24" cy="20" r="7" />
+        <path d="M24 5v4M24 31v4M9 20h4M35 20h4M13.4 9.4l2.8 2.8M31.8 27.8l2.8 2.8M13.4 30.6l2.8-2.8M31.8 12.2l2.8-2.8" />
+        <path d="M6 42c6-5 12-5 18 0s12 5 18 0" />
+      </>
+    ),
+    search: (
+      <>
+        <circle cx="21" cy="21" r="12" />
+        <path d="m30 30 11 11" />
+        <path d="M16 21h10" />
+      </>
+    ),
+  }
   return (
-    <svg viewBox="0 0 40 40" fill="none" className="h-[40px] w-[40px]">
-      {kind === 'free' ? (
-        <>
-          <rect x="5" y="9" width="30" height="26" rx="7" style={{ stroke: 'var(--c-line)' }} strokeWidth="1.6" />
-          <path d="M13 6v5M27 6v5" style={{ stroke: 'var(--c-line)' }} strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M14 22.5 18 26.5l8-8" style={{ stroke: 'var(--c-accent-line)' }} strokeWidth="1.8" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          <rect x="5" y="9" width="30" height="26" rx="7" style={{ stroke: 'var(--c-line)' }} strokeWidth="1.6" strokeDasharray="3.5 3.5" />
-          <path d="M13 6v5M27 6v5" style={{ stroke: 'var(--c-line)' }} strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M20 17v9M15.5 21.5h9" style={{ stroke: 'var(--c-ink5)' }} strokeWidth="1.8" strokeLinecap="round" />
-        </>
-      )}
+    <svg viewBox="0 0 48 48" fill="none" style={{ stroke: 'var(--c-ink3)' }} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-[52px] w-[52px]">
+      {art[kind]}
     </svg>
   )
 }
 
-export function EmptyBlock({ kind, title, desc, actions }: { kind: 'free' | 'none'; title: string; desc?: string; actions?: [string, () => void][] }) {
+export type EmptyAction = [label: string, onClick: () => void, icon?: React.ReactNode]
+
+export function EmptyBlock({ kind, title, desc, actions, className = 'px-5', onSurface }: {
+  kind: EmptyKind
+  title: string
+  desc?: string
+  actions?: EmptyAction[]
+  className?: string
+  onSurface?: boolean
+}) {
   return (
-    <div className="flex flex-col items-center px-8 text-center">
+    <div className={`flex flex-col ${className}`}>
       <EmptyArt kind={kind} />
-      <div className="mt-4 text-[17px] font-extrabold tracking-[-.02em] text-(--c-ink)">{title}</div>
-      {desc && <div className="mt-2 text-[13px] leading-[1.6] font-medium text-(--c-ink4)">{desc}</div>}
+      <div className="mt-6 text-[17px] font-extrabold tracking-[-.01em] text-(--c-ink)">{title}</div>
+      {desc && <div className="mt-2 text-[13.5px] leading-[1.55] font-medium text-(--c-ink3)">{desc}</div>}
       {actions && actions.length > 0 && (
-        <div className="mt-5 flex items-center gap-5">
-          {actions.map(([label, fn], i) => (
-            <button key={label} onClick={fn} className={`text-[13px] font-bold ${i === 0 ? 'text-(--c-accent)' : 'text-(--c-ink3)'}`}>{label}</button>
+        <div className="mt-5 flex items-center gap-2">
+          {actions.map(([label, fn, icon], i) => (
+            <button
+              key={label}
+              onClick={fn}
+              className={`flex h-[34px] items-center gap-1.5 rounded-full text-[13px] font-bold transition-transform duration-150 active:scale-[.96] ${i === 0 ? 'bg-(--c-accent) text-white' : `${onSurface ? 'bg-(--c-surface2)' : 'bg-(--c-surface)'} text-(--c-ink)`} ${icon ? 'pl-3 pr-3.5' : 'px-3.5'}`}
+            >
+              {icon}
+              {label}
+            </button>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+export const CameraIcon = ({ size = 18, stroke = 'var(--c-ink)' }: { size?: number; stroke?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ stroke }} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
+    <path d="M4 9a2.5 2.5 0 0 1 2.5-2.5H8l1.1-1.7c.3-.5.8-.8 1.4-.8h3c.6 0 1.1.3 1.4.8L16 6.5h1.5A2.5 2.5 0 0 1 20 9v7.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z" />
+    <circle cx="12" cy="12.6" r="3.1" />
+  </svg>
+)
+
+export const ArrowUpIcon = ({ stroke = '#fff' }: { stroke?: string }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+)
+
+/** 胶囊标签：课程、截止、分类 */
+export function Chip({ color, children, tone = 'plain', onClick }: {
+  color?: string
+  children: React.ReactNode
+  tone?: 'plain' | 'accent'
+  onClick?: () => void
+}) {
+  const Tag = onClick ? 'button' : 'span'
+  return (
+    <Tag
+      onClick={onClick}
+      className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'} ${onClick ? 'transition-transform duration-150 active:scale-[.96]' : ''}`}
+    >
+      {color && <span className="h-[7px] w-[7px] rounded-full" style={{ background: color }} />}
+      {children}
+    </Tag>
+  )
+}
+
+/** 快速记录胶囊：相机 + 一句话，压在底栏上面 */
+export function QuickBar({ onCamera, onText, placeholder = '新待办' }: {
+  onCamera: () => void
+  onText: () => void
+  placeholder?: string
+}) {
+  return (
+    <div className="absolute inset-x-4 bottom-[92px] z-[9]">
+      <div className="flex items-center gap-2 rounded-full p-[6px] pr-3.5" style={dockStyle}>
+        <button
+          onClick={onCamera}
+          className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-(--c-surface2) transition-transform duration-150 active:scale-[.92]"
+        >
+          <CameraIcon />
+        </button>
+        <button onClick={onText} className="flex-1 pl-1 text-left text-[15px] font-medium text-(--c-ink4)">{placeholder}</button>
+      </div>
+    </div>
+  )
+}
+
+/** 日期条下的全天状态带：学期已结束、假期 */
+export function WeekBand({ tone, title, meta }: { tone: 'gray' | 'amber'; title: string; meta: string }) {
+  const c = tone === 'amber' ? '#C29155' : '#8A8E97'
+  return (
+    <div className="flex items-center gap-2 rounded-[8px] px-2.5 py-[6px]" style={{ background: tint(c, 12) }}>
+      <i className="h-[14px] w-[3px] flex-none rounded-full" style={{ background: c }} />
+      <span className="text-[11.5px] font-bold" style={{ color: `color-mix(in srgb, ${c} 80%, var(--c-ink-mix))` }}>{title}</span>
+      <span className="ml-auto text-[10.5px] font-semibold tabular-nums" style={{ color: `color-mix(in srgb, ${c} 65%, var(--c-ink-mix))` }}>{meta}</span>
+    </div>
+  )
+}
+
+/** 停课的课：留在原时段的虚线幽灵块 */
+export function GhostEvent({ name, color, top, h, note = '停课' }: {
+  name: string
+  color: string
+  top: number
+  h: number
+  note?: string
+}) {
+  return (
+    <div
+      className="absolute inset-x-0 overflow-hidden rounded-[9px] border-[1.5px] border-dashed px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
+      style={{ top, height: h, borderColor: tint(color, 45), color: `color-mix(in srgb, ${color} 70%, var(--c-ink-mix))` }}
+    >
+      <span className="opacity-70">{name}</span>
+      <div className="mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60">{note}</div>
+    </div>
+  )
+}
+
+/** 底栏上方的悬浮胶囊动作 */
+export function FloatPills({ actions }: { actions: [string, () => void][] }) {
+  return (
+    <div className="absolute inset-x-0 bottom-[100px] z-[9] flex justify-center gap-2">
+      {actions.map(([label, fn], i) => (
+        <button
+          key={label}
+          onClick={fn}
+          className={`flex h-[36px] items-center rounded-full px-4 text-[13px] font-bold transition-transform duration-150 active:scale-[.96] ${i === 0 ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}
+          style={dockStyle}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -711,12 +862,12 @@ export function TextAction({ children, onClick, tone = 'brand', disabled }: { ch
 }
 
 /* 底部主操作：大号实心主题色 */
-export function PrimaryButton({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
+export function PrimaryButton({ children, onClick, disabled, onDark }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; onDark?: boolean }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] disabled:bg-(--c-line) disabled:text-(--c-ink5)"
+      className={`w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] ${onDark ? 'disabled:bg-white/12 disabled:text-white/35' : 'disabled:bg-(--c-line) disabled:text-(--c-ink5)'}`}
     >
       {children}
     </button>
