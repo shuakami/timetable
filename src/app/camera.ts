@@ -22,8 +22,8 @@ export type PermissionStatus = 'granted' | 'denied' | 'prompt'
 interface TtCameraPlugin {
   checkPermissions(): Promise<{ camera: PermissionStatus; photos: PermissionStatus }>
   requestPermission(o: { kind: 'camera' | 'photos' }): Promise<{ status: PermissionStatus }>
-  start(o: { position: 'back' | 'front'; x: number; y: number; width: number; height: number }): Promise<{ position: 'back' | 'front' }>
-  stop(): Promise<void>
+  start(o: { position: 'back' | 'front'; x: number; y: number; width: number; height: number; delay: number }): Promise<{ position: 'back' | 'front' }>
+  stop(): Promise<{ frozen?: string }>
   switchCamera(): Promise<{ position: 'back' | 'front' }>
   setTorch(o: { on: boolean }): Promise<void>
   capture(): Promise<CapturedPhoto>
@@ -130,18 +130,20 @@ export const camera = {
     }
   },
 
-  /** rect 是取景区在页面里的位置：原生预览就贴在这块地方，页面留透明洞 */
-  async start(position: 'back' | 'front', rect: { x: number; y: number; width: number; height: number }) {
+  /** rect 是取景区在页面里的位置：原生预览叠在这块上方；delay 后才淡入（等页面推入动画走完） */
+  async start(position: 'back' | 'front', rect: { x: number; y: number; width: number; height: number }, delay = 0) {
     if (!nativeCamera()) return webStart(position).then(() => undefined)
-    await TtCamera.start({ position, ...rect })
+    await TtCamera.start({ position, ...rect, delay })
   },
 
-  async stop() {
+  /** 收起预览；原生会把最后一帧定格成 data URL 还回来，页面填在取景框里接上 */
+  async stop(): Promise<string | null> {
     if (!nativeCamera()) {
       webStop()
-      return
+      return null
     }
-    await TtCamera.stop()
+    const r = await TtCamera.stop()
+    return r?.frozen ?? null
   },
 
   async switchCamera(): Promise<'back' | 'front'> {

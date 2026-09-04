@@ -456,13 +456,15 @@ export function CameraPage({
   const [torch, setTorch] = useState(false)
   const [thumb, setThumb] = useState<GalleryItem | null>(null)
   const [busy, setBusy] = useState(false)
+  /** 原生预览收起时的定格帧：填在取景框里，切页动画期间画面不断 */
+  const [frozen, setFrozen] = useState<string | null>(null)
   const frame = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLDivElement>(null)
   const course = state.courses.find((c) => c.id === cid)
 
   const startPreview = async () => {
     if (!frame.current) return
-    await camera.start('back', layoutRect(frame.current))
+    await camera.start('back', layoutRect(frame.current), SLIDE.duration * 1000)
     const el = camera.webPreview()
     if (el && video.current) {
       el.className = 'h-full w-full object-cover'
@@ -488,22 +490,22 @@ export function CameraPage({
     }
   }, [])
 
-  /* 原生预览层叠在 WebView 上方：页面被盖住或开始退场就立刻撤掉，不等卸载 */
+  /* 原生预览层叠在 WebView 上方：进页就开始预热，页面被盖住或开始退场就定格收起 */
   const present = useIsPresent()
   const live = granted && active && present
+  const mounted = useRef(true)
+  useEffect(() => () => { mounted.current = false }, [])
   useEffect(() => {
+    const freeze = () => camera.stop().then((f) => { if (mounted.current && f) setFrozen(f) })
     if (!live) {
-      void camera.stop()
+      void freeze()
       return
     }
     let alive = true
-    const t = window.setTimeout(() => {
-      void startPreview().catch(() => { if (alive) setDenied(true) })
-    }, SLIDE.duration * 1000)
+    void startPreview().catch(() => { if (alive) setDenied(true) })
     return () => {
       alive = false
-      window.clearTimeout(t)
-      void camera.stop()
+      void freeze()
     }
   }, [live])
 
@@ -512,7 +514,8 @@ export function CameraPage({
     setBusy(true)
     try {
       const photo = await camera.capture()
-      await camera.stop()
+      const f = await camera.stop()
+      if (f) setFrozen(f)
       onShot([photo], cid || undefined)
     } catch {
       setBusy(false)
@@ -550,6 +553,7 @@ export function CameraPage({
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div ref={frame} className="absolute inset-y-0 inset-x-2 rounded-[24px]">
             <div ref={video} className="absolute inset-0 overflow-hidden rounded-[24px] bg-black [&>video]:h-full [&>video]:w-full [&>video]:object-cover" />
+            {frozen && <img src={frozen} alt="" className="pointer-events-none absolute inset-0 h-full w-full rounded-[24px] object-cover" />}
             <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ boxShadow: '0 0 0 200vmax #000' }} />
             <div className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.25), transparent 30%, transparent 75%, rgba(0,0,0,.35))' }} />
             {['left-5 top-5 border-l-2 border-t-2 rounded-tl-[8px]', 'right-5 top-5 border-r-2 border-t-2 rounded-tr-[8px]', 'left-5 bottom-5 border-l-2 border-b-2 rounded-bl-[8px]', 'right-5 bottom-5 border-r-2 border-b-2 rounded-br-[8px]'].map((c) => (

@@ -83,6 +83,8 @@ public class TtCamera extends Plugin {
     @Override
     public void load() {
         io = Executors.newSingleThreadExecutor();
+        // 提前初始化 CameraX，进相机页时少等几百毫秒
+        ProcessCameraProvider.getInstance(getContext());
     }
 
     /* ---------------- 权限 ---------------- */
@@ -152,6 +154,7 @@ public class TtCamera extends Plugin {
         final int y = dp(call.getDouble("y", 0d));
         final int w = dp(call.getDouble("width", 0d));
         final int h = dp(call.getDouble("height", 0d));
+        final long revealAt = System.currentTimeMillis() + call.getInt("delay", 0);
 
         getActivity().runOnUiThread(() -> {
             try {
@@ -163,6 +166,17 @@ public class TtCamera extends Plugin {
                     frame = new FrameLayout(getContext());
                     frame.setClickable(false);
                     frame.setFocusable(false);
+                    frame.setAlpha(0f);
+                    final FrameLayout f = frame;
+                    // 第一帧到了、且页面推入动画走完，再淡入；不让黑屏/拉伸的中间态露出来
+                    previewView.getPreviewStreamState().observe((LifecycleOwner) getActivity(), state -> {
+                        if (state != PreviewView.StreamState.STREAMING || f != frame || f.getAlpha() > 0f) return;
+                        long wait = Math.max(0, revealAt - System.currentTimeMillis());
+                        f.postDelayed(() -> {
+                            if (f != frame) return;
+                            f.animate().alpha(1f).setDuration(220).start();
+                        }, wait);
+                    });
                     frame.addView(previewView, new FrameLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                     frame.addView(new FrameOverlay(getContext()), new FrameLayout.LayoutParams(
@@ -222,9 +236,29 @@ public class TtCamera extends Plugin {
         }, ContextCompat.getMainExecutor(getContext()));
     }
 
+    /**
+     * 收起预览：先把当前画面定格成一张图交给页面，页面用它填在取景框里，
+     * 之后的切页动画就全在 WebView 内完成，原生层消失时不会看到空洞。
+     */
     @PluginMethod
     public void stop(PluginCall call) {
         getActivity().runOnUiThread(() -> {
+            JSObject o = new JSObject();
+            if (previewView != null && frame != null && frame.getAlpha() > 0f) {
+                try {
+                    Bitmap b = previewView.getBitmap();
+                    if (b != null) {
+                        int max = 720;
+                        if (b.getWidth() > max) {
+                            b = Bitmap.createScaledBitmap(b, max, Math.round(b.getHeight() * (float) max / b.getWidth()), true);
+                        }
+                        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                        b.compress(Bitmap.CompressFormat.JPEG, 82, bo);
+                        o.put("frozen", "data:image/jpeg;base64," + android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP));
+                    }
+                } catch (Exception ignored) {
+                }
+            }
             if (provider != null) provider.unbindAll();
             if (frame != null && frame.getParent() != null) {
                 ((ViewGroup) frame.getParent()).removeView(frame);
@@ -233,7 +267,7 @@ public class TtCamera extends Plugin {
             previewView = null;
             capture = null;
             camera = null;
-            call.resolve();
+            call.resolve(o);
         });
     }
 
@@ -282,7 +316,7 @@ public class TtCamera extends Plugin {
             int w = getWidth();
             int h = getHeight();
             c.drawRect(0, 0, w, h, shade);
-            float in = dp(5) + dp(1);
+            float in = dp(20) + dp(1);
             float len = dp(24);
             float r = dp(8);
             drawCorner(c, in, in, 1, 1, len, r);
