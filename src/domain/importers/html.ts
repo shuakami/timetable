@@ -131,7 +131,7 @@ function parseTableMode(grid: string[][], opts: HtmlTableOptions): RuleOutput {
       teacher: map.teacher != null ? cells[map.teacher]?.trim() || undefined : undefined,
       teacherPhone: map.teacherPhone != null
         ? cells[map.teacherPhone]?.trim() || undefined
-        : extractPhone(cells[map.teacher]),
+        : map.teacher != null ? extractPhone(cells[map.teacher]) : undefined,
       location: map.location != null ? cells[map.location]?.trim() || undefined : undefined,
       weekday,
       startPeriod: pr.start,

@@ -49,6 +49,7 @@ export interface SessionRule {
   weeksMask: bigint // bit(n-1) = 第 n 周
   location?: string
   teacher?: string
+  teacherPhone?: string
 }
 
 export type OverrideKind =
