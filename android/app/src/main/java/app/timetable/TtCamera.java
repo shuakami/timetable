@@ -152,7 +152,8 @@ public class TtCamera extends Plugin {
                 ViewGroup root = (ViewGroup) getBridge().getWebView().getParent();
                 if (previewView == null) {
                     previewView = new PreviewView(getContext());
-                    previewView.setImplementationMode(PreviewView.ImplementationMode.PERFORMANCE);
+                    // TextureView 走普通视图层级，能被上层透明 WebView 透出；SurfaceView 会被窗口底色盖住
+                    previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
                     previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
                     root.addView(previewView, 0);
                 }

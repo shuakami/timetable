@@ -459,6 +459,7 @@ export function CameraPage({
 
   useEffect(() => {
     let alive = true
+    if (nativeCamera()) document.documentElement.dataset.camera = '1'
     void (async () => {
       const status = await camera.request('camera')
       if (!alive) return
@@ -476,6 +477,7 @@ export function CameraPage({
     })()
     return () => {
       alive = false
+      delete document.documentElement.dataset.camera
       void camera.stop()
     }
   }, [])
@@ -501,7 +503,7 @@ export function CameraPage({
 
   return (
     <Page className="bg-transparent">
-      <div className="absolute inset-0 flex flex-col">
+      <div data-camera-page className="absolute inset-0 flex flex-col">
         <div className="flex flex-none items-center justify-between bg-black px-4 pt-12 pb-4">
           <CircleBtn onClick={onBack}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
