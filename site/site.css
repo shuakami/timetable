@@ -21,6 +21,38 @@
   --wrap: 1120px;
   --gutter: clamp(20px, 4vw, 48px);
   --shadow-phone: 0 0 0 0.5px rgba(27, 28, 32, 0.06), 0 2px 6px rgba(27, 28, 32, 0.03), 0 24px 60px -12px rgba(27, 28, 32, 0.1);
+  --phone-fill: #f7f7f6;
+  --btn-hover: #3a3d45;
+  --ghost-ring: rgba(27, 28, 32, 0.16);
+  --ghost-hover: rgba(27, 28, 32, 0.04);
+  --tag-bg: #fff;
+  --mascot-shadow: drop-shadow(0 12px 24px rgba(27, 28, 32, 0.08));
+  --phone-hero-shadow: 0 0 0 0.5px rgba(27, 28, 32, 0.06), 0 2px 6px rgba(27, 28, 32, 0.03), 0 48px 100px -24px rgba(27, 28, 32, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #111214;
+    --paper-2: #1a1b1f;
+    --ink: #f1f1ef;
+    --ink-2: #b3b6be;
+    --ink-3: #8f939c;
+    --line: #2f3036;
+    --pencil: #50545c;
+    --blue: #6aa8f8;
+    --purple: #9d8ff5;
+    --blue-soft: #1b2a40;
+    --purple-soft: #262247;
+
+    --shadow-phone: 0 0 0 0.5px rgba(255, 255, 255, 0.09), 0 2px 6px rgba(0, 0, 0, 0.3), 0 24px 60px -12px rgba(0, 0, 0, 0.55);
+    --phone-fill: #111214;
+    --btn-hover: #45474e;
+    --ghost-ring: rgba(255, 255, 255, 0.22);
+    --ghost-hover: rgba(255, 255, 255, 0.06);
+    --tag-bg: #1a1b1f;
+    --mascot-shadow: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
+    --phone-hero-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.09), 0 2px 6px rgba(0, 0, 0, 0.3), 0 48px 100px -24px rgba(0, 0, 0, 0.6);
+  }
 }
 
 *,
@@ -43,6 +75,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  color-scheme: light dark;
 }
 
 img,
@@ -76,7 +109,7 @@ ol {
   top: 8px;
   padding: 8px 12px;
   background: var(--ink);
-  color: #fff;
+  color: var(--paper);
   border-radius: 8px;
   z-index: 100;
 }
@@ -145,7 +178,7 @@ ol {
   height: auto;
   border-radius: 26px;
   box-shadow: var(--shadow-phone);
-  background: #f7f7f6;
+  background: var(--phone-fill);
 }
 .tilt-l {
   transform: rotate(-2deg);
@@ -162,7 +195,7 @@ ol {
   padding: 0 22px;
   border-radius: 999px;
   background: var(--ink);
-  color: #fff;
+  color: var(--paper);
   text-decoration: none;
   font-weight: 500;
   font-size: 15px;
@@ -175,15 +208,15 @@ ol {
   fill: currentColor;
 }
 .btn:hover {
-  background: #000;
+  background: var(--btn-hover);
 }
 .btn-ghost {
   background: transparent;
   color: var(--ink);
-  box-shadow: inset 0 0 0 1.5px rgba(27, 28, 32, 0.16);
+  box-shadow: inset 0 0 0 1.5px var(--ghost-ring);
 }
 .btn-ghost:hover {
-  background: rgba(27, 28, 32, 0.04);
+  background: var(--ghost-hover);
 }
 .ico {
   width: 20px;
@@ -314,7 +347,7 @@ section {
   left: 190px;
   top: 18px;
   width: 260px;
-  box-shadow: 0 0 0 0.5px rgba(27, 28, 32, 0.06), 0 2px 6px rgba(27, 28, 32, 0.03), 0 48px 100px -24px rgba(27, 28, 32, 0.14);
+  box-shadow: var(--phone-hero-shadow);
 }
 .note {
   position: absolute;
@@ -355,7 +388,7 @@ section {
   bottom: -8px;
   width: 112px;
   transform: rotate(-12deg);
-  filter: drop-shadow(0 12px 24px rgba(27, 28, 32, 0.08));
+  filter: var(--mascot-shadow);
 }
 
 /* ============ 一天 ============ */
@@ -465,7 +498,7 @@ section {
 }
 .tag {
   align-self: center;
-  background: #fff;
+  background: var(--tag-bg);
   border: 1.5px solid var(--ink);
   border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
   padding: 8px 14px;

@@ -31,19 +31,23 @@
   --c-surface: #FFFFFF;
   --c-surface2: #F2F2F1;
   --c-line: #E5E5E3;
+  --c-line2: #F4F4F6;
   --c-ink: #1B1C20;
   --c-ink2: #6B6F78;
   --c-ink3: #8A8E97;
   --c-ink4: #A2A6AF;
+  --c-ink4b: #B0B4BD;
   --c-ink5: #C4C7CE;
-  --c-accent: #3B8BF5;
-  --c-accent2: #7FB4FA;
-  --c-accent-soft: #EAF2FE;
+  --c-ink5b: #D3D6DE;
+  --c-accent: #4F5BD5;
+  --c-accent2: #8A93E5;
+  --c-accent-soft: #EEF0FC;
   --c-accent-line: #C3DAFB;
   --c-danger: #C25B5B;
   --c-rose: #DE5B78;
   --c-rose-soft: #FDEEF1;
   --c-amber: #B98A2F;
+  --c-amber2: #C29155;
   --c-amber-soft: #FBF3E4;
   --c-dock: linear-gradient(180deg, rgba(250,250,250,.98), rgba(251,251,251,.98));
   --c-dock-line: #FFFFFF;
@@ -52,6 +56,16 @@
   --c-menu-shadow: 0 8px 24px rgba(27,28,32,.06);
   --c-lift-shadow: 0 1px 2px rgba(27,28,32,.04), 0 10px 24px rgba(27,28,32,.10);
   --c-scrim: rgba(27,28,32,.25);
+  --c-fade: linear-gradient(to top, #F7F7F6 0%, #F7F7F6 42%, rgba(247,247,246,.85) 66%, rgba(247,247,246,0) 100%);
+  --c-fade-photo: linear-gradient(to top, #F7F7F6 0%, rgba(247,247,246,.7) 50%, transparent 100%);
+  --c-tint-base: #fff;
+  --c-ink-mix: #000;
+  --c-dot-border: #D8D9DC;
+  --c-radio-border: #DDDEE3;
+  --c-mono-ink: #4A4D55;
+  --c-mono-key: #6D78D6;
+  --c-mono-punc: #B0B4BD;
+  --c-row-muted: #FAFAFA;
 }
 
 [data-theme='dark'] {
@@ -61,19 +75,23 @@
   --c-surface: #1C1D21;
   --c-surface2: #27282D;
   --c-line: #2F3036;
+  --c-line2: #26272C;
   --c-ink: #F1F1EF;
   --c-ink2: #B3B6BE;
   --c-ink3: #8F939C;
-  --c-ink4: #6F737C;
-  --c-ink5: #50545C;
-  --c-accent: #6AA8F8;
-  --c-accent2: #8FBDFA;
-  --c-accent-soft: #1B2A40;
+  --c-ink4: #8F939C;
+  --c-ink4b: #7A7E88;
+  --c-ink5: #6F737C;
+  --c-ink5b: #50545C;
+  --c-accent: #7C8FF0;
+  --c-accent2: #8A93E5;
+  --c-accent-soft: #232A46;
   --c-accent-line: #2C4A73;
   --c-danger: #E27878;
   --c-rose: #EE7A93;
   --c-rose-soft: #3B222A;
   --c-amber: #D9AA4C;
+  --c-amber2: #D9AA4C;
   --c-amber-soft: #39301A;
   --c-dock: linear-gradient(180deg, rgba(32,33,38,.98), rgba(30,31,36,.98));
   --c-dock-line: rgba(255,255,255,.06);
@@ -82,6 +100,16 @@
   --c-menu-shadow: 0 8px 24px rgba(0,0,0,.28);
   --c-lift-shadow: 0 1px 2px rgba(0,0,0,.2), 0 10px 24px rgba(0,0,0,.3);
   --c-scrim: rgba(0,0,0,.5);
+  --c-fade: linear-gradient(to top, #111214 0%, #111214 42%, rgba(17,18,20,.85) 66%, rgba(17,18,20,0) 100%);
+  --c-fade-photo: linear-gradient(to top, #111214 0%, rgba(17,18,20,.7) 50%, transparent 100%);
+  --c-tint-base: #26272C;
+  --c-ink-mix: #fff;
+  --c-dot-border: #4A4D54;
+  --c-radio-border: #4A4D54;
+  --c-mono-ink: #B3B6BE;
+  --c-mono-key: #8F9BE8;
+  --c-mono-punc: #6F737C;
+  --c-row-muted: #26272C;
 }
 
 [data-theme='black'] {
@@ -91,19 +119,23 @@
   --c-surface: #121214;
   --c-surface2: #1D1D20;
   --c-line: #262629;
+  --c-line2: #1B1B1E;
   --c-ink: #F1F1EF;
   --c-ink2: #B3B6BE;
   --c-ink3: #8F939C;
-  --c-ink4: #6F737C;
-  --c-ink5: #4A4D54;
-  --c-accent: #6AA8F8;
-  --c-accent2: #8FBDFA;
-  --c-accent-soft: #14202F;
+  --c-ink4: #8F939C;
+  --c-ink4b: #7A7E88;
+  --c-ink5: #6F737C;
+  --c-ink5b: #4A4D54;
+  --c-accent: #7C8FF0;
+  --c-accent2: #8A93E5;
+  --c-accent-soft: #1A1F36;
   --c-accent-line: #2C4A73;
   --c-danger: #E27878;
   --c-rose: #EE7A93;
   --c-rose-soft: #35202A;
   --c-amber: #D9AA4C;
+  --c-amber2: #D9AA4C;
   --c-amber-soft: #302A18;
   --c-dock: linear-gradient(180deg, rgba(22,22,24,.98), rgba(20,20,22,.98));
   --c-dock-line: rgba(255,255,255,.06);
@@ -112,6 +144,16 @@
   --c-menu-shadow: 0 8px 24px rgba(0,0,0,.35);
   --c-lift-shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 24px rgba(0,0,0,.35);
   --c-scrim: rgba(0,0,0,.6);
+  --c-fade: linear-gradient(to top, #000 0%, #000 42%, rgba(0,0,0,.85) 66%, rgba(0,0,0,0) 100%);
+  --c-fade-photo: linear-gradient(to top, #000 0%, rgba(0,0,0,.7) 50%, transparent 100%);
+  --c-tint-base: #1D1D20;
+  --c-ink-mix: #fff;
+  --c-dot-border: #3A3A3E;
+  --c-radio-border: #3A3A3E;
+  --c-mono-ink: #B3B6BE;
+  --c-mono-key: #8F9BE8;
+  --c-mono-punc: #6F737C;
+  --c-row-muted: #1D1D20;
 }
 
 html,
