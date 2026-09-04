@@ -875,7 +875,8 @@ section {
     width: 100%;
     height: auto;
     max-width: 420px;
-    padding: 0 0 0 12%;
+    margin: 8px auto 0;
+    padding: 0;
   }
   .leaders,
   .note {
@@ -884,32 +885,42 @@ section {
   .phone-hero {
     position: relative;
     left: 0;
-    width: 64%;
-    margin-left: 14%;
-    transform: rotate(-1.5deg);
+    top: 0;
+    width: 68%;
+    margin: 0 auto;
+    transform: none;
   }
   .mascot-peek {
-    width: 26%;
-    left: 0;
-    bottom: 6%;
+    width: 24%;
+    left: 4%;
+    bottom: 4%;
   }
 
+  .stops {
+    margin-top: 48px;
+  }
   .stop {
     grid-template-columns: 1fr;
-    row-gap: 24px;
+    row-gap: 28px;
+    justify-items: center;
   }
   .stop-r .stop-text {
     order: 2;
   }
-  .stop-fig {
-    justify-content: flex-start;
-  }
   .stop-fig .phone {
-    width: 200px;
+    width: 220px;
+    transform: none;
+  }
+  .stop-text {
+    max-width: 34em;
+    text-align: center;
+  }
+  .time {
+    margin-left: 0;
   }
   .connector {
-    height: 56px;
-    margin: 0;
+    height: 64px;
+    margin: 8px 0;
     position: relative;
   }
   .connector svg {
@@ -918,13 +929,10 @@ section {
   .connector::before {
     content: "";
     position: absolute;
-    left: 100px;
+    left: 50%;
     top: 0;
     bottom: 0;
     border-left: 2.5px dashed var(--pencil);
-  }
-  .stop-text {
-    max-width: none;
   }
 
   .funnel {
@@ -943,14 +951,20 @@ section {
     gap: 12px;
     padding: 0;
   }
+  .tag:nth-child(odd) {
+    transform: rotate(-0.6deg);
+  }
   .tag:nth-child(even) {
-    transform: rotate(1deg);
+    transform: rotate(0.6deg);
   }
   .funnel-phone,
   .funnel-result {
     position: static;
-    width: 200px;
-    margin-top: 32px;
+    width: 220px;
+    margin: 36px auto 0;
+  }
+  .funnel-result .phone {
+    transform: none;
   }
 
   .ruler-line {
