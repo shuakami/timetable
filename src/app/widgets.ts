@@ -13,6 +13,7 @@ interface WidgetBridgePlugin {
   toast(o: { text: string }): Promise<void>
   requestIgnoreBatteryOptimizations(): Promise<{ ignoring: boolean }>
   openChannelSettings(o: { channelId: string }): Promise<void>
+  openAutostartSettings(): Promise<void>
   pickDate(o: { value: string }): Promise<{ value: string }>
   pickTime(o: { value: string }): Promise<{ value: string }>
   pickOption(o: { options: string[]; selected: number; title?: string }): Promise<{ index: number }>
@@ -75,6 +76,22 @@ export async function requestIgnoreBattery(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** 查询电池优化状态 */
+export async function batteryOptimizationsIgnored(): Promise<boolean> {
+  if (!native()) return true
+  try {
+    return (await WidgetBridge.requestIgnoreBatteryOptimizations()).ignoring
+  } catch {
+    return true
+  }
+}
+
+/** 打开自启动设置页（ColorOS / MIUI / Flyme 各有专属页） */
+export function openAutostartSettings(): void {
+  if (!native()) return
+  WidgetBridge.openAutostartSettings().catch(() => undefined)
 }
 
 /** 打开通知渠道的系统设置页 */

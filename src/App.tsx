@@ -1113,6 +1113,103 @@ function NotifPrefScreen() {
   )
 }
 
+/* ---------------- 系统权限（屏 1） ---------------- */
+
+function PermsScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col pt-12">
+        <div className="px-5">
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">开启提醒</h1>
+        </div>
+
+        <div className="mt-6 px-5">
+          <div className="overflow-hidden rounded-[18px] bg-(--c-surface)">
+            <PermRow label="通知" action="开启" />
+            <PermRow label="锁屏与横幅" action="去设置" sep />
+            <PermRow label="准点提醒" action="允许" sep />
+            <PermRow label="保持后台运行" action="设置" sep />
+            <PermRow label="开机自启" action="去设置" sep />
+          </div>
+        </div>
+
+        <div className="mt-auto" />
+      </div>
+      <div className="px-5 pb-6">
+        <button className="w-full rounded-[16px] bg-(--c-accent) py-4 text-[15.5px] font-bold text-white">好了</button>
+      </div>
+    </Phone>
+  )
+}
+
+function PermRow({ label, action, sep }: { label: string; action: string; sep?: boolean }) {
+  return (
+    <div className={`flex h-[52px] items-center px-4 ${sep ? 'border-t border-(--c-line2)' : ''}`}>
+      <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{label}</span>
+      <span className="text-[12.5px] font-bold text-(--c-accent)">{action}</span>
+    </div>
+  )
+}
+
+/* ---------------- 锁屏与横幅（屏 2） ---------------- */
+
+function BannerHelpScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col pt-12">
+        <div className="px-5">
+          <div className="flex h-9 items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19 8 12l7-7" /></svg>
+            </span>
+          </div>
+          <h1 className="mt-3 text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">锁屏与横幅</h1>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 px-5">
+          <Bullet
+            title="锁屏显示"
+            path={['通知页', '锁屏显示', '显示所有内容']}
+          />
+          <Bullet
+            title="横幅通知"
+            path={['通知页', '横幅通知', '允许（可同时开悬浮通知）']}
+          />
+          <Bullet
+            title="置顶（重要程度）"
+            path={['通知页右上角', '设为紧急', '优先弹横幅而非静默进状态栏']}
+          />
+        </div>
+
+        <div className="mt-auto" />
+      </div>
+      <div className="px-5 pb-6">
+        <button className="w-full rounded-[16px] bg-(--c-accent) py-4 text-[15.5px] font-bold text-white">去系统设置</button>
+      </div>
+    </Phone>
+  )
+}
+
+function Bullet({ title, path }: { title: string; path: string[] }) {
+  return (
+    <div className="rounded-[18px] bg-(--c-surface) px-4 py-3.5">
+      <div className="text-[14px] font-bold tracking-[-.01em] text-(--c-ink)">{title}</div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] leading-[1.5] font-medium text-(--c-ink4)">
+        {path.map((seg, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            {i > 0 && (
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-(--c-ink5)">
+                <path d="m9 5 7 7-7 7" />
+              </svg>
+            )}
+            <span>{seg}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- 10 widgets ---------------- */
 
 function WCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -2189,6 +2286,8 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['me', '我的', () => <MeScreen />],
   ['lock', '锁屏', () => <LockScreen />],
   ['notif', '通知偏好', () => <NotifPrefScreen />],
+  ['perms', '开启提醒', () => <PermsScreen />],
+  ['banner-help', '锁屏与横幅', () => <BannerHelpScreen />],
   ['widget', '桌面小组件', () => <WidgetScreen />],
   ['widget2', '小组件样式', () => <WidgetScreen2 />],
   ['freeday', '今天没有课', () => <FreeDayScreen />],

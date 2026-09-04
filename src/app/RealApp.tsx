@@ -19,6 +19,7 @@ import {
   ManualAddPage, TaskEditorPage, TodoView,
 } from './pages'
 import { NotifPrefPage, PrefPickPage, WidgetPage, type PrefKey } from './reminder'
+import { PermsPage } from './permissions'
 import { attachNotificationActions, notificationsAllowed, pushChange, requestNotifications, setNotificationRouter, syncNotifications } from './notify'
 import { nativeToast, syncWidgets } from './widgets'
 import { THEME_LABEL, resolve, setTheme, useTheme, type ThemePref } from './theme'
@@ -1264,7 +1265,7 @@ function RuleEditorPage({ rule, onBack }: { rule: RuleManifest | null; onBack: (
 
 /* ---------------- 我的 ---------------- */
 
-type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'changes' | 'notif' | 'widget' | 'theme'
+type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'changes' | 'notif' | 'perms' | 'widget' | 'theme'
 
 const WIDGET_LABEL: Record<WidgetStyle, string> = {
   today: '今日课程',
@@ -1290,6 +1291,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
     ]],
     ['提醒', [
       ['上课提醒', `课前 ${state.prefs.classLead} 分钟`, 'notif'],
+      ['提醒与权限', '', 'perms'],
       ['作业提醒', `截止前一晚 ${fmtMinutes(state.prefs.taskEveningAt)}`, 'notif'],
     ]],
     ['外观', [
@@ -1573,6 +1575,7 @@ function CoursesPage({ onBack, onDetail, onManual }: { onBack: () => void; onDet
 
 const ONBOARD_KEY = 'tt.onboarded.v1'
 const NOTIF_ASK_KEY = 'tt.notifAsked.v1'
+const PERMS_DONE_KEY = 'tt.perms.done.v1'
 
 type Route =
   | { k: 'course'; course: Course }
@@ -1591,6 +1594,7 @@ type Route =
   | { k: 'trash' }
   | { k: 'courses' }
   | { k: 'notif' }
+  | { k: 'perms' }
   | { k: 'notifPick'; pref: PrefKey }
   | { k: 'widget' }
   | { k: 'theme' }
@@ -1712,6 +1716,12 @@ export default function RealApp() {
       /* 忽略 */
     }
     setOnboarded(true)
+    /* 首次完成引导时：自动推一次「开启提醒」 */
+    try {
+      if (localStorage.getItem(PERMS_DONE_KEY) !== '1') {
+        setStack((s) => [...s, { k: 'perms' }])
+      }
+    } catch { /* 忽略 */ }
   }, [onboardUnder, stack.length])
 
   /* 系统返回：先关浮层，再退内页，再回今天；引导期间退上一步 */
@@ -1805,6 +1815,8 @@ export default function RealApp() {
         return <TrashPage key={key} onBack={pop} />
       case 'notif':
         return <NotifPrefPage key={key} onBack={pop} onPick={(pref) => push({ k: 'notifPick', pref })} />
+      case 'perms':
+        return <PermsPage key={key} isFirstTime={false} onBack={pop} onFinish={pop} />
       case 'notifPick':
         return <PrefPickPage key={key} pref={r.pref} onBack={pop} />
       case 'widget':
