@@ -14,47 +14,12 @@ interface WidgetBridgePlugin {
   requestIgnoreBatteryOptimizations(): Promise<{ ignoring: boolean }>
   openChannelSettings(o: { channelId: string }): Promise<void>
   openAutostartSettings(): Promise<{ vendor: boolean }>
-  pickDate(o: { value: string }): Promise<{ value: string }>
-  pickTime(o: { value: string }): Promise<{ value: string }>
-  pickOption(o: { options: string[]; selected: number; title?: string }): Promise<{ index: number }>
   addListener(event: 'systemDark', cb: (o: { dark: boolean }) => void): Promise<PluginListenerHandle>
 }
 
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge')
 
 const native = () => Capacitor.getPlatform() === 'android'
-
-/** 原生系统选择器可用（Android），否则用网页控件 */
-export const hasNativePickers = native
-
-/** 系统日期选择，取消返回 null */
-export async function nativePickDate(value: string): Promise<string | null> {
-  try {
-    const r = await WidgetBridge.pickDate({ value })
-    return r.value || null
-  } catch {
-    return null
-  }
-}
-
-export async function nativePickTime(value: string): Promise<string | null> {
-  try {
-    const r = await WidgetBridge.pickTime({ value })
-    return r.value || null
-  } catch {
-    return null
-  }
-}
-
-/** 系统单选列表，取消返回 null */
-export async function nativePickOption(options: string[], selected: number, title?: string): Promise<number | null> {
-  try {
-    const r = await WidgetBridge.pickOption({ options, selected, title })
-    return r.index >= 0 ? r.index : null
-  } catch {
-    return null
-  }
-}
 
 /** 首帧画完，通知原生收走系统开屏 */
 export function notifyWebReady(): void {

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, animate, motion, useIsPresent, useMotionValue } from 'motion/react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useIsPresent, useMotionValue } from 'motion/react'
 import type { Course, Task, TaskPhoto } from '../domain/types'
 import { fmtMinutes, weekdayOf } from '../domain/dates'
 import type { Snapshot } from '../domain/engine'
@@ -10,8 +10,8 @@ import { nowMinutes, todayStr } from './semester'
 import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './camera'
 import { TaskPhotoImg } from './photo'
 import {
-  ActionSheet, ArrowUpIcon, BottomVeil, COMPOSE_RADIUS, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
-  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, WD, WD_SHORT, Wheel, composeLayoutId, dockStyle, md, type ActionItem,
+  ActionSheet, ArrowUpIcon, BottomVeil, CAL_H, COMPOSE_RADIUS, Calendar, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
+  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, SWAP, TimeWheels, WD, addDaysStr, composeLayoutId, dockStyle, md, type ActionItem,
 } from './ui'
 
 const KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
@@ -301,21 +301,20 @@ export function ComposeOverlay({
     return () => window.clearTimeout(t)
   }, [])
 
-  /* 键盘弹出/收起改的是窗口高度，卡片会跟着硬跳：先把它放回原处，再平滑滑到新位置 */
+  /*
+   * 键盘跟随：卡片挂在一个高度定死（挂载时视口高）的层里，视口被键盘压短也不动；
+   * 原生逐帧把键盘露出的高度（ImeFollow）喂进来，卡片按它平移，和系统键盘动画同步。
+   */
   const y = useMotionValue(0)
-  const [, relayout] = useState(0)
+  const dock = useRef<HTMLDivElement>(null)
+  const [dockH, setDockH] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    setDockH(dock.current?.parentElement?.clientHeight ?? null)
+  }, [])
   useEffect(() => {
-    let last = window.innerHeight
-    const onResize = () => {
-      const d = last - window.innerHeight
-      last = window.innerHeight
-      if (Math.abs(d) < 40) return
-      y.set(y.get() + d)
-      animate(y, 0, SHEET)
-      relayout((n) => n + 1)
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    const w = window as Window & { __ttIme?: (kb: number) => void }
+    w.__ttIme = (kb) => y.set(-kb)
+    return () => { delete w.__ttIme }
   }, [y])
 
   const send = () => {
@@ -340,10 +339,11 @@ export function ComposeOverlay({
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={FADE} className="absolute inset-0 z-[50]">
       <button onClick={onClose} className="absolute inset-0 bg-(--c-bg)/55" />
+      <div ref={dock} className="pointer-events-none absolute inset-x-0 top-0" style={{ height: dockH ?? '100%' }}>
       <motion.div
         layoutId={composeLayoutId(courseId)}
         transition={SHEET}
-        className="absolute inset-x-3 bottom-3 px-4 pt-3.5 pb-3"
+        className="pointer-events-auto absolute inset-x-3 bottom-3 px-4 pt-3.5 pb-3"
         style={{ ...dockStyle, borderRadius: COMPOSE_RADIUS, y }}
       >
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15, delay: 0.1 }}>
@@ -381,6 +381,7 @@ export function ComposeOverlay({
           </div>
         </motion.div>
       </motion.div>
+      </div>
       {meta.node}
     </motion.div>
   )
@@ -773,11 +774,6 @@ function MetaChips({
   )
 }
 
-const addDaysStr = (d: string, n: number) => {
-  const x = new Date(`${d}T00:00:00`)
-  x.setDate(x.getDate() + n)
-  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
-}
 
 /** 课程选择：不关联 + 各门课，课程色作图标 */
 function CourseSheet({ courses, cid, onPick, onClose }: { courses: Course[]; cid: string; onPick: (id: string) => void; onClose: () => void }) {
@@ -796,32 +792,8 @@ function KindSheet({ kind, onPick, onClose }: { kind: Task['kind']; onPick: (k: 
   return <ActionSheet title="分类" groups={[items]} onClose={onClose} />
 }
 
-const WHEEL_STEP = 5
-const CAL_ROW = 42
-const CAL_H = 40 + 26 + CAL_ROW * 6
-
-const ymOf = (d: string) => d.slice(0, 7)
-const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate()
-const pad2 = (n: number) => String(n).padStart(2, '0')
-const ymd = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`
-const shiftMonth = (ym: string, n: number) => {
-  const y = Number(ym.slice(0, 4))
-  const m = Number(ym.slice(5, 7)) - 1 + n
-  return `${y + Math.floor(m / 12)}-${pad2(((m % 12) + 12) % 12 + 1)}`
-}
-/** 六行七列，周一起；不足处用上月末与下月初补齐 */
-function calendarCells(ym: string): string[] {
-  const y = Number(ym.slice(0, 4))
-  const m = Number(ym.slice(5, 7))
-  const first = ymd(y, m, 1)
-  const lead = weekdayOf(first) - 1
-  return Array.from({ length: 42 }, (_, i) => addDaysStr(first, i - lead))
-}
-
-const SWAP = { duration: 0.2 } as const
-
 /**
- * 截止选择：一张卡里放日期胶囊 + 时刻胶囊，下面随选中的胶囊切成月历 / 年月日滚轮 / 时刻滚轮。
+ * 截止选择：一张卡里放日期胶囊 + 时刻胶囊，下面随选中的胶囊切成月历 / 时刻滚轮。
  * 常用的「今晚 / 明天 / 下次课前」是一排快捷项，点了直接定；月历里挑完按底部确定。
  */
 function DueSheet({
@@ -837,15 +809,7 @@ function DueSheet({
   const dismiss = useRef<(() => void) | null>(null)
   const [d, setD] = useState(due || today)
   const [m, setM] = useState(dueMinutes ?? 23 * 60)
-  const [view, setView] = useState<'cal' | 'ym' | 'time'>('cal')
-  const [month, setMonth] = useState(ymOf(due || today))
-  const [dir, setDir] = useState(1)
-
-  const goMonth = (n: number) => { setDir(n); setMonth((x) => shiftMonth(x, n)) }
-  const pickDay = (x: string) => {
-    setD(x)
-    if (ymOf(x) !== month) { setDir(x > month ? 1 : -1); setMonth(ymOf(x)) }
-  }
+  const [timeView, setTimeView] = useState(false)
 
   const tomorrow = addDaysStr(today, 1)
   const is = (x: string, mm: number) => due === x && dueMinutes === mm
@@ -863,24 +827,7 @@ function DueSheet({
   }
   if (due) quick.push({ label: '没有截止', on: false, go: () => done('', undefined) })
 
-  /* 年月日滚轮 */
-  const y0 = Number(today.slice(0, 4))
-  const years = useMemo(() => Array.from({ length: 4 }, (_, i) => `${y0 - 1 + i}年`), [y0])
-  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => `${i + 1}月`), [])
-  const dy = Number(d.slice(0, 4))
-  const dm = Number(d.slice(5, 7))
-  const dd = Number(d.slice(8))
-  const mdays = useMemo(() => Array.from({ length: daysInMonth(dy, dm) }, (_, i) => `${i + 1}日`), [dy, dm])
-  const setYmd = (y: number, mo: number, day: number) => pickDay(ymd(y, mo, Math.min(day, daysInMonth(y, mo))))
-
-  /* 时刻滚轮 */
-  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => pad2(i)), [])
-  const minutes = useMemo(() => Array.from({ length: 60 / WHEEL_STEP }, (_, i) => pad2(i * WHEEL_STEP)), [])
-  const hi = Math.floor(m / 60)
-  const mi = Math.round((m % 60) / WHEEL_STEP) % (60 / WHEEL_STEP)
-
-  const cells = useMemo(() => calendarCells(month), [month])
-  const dateLabel = `${dy !== y0 ? `${dy}年` : ''}${md(d)} ${WD[weekdayOf(d)]}`
+  const dateLabel = `${d.slice(0, 4) !== today.slice(0, 4) ? `${d.slice(0, 4)}年` : ''}${md(d)} ${WD[weekdayOf(d)]}`
   const pill = (on: boolean) =>
     `h-[38px] rounded-full px-4 text-[14.5px] font-bold tabular-nums transition-colors duration-200 ${on ? 'bg-(--c-accent) text-white' : 'bg-(--c-surface2) text-(--c-ink)'}`
 
@@ -894,8 +841,8 @@ function DueSheet({
     >
       <div className="flex items-center gap-2 pb-3.5">
         <span className="mr-auto text-[15px] font-semibold text-(--c-ink)">截止于</span>
-        <button onClick={() => setView(view === 'time' ? 'cal' : view)} className={pill(view !== 'time')}>{dateLabel}</button>
-        <button onClick={() => setView('time')} className={pill(view === 'time')}>{fmtMinutes(m)}</button>
+        <button onClick={() => setTimeView(false)} className={pill(!timeView)}>{dateLabel}</button>
+        <button onClick={() => setTimeView(true)} className={pill(timeView)}>{fmtMinutes(m)}</button>
       </div>
       <div className="flex flex-wrap gap-1.5 border-t border-(--c-line) py-3">
         {quick.map((q) => (
@@ -908,80 +855,15 @@ function DueSheet({
           </button>
         ))}
       </div>
-
       <div className="relative border-t border-(--c-line)" style={{ height: CAL_H }}>
         <AnimatePresence initial={false}>
-          {view === 'cal' && (
+          {timeView ? (
+            <motion.div key="time" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex items-center">
+              <TimeWheels minutes={m} onChange={setM} className="flex-1" />
+            </motion.div>
+          ) : (
             <motion.div key="cal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0">
-              <div className="flex h-10 items-center justify-between">
-                <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 5-7 7 7 7" /></svg>
-                </button>
-                <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
-                  {Number(month.slice(0, 4))}年{Number(month.slice(5, 7))}月
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-ink3)"><path d="M6 9h12l-6 7z" /></svg>
-                </button>
-                <button onClick={() => goMonth(1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
-                </button>
-              </div>
-              <div className="grid h-[26px] grid-cols-7 items-center">
-                {WD_SHORT.slice(1).map((w) => <span key={w} className="text-center text-[12px] font-semibold text-(--c-ink4)">{w}</span>)}
-              </div>
-              <div className="relative" style={{ height: CAL_ROW * 6 }}>
-                <AnimatePresence initial={false} custom={dir}>
-                  <motion.div
-                    key={month}
-                    custom={dir}
-                    variants={{
-                      enter: (n: number) => ({ opacity: 0, transform: `translateX(${n * 18}px)` }),
-                      show: { opacity: 1, transform: 'translateX(0px)' },
-                      exit: (n: number) => ({ opacity: 0, transform: `translateX(${-n * 18}px)` }),
-                    }}
-                    initial="enter"
-                    animate="show"
-                    exit="exit"
-                    transition={SHEET}
-                    className="absolute inset-0 grid grid-cols-7"
-                  >
-                    {cells.map((c) => {
-                      const inMonth = ymOf(c) === month
-                      const sel = c === d
-                      const isToday = c === today
-                      return (
-                        <button key={c} onClick={() => pickDay(c)} className="relative flex items-center justify-center" style={{ height: CAL_ROW }}>
-                          {sel && inMonth && <motion.span layoutId="due-day" transition={SHEET} className="absolute h-[34px] w-[34px] rounded-full bg-(--c-accent)" />}
-                          <span
-                            className={`relative text-[15px] tabular-nums ${sel && inMonth ? 'font-bold text-white' : isToday ? 'font-bold text-(--c-accent)' : inMonth ? 'font-medium text-(--c-ink)' : 'font-medium text-(--c-ink5)'}`}
-                          >
-                            {Number(c.slice(8))}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          )}
-          {view === 'ym' && (
-            <motion.div key="ym" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex flex-col">
-              <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
-                {dy}年{dm}月
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
-              </button>
-              <div className="flex flex-1 items-center gap-2">
-                <Wheel items={years} index={Math.max(0, Math.min(years.length - 1, dy - (y0 - 1)))} onChange={(i) => setYmd(y0 - 1 + i, dm, dd)} className="flex-1" />
-                <Wheel items={months} index={dm - 1} onChange={(i) => setYmd(dy, i + 1, dd)} className="flex-1" />
-                <Wheel items={mdays} index={Math.min(dd, mdays.length) - 1} onChange={(i) => setYmd(dy, dm, i + 1)} className="flex-1" />
-              </div>
-            </motion.div>
-          )}
-          {view === 'time' && (
-            <motion.div key="time" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SWAP} className="absolute inset-0 flex items-center gap-2 px-10">
-              <Wheel items={hours} index={hi} onChange={(i) => setM(i * 60 + mi * WHEEL_STEP)} className="flex-1" />
-              <span className="text-[18px] font-bold text-(--c-ink3)">:</span>
-              <Wheel items={minutes} index={mi} onChange={(i) => setM(hi * 60 + i * WHEEL_STEP)} className="flex-1" />
+              <Calendar value={d} onChange={setD} today={today} />
             </motion.div>
           )}
         </AnimatePresence>

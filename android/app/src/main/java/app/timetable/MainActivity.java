@@ -11,6 +11,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     /** 开屏最多停留多久：页面迟迟不报首帧时也要放行 */
     private static final long SPLASH_MAX_MS = 4000;
+    private ResumeCover resumeCover;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -22,6 +23,20 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TtCamera.class);
         super.onCreate(savedInstanceState);
         ThemeApply.applySaved(this, getBridge().getWebView());
+        ImeFollow.install(this, getBridge().getWebView());
+        resumeCover = new ResumeCover(this, getBridge().getWebView());
+    }
+
+    @Override
+    public void onPause() {
+        if (resumeCover != null) resumeCover.capture();
+        super.onPause();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (resumeCover != null) resumeCover.release();
     }
 
     /** uiMode 在 configChanges 里，系统深浅色切换不重建 Activity，这里把变化转给页面 */
