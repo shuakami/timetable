@@ -1,6 +1,52 @@
 /* 嘎嘎课程表 · 首页
    一条手绘虚线串起一天。纸色底，蓝紫两支笔。 */
 
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("assets/fonts/Geist-Var.woff2") format("woff2-variations");
+  unicode-range: U+0020-007E, U+00A0, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+00B7, U+3001-3002, U+FF01-FF5E;
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("assets/fonts/GeistMono-Var.woff2") format("woff2-variations");
+  unicode-range: U+0020-007E, U+00A0, U+2013-2014, U+00B7;
+}
+@font-face {
+  font-family: "Noto Sans SC Local";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/NotoSansSC-Regular-subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Noto Sans SC Local";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("assets/fonts/NotoSansSC-Medium-subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Noto Sans SC Local";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("assets/fonts/NotoSansSC-Bold-subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("assets/fonts/Caveat-Var.woff2") format("woff2-variations");
+  unicode-range: U+0020-007E, U+00A0, U+2013-2014, U+00B7;
+}
+
 :root {
   --paper: #faf8f4;
   --paper-2: #f2eee7;
@@ -14,9 +60,9 @@
   --blue-soft: #eaf2fe;
   --purple-soft: #efedfd;
 
-  --sans: "Geist", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+  --sans: "Geist", "Noto Sans SC Local", "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --hand: "Caveat", "Noto Sans SC", "PingFang SC", sans-serif;
+  --hand: "Caveat", "Noto Sans SC Local", "PingFang SC", sans-serif;
 
   --wrap: 1120px;
   --gutter: clamp(20px, 4vw, 48px);
