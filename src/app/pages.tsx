@@ -422,7 +422,7 @@ export function CourseDetailPage({
           <div className="mt-3 h-1 overflow-hidden rounded-full bg-(--c-surface2)">
             <i className="block h-full rounded-full bg-(--c-accent)" style={{ width: `${sessions.length ? (passed.length / sessions.length) * 100 : 0}%` }} />
           </div>
-          <div className="mt-4 flex items-baseline border-t border-(--c-surface2) pt-3.5">
+          <div className="mt-4 flex items-baseline">
             <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">出勤</span>
             <span className="text-[14px] font-semibold tabular-nums text-(--c-ink)">
               {passed.length === 0 ? '—' : `${attended.length} / ${passed.length}，出勤率 ${rate}%`}

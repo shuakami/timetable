@@ -546,7 +546,7 @@ function DetailScreen() {
           <div className="mt-3 h-1 overflow-hidden rounded-full bg-(--c-surface2)">
             <i className="block h-full w-[20.3%] rounded-full bg-(--c-accent)" />
           </div>
-          <div className="mt-4 flex items-baseline border-t border-(--c-line2) pt-3.5">
+          <div className="mt-4 flex items-baseline">
             <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">出勤</span>
             <span className="text-[14px] font-semibold tabular-nums text-(--c-ink)">6 / 7，出勤率 86%</span>
           </div>

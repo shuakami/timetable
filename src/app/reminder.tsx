@@ -5,8 +5,8 @@ import { addDays, fmtMinutes, weekOf, dateOf } from '../domain/dates'
 import { todayStr } from './semester'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
 import type { Minutes, Prefs, WidgetStyle } from '../domain/types'
-import { notificationsAllowed, requestNotifications, syncNotifications } from './notify'
-import { addWidgetToHome, syncWidgets, widgetPinSupported } from './widgets'
+import { exactAlarmsAllowed, notificationsAllowed, requestExactAlarms, requestNotifications, scheduleTestNotification, syncNotifications } from './notify'
+import { addWidgetToHome, nativeToast, syncWidgets, widgetPinSupported } from './widgets'
 
 /* ---------------- 通知偏好 ---------------- */
 
@@ -127,10 +127,19 @@ const GROUPS: [string, PrefKey[]][] = [
 export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: (k: PrefKey) => void }) {
   const state = useStore()
   const [allowed, setAllowed] = useState(true)
+  const [exact, setExact] = useState(true)
 
   useEffect(() => {
     void notificationsAllowed().then(setAllowed)
+    void exactAlarmsAllowed().then(setExact)
   }, [])
+
+  const testAt = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(8, 0, 0, 0)
+    return d
+  })()
 
   return (
     <Page>
@@ -147,6 +156,15 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
           >
             <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">系统通知未开启</span>
             <span className="text-[12.5px] font-bold text-(--c-accent)">开启</span>
+          </button>
+        )}
+        {allowed && !exact && (
+          <button
+            onClick={async () => setExact(await requestExactAlarms())}
+            className="mt-6 flex w-full items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5 text-left transition-opacity active:opacity-60"
+          >
+            <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">提醒可能不准时</span>
+            <span className="text-[12.5px] font-bold text-(--c-accent)">允许闹钟</span>
           </button>
         )}
         <div className="mt-5">
@@ -168,6 +186,19 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
               </div>
             </div>
           ))}
+          <div className="mt-5">
+            <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">测试</div>
+            <button
+              onClick={async () => {
+                const ok = await scheduleTestNotification(testAt)
+                nativeToast(ok ? `明天 08:00 会收到一条测试通知` : '通知未开启')
+              }}
+              className="mt-2 flex w-full items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5 text-left transition-opacity active:opacity-60"
+            >
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">发一条测试通知</span>
+              <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">明天 08:00</span>
+            </button>
+          </div>
         </div>
       </div>
     </Page>

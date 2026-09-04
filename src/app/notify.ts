@@ -28,6 +28,49 @@ export async function requestNotifications(): Promise<boolean> {
   return display === 'granted'
 }
 
+/** Android 12+ 的「闹钟和提醒」权限；没有它，系统可能把通知延后几十分钟 */
+export async function exactAlarmsAllowed(): Promise<boolean> {
+  if (Capacitor.getPlatform() !== 'android') return true
+  try {
+    const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting()
+    return exact_alarm === 'granted'
+  } catch {
+    return true
+  }
+}
+
+export async function requestExactAlarms(): Promise<boolean> {
+  if (Capacitor.getPlatform() !== 'android') return true
+  try {
+    const { exact_alarm } = await LocalNotifications.changeExactNotificationSetting()
+    return exact_alarm === 'granted'
+  } catch {
+    return false
+  }
+}
+
+/** 排一条测试通知；group 标成 snooze 以免被重排时撤掉 */
+export async function scheduleTestNotification(at: Date): Promise<boolean> {
+  if (!native()) return false
+  try {
+    if (!(await notificationsAllowed())) return false
+    await ensureChannel()
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: stableId('test'),
+        title: '通知测试',
+        body: '能看到这条，说明上课提醒能正常送达。',
+        channelId: CHANNEL,
+        schedule: { at, allowWhileIdle: true },
+        extra: { group: 'snooze' },
+      }],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function ensureChannel() {
   if (Capacitor.getPlatform() !== 'android') return
   try {
