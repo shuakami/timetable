@@ -37,6 +37,7 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         if (resumeCover != null) resumeCover.release();
+        WidgetBridge.notifyDynamicColors(this);
     }
 
     /** uiMode 在 configChanges 里，系统深浅色切换不重建 Activity，这里把变化转给页面 */

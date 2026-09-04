@@ -25,7 +25,7 @@ import { NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } 
 import { PermsPage } from './permissions'
 import { attachNotificationActions, notificationsAllowed, pushChange, requestNotifications, setNotificationRouter, syncNotifications } from './notify'
 import { nativeToast, syncWidgets } from './widgets'
-import { THEME_LABEL, resolve, setTheme, useTheme, type ThemePref } from './theme'
+import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
   BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
   TextAction, TextInput, TopBar, WD, WD_SHORT, dockStyle, md, tint, type Ghost, type Rect,
@@ -1411,6 +1411,7 @@ const THEME_ORDER: ThemePref[] = ['system', 'light', 'dark', 'black']
 /* 主题选择：选项列表同提醒设置页，上方三块小预览直接用各主题的色板渲染 */
 function ThemePage({ onBack }: { onBack: () => void }) {
   const theme = useTheme()
+  const [dyn, dynOk] = useDynamic()
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-[130px] [scrollbar-width:none]">
@@ -1454,6 +1455,29 @@ function ThemePage({ onBack }: { onBack: () => void }) {
             )
           })}
         </div>
+        {dynOk && (
+          <>
+            <div className="mt-6 px-1 text-[12px] font-bold text-(--c-ink4)">主题色</div>
+            <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+              {([[false, '默认'], [true, '跟随系统配色']] as const).map(([v, label], i) => {
+                const on = dyn === v
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setDynamic(v)}
+                    className={`flex w-full items-center py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}
+                  >
+                    <span className={`flex-1 text-[14px] font-semibold ${on ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{label}</span>
+                    {on && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-accent)' }} strokeWidth="2.6"><path d="m5 13 4.5 4.5L19 7" /></svg>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="mt-2 px-1 text-[12px] font-medium text-(--c-ink4)">取自当前壁纸的 Material You 色板。</div>
+          </>
+        )}
       </div>
     </Page>
   )

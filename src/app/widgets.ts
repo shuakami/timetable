@@ -10,11 +10,19 @@ interface WidgetBridgePlugin {
   ready(): Promise<void>
   setTheme(o: { bg: string; light: boolean }): Promise<void>
   systemDark(): Promise<{ dark: boolean }>
+  dynamicColors(): Promise<DynamicColors>
   toast(o: { text: string }): Promise<void>
   requestIgnoreBatteryOptimizations(): Promise<{ ignoring: boolean }>
   openChannelSettings(o: { channelId: string }): Promise<void>
   openAutostartSettings(): Promise<{ vendor: boolean }>
   addListener(event: 'systemDark', cb: (o: { dark: boolean }) => void): Promise<PluginListenerHandle>
+  addListener(event: 'dynamicColors', cb: (o: DynamicColors) => void): Promise<PluginListenerHandle>
+}
+
+/** Material You 主色调板：tone 100 → 0 共 13 级 hex；12 以下 supported 为 false */
+export interface DynamicColors {
+  supported: boolean
+  accent?: string[]
 }
 
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge')
@@ -79,6 +87,13 @@ export function watchSystemDark(cb: (dark: boolean) => void): void {
   if (!native()) return
   WidgetBridge.systemDark().then((o) => cb(o.dark)).catch(() => undefined)
   void WidgetBridge.addListener('systemDark', (o) => cb(o.dark)).catch(() => undefined)
+}
+
+/** 系统动态色板：启动取一次，回前台时原生再推（壁纸换色） */
+export function watchDynamicColors(cb: (o: DynamicColors) => void): void {
+  if (!native()) return
+  WidgetBridge.dynamicColors().then(cb).catch(() => undefined)
+  void WidgetBridge.addListener('dynamicColors', cb).catch(() => undefined)
 }
 
 /** 把课表快照写给桌面小组件并触发重绘 */

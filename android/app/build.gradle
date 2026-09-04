@@ -18,8 +18,8 @@ android {
         applicationId "app.timetable"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode System.getenv("VERSION_CODE")?.toInteger() ?: 21
-        versionName System.getenv("VERSION_NAME") ?: "1.4.28"
+        versionCode System.getenv("VERSION_CODE")?.toInteger() ?: 22
+        versionName System.getenv("VERSION_NAME") ?: "1.4.29"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

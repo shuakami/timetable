@@ -58,6 +58,39 @@ public class WidgetBridge extends Plugin {
         act.runOnUiThread(() -> p.notifyListeners("systemDark", o));
     }
 
+    /** Material You 主色调板（Android 12+），tone 100 → 0 共 13 级 */
+    private static final int[] ACCENT1 = {
+        android.R.color.system_accent1_0, android.R.color.system_accent1_10, android.R.color.system_accent1_50,
+        android.R.color.system_accent1_100, android.R.color.system_accent1_200, android.R.color.system_accent1_300,
+        android.R.color.system_accent1_400, android.R.color.system_accent1_500, android.R.color.system_accent1_600,
+        android.R.color.system_accent1_700, android.R.color.system_accent1_800, android.R.color.system_accent1_900,
+        android.R.color.system_accent1_1000,
+    };
+
+    private static JSObject dynamicColorsJson(android.content.Context ctx) {
+        JSObject o = new JSObject();
+        boolean ok = Build.VERSION.SDK_INT >= 31;
+        o.put("supported", ok);
+        if (!ok) return o;
+        JSArray accent = new JSArray();
+        for (int id : ACCENT1) accent.put(String.format("#%06X", 0xFFFFFF & ctx.getColor(id)));
+        o.put("accent", accent);
+        return o;
+    }
+
+    @PluginMethod
+    public void dynamicColors(PluginCall call) {
+        call.resolve(dynamicColorsJson(getContext()));
+    }
+
+    /** 壁纸换色后系统色板会变：回前台时再推一次，页面自己比对 */
+    public static void notifyDynamicColors(Activity act) {
+        WidgetBridge p = instance;
+        if (p == null || Build.VERSION.SDK_INT < 31) return;
+        JSObject o = dynamicColorsJson(act);
+        act.runOnUiThread(() -> p.notifyListeners("dynamicColors", o));
+    }
+
     /**
      * 系统对话框主题：DeviceDefault 由 ROM 厂商覆写（ColorOS / MIUI / One UI / Pixel 动态取色），
      * AppCompat/Material 只会得到 AOSP 原生样式。
