@@ -27,6 +27,7 @@ import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
@@ -57,7 +58,7 @@ import java.util.concurrent.Executors;
         name = "TtCamera",
         permissions = {
                 @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
-                @Permission(alias = "photos", strings = { Manifest.permission.READ_EXTERNAL_STORAGE }),
+                @Permission(alias = "photos", strings = { Manifest.permission.READ_EXTERNAL_STORAGE, "android.permission.READ_MEDIA_IMAGES" }),
         }
 )
 public class TtCamera extends Plugin {
@@ -155,12 +156,17 @@ public class TtCamera extends Plugin {
                     previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
                     root.addView(previewView, 0);
                 }
-                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                        w > 0 ? w : ViewGroup.LayoutParams.MATCH_PARENT,
-                        h > 0 ? h : ViewGroup.LayoutParams.MATCH_PARENT);
-                lp.gravity = Gravity.TOP | Gravity.START;
-                lp.leftMargin = x;
-                lp.topMargin = y;
+                ViewGroup.LayoutParams lp = previewView.getLayoutParams();
+                lp.width = w > 0 ? w : ViewGroup.LayoutParams.MATCH_PARENT;
+                lp.height = h > 0 ? h : ViewGroup.LayoutParams.MATCH_PARENT;
+                if (lp instanceof ViewGroup.MarginLayoutParams) {
+                    ((ViewGroup.MarginLayoutParams) lp).setMargins(x, y, 0, 0);
+                }
+                if (lp instanceof CoordinatorLayout.LayoutParams) {
+                    ((CoordinatorLayout.LayoutParams) lp).gravity = Gravity.TOP | Gravity.START;
+                } else if (lp instanceof FrameLayout.LayoutParams) {
+                    ((FrameLayout.LayoutParams) lp).gravity = Gravity.TOP | Gravity.START;
+                }
                 previewView.setLayoutParams(lp);
 
                 if (!webViewBgSaved) {
