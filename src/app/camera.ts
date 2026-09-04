@@ -26,6 +26,7 @@ interface TtCameraPlugin {
   stop(): Promise<{ frozen?: string }>
   switchCamera(): Promise<{ position: 'back' | 'front' }>
   setTorch(o: { on: boolean }): Promise<void>
+  setZoom(o: { ratio: number }): Promise<{ ratio: number }>
   capture(): Promise<CapturedPhoto>
   listRecent(o: { limit: number; page: number }): Promise<{ items: GalleryItem[] }>
   importPicked(o: { ids: string[] }): Promise<{ items: CapturedPhoto[] }>
@@ -159,6 +160,17 @@ export const camera = {
   async torch(on: boolean) {
     if (!nativeCamera()) return
     await TtCamera.setTorch({ on })
+  },
+
+  /** 双指缩放：返回实际生效的倍率（浏览器里用 CSS 放大预览顶上，最大 4x） */
+  async zoom(ratio: number): Promise<number> {
+    if (!nativeCamera()) {
+      const r = Math.max(1, Math.min(4, ratio))
+      if (webVideo) webVideo.style.transform = `scale(${r})`
+      return r
+    }
+    const r = await TtCamera.setZoom({ ratio })
+    return r.ratio
   },
 
   async capture(): Promise<CapturedPhoto> {

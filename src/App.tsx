@@ -1290,10 +1290,9 @@ function Todo2DetailScreen() {
           <div className="text-[14px] leading-[1.5] font-medium text-(--c-ink)">第 7 题要用高斯公式，带上上次的习题册。</div>
         </div>
 
-
-        <div className="flex-1" />
-        <div className="pb-8">
-          <div className="rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">完成</div>
+        <div className="mt-3 flex items-center gap-3 rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+          <span className="h-[17px] w-[17px] flex-none rounded-[6px] border-[1.6px] border-(--c-ink5)" />
+          <span className="text-[14px] font-bold text-(--c-ink)">完成</span>
         </div>
       </div>
     </Phone>

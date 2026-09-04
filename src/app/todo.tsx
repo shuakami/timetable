@@ -89,17 +89,23 @@ async function chooseIndex(options: string[], selected: number, title: string): 
 
 /* ---------------- 待办列表 ---------------- */
 
+function CheckBox({ done, color }: { done: boolean; color: string }) {
+  return (
+    <span
+      className="flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[6px] border-[1.6px] transition-colors"
+      style={{ borderColor: done ? color : 'var(--c-ink5)', background: done ? color : 'transparent' }}
+    >
+      {done && (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-surface)' }} strokeWidth="3.6"><path d="m6 12.5 4 4 8-9" /></svg>
+      )}
+    </span>
+  )
+}
+
 function Check({ done, color, onClick }: { done: boolean; color: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="mt-[2px] flex-none">
-      <span
-        className="flex h-[17px] w-[17px] items-center justify-center rounded-[6px] border-[1.6px] transition-colors"
-        style={{ borderColor: done ? color : 'var(--c-ink5)', background: done ? color : 'transparent' }}
-      >
-        {done && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-surface)' }} strokeWidth="3.6"><path d="m6 12.5 4 4 8-9" /></svg>
-        )}
-      </span>
+      <CheckBox done={done} color={color} />
     </button>
   )
 }
@@ -464,6 +470,7 @@ export function CameraPage({
 
   const startPreview = async () => {
     if (!frame.current) return
+    zoom.current = 1
     await camera.start('back', layoutRect(frame.current), SLIDE.duration * 1000)
     const el = camera.webPreview()
     if (el && video.current) {
@@ -530,6 +537,29 @@ export function CameraPage({
     setCid(i === 0 ? '' : courses[i - 1].id)
   }
 
+  /* 双指缩放：以抓住时的倍率为基准，按两指距离变化成比例调整 */
+  const zoom = useRef(1)
+  const pinch = useRef<{ base: number; dist: number; pending: boolean } | null>(null)
+  const touchDist = (t: React.TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 2) return
+    pinch.current = { base: zoom.current, dist: touchDist(e.touches), pending: false }
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    const p = pinch.current
+    if (!p || e.touches.length !== 2) return
+    const want = p.base * (touchDist(e.touches) / p.dist)
+    if (p.pending || Math.abs(want - zoom.current) < 0.01) return
+    p.pending = true
+    void camera.zoom(want).then((r) => {
+      zoom.current = r
+      if (pinch.current) pinch.current.pending = false
+    })
+  }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) pinch.current = null
+  }
+
   return (
     <Page className="bg-transparent">
       <div className="absolute inset-0 flex flex-col">
@@ -551,7 +581,14 @@ export function CameraPage({
         </div>
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          <div ref={frame} className="absolute inset-y-0 inset-x-2 rounded-[24px]">
+          <div
+            ref={frame}
+            className="absolute inset-y-0 inset-x-2 touch-none rounded-[24px]"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onTouchCancel={onTouchEnd}
+          >
             <div ref={video} className="absolute inset-0 overflow-hidden rounded-[24px] bg-black [&>video]:h-full [&>video]:w-full [&>video]:object-cover" />
             {frozen && <img src={frozen} alt="" className="pointer-events-none absolute inset-0 h-full w-full rounded-[24px] object-cover" />}
             <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ boxShadow: '0 0 0 200vmax #000' }} />
@@ -971,14 +1008,16 @@ export function TaskDetailPage({
           />
         </div>
 
+        <button
+          onClick={() => store.editTask(cur.id, { done: !cur.done })}
+          className="mt-3 flex w-full items-center gap-3 rounded-[16px] bg-(--c-surface) px-4 py-3.5 text-left transition-transform duration-150 active:scale-[.98]"
+        >
+          <CheckBox done={cur.done} color={state.courses.find((c) => c.id === meta.cid)?.color ?? 'var(--c-accent)'} />
+          <span className={`text-[14px] font-bold ${cur.done ? 'text-(--c-ink4)' : 'text-(--c-ink)'}`}>{cur.done ? '已完成' : '完成'}</span>
+        </button>
 
-        <div className="pb-6" />
+        <div className="pb-[max(22px,env(safe-area-inset-bottom))]" />
         {meta.node}
-      </div>
-      <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">
-        <PrimaryButton onClick={() => { store.editTask(cur.id, { done: !cur.done }); onBack() }}>
-          {cur.done ? '标记未完成' : '完成'}
-        </PrimaryButton>
       </div>
     </Page>
   )

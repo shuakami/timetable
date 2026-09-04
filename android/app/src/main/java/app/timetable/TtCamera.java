@@ -31,6 +31,7 @@ import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
+import androidx.camera.core.ZoomState;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
@@ -275,6 +276,27 @@ public class TtCamera extends Plugin {
     public void switchCamera(PluginCall call) {
         lensFacing = lensFacing == CameraSelector.LENS_FACING_BACK ? CameraSelector.LENS_FACING_FRONT : CameraSelector.LENS_FACING_BACK;
         getActivity().runOnUiThread(() -> bindCamera(call));
+    }
+
+    /** 双指缩放：传目标倍率，按镜头能力夹紧后返回实际倍率 */
+    @PluginMethod
+    public void setZoom(PluginCall call) {
+        double ratio = call.getDouble("ratio", 1d);
+        getActivity().runOnUiThread(() -> {
+            JSObject o = new JSObject();
+            if (camera == null) {
+                o.put("ratio", 1d);
+                call.resolve(o);
+                return;
+            }
+            ZoomState z = camera.getCameraInfo().getZoomState().getValue();
+            float min = z != null ? z.getMinZoomRatio() : 1f;
+            float max = z != null ? z.getMaxZoomRatio() : 1f;
+            float r = (float) Math.max(min, Math.min(max, ratio));
+            camera.getCameraControl().setZoomRatio(r);
+            o.put("ratio", r);
+            call.resolve(o);
+        });
     }
 
     @PluginMethod
