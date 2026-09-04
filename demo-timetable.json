@@ -1,0 +1,17 @@
+{
+  "tableName": "演示课表",
+  "courses": [
+    { "name": "高等数学 A", "teacher": "陈立群", "location": "理教 204", "day": 1, "startNode": 1, "step": 2, "weeks": "1-16" },
+    { "name": "大学英语（三）", "teacher": "Sarah Lin", "location": "外语楼 305", "day": 1, "startNode": 5, "step": 2, "weeks": "1-16" },
+    { "name": "数据结构", "teacher": "王海峰", "location": "计科楼 A302", "day": 2, "startNode": 1, "step": 2, "weeks": "1-16" },
+    { "name": "线性代数", "teacher": "赵敏", "location": "理教 110", "day": 2, "startNode": 3, "step": 2, "weeks": "1-8,10-16" },
+    { "name": "数据结构实验", "teacher": "王海峰", "location": "机房 B201", "day": 2, "startNode": 7, "step": 2, "weeks": [2, 4, 6, 8, 10, 12, 14, 16] },
+    { "name": "大学物理", "teacher": "李国强", "location": "理教 302", "day": 3, "startNode": 3, "step": 2, "weeks": "1-16" },
+    { "name": "体育（羽毛球）", "location": "体育馆 2 号场", "day": 3, "startNode": 7, "step": 2, "weeks": "1-14" },
+    { "name": "离散数学", "teacher": "周晓", "location": "计科楼 A401", "day": 4, "startNode": 1, "step": 2, "weeks": "1-12" },
+    { "name": "大学物理实验", "teacher": "李国强", "location": "实验楼 C105", "day": 4, "startNode": 5, "step": 3, "weeks": [3, 5, 7, 9, 11, 13, 15] },
+    { "name": "程序设计（C++）", "teacher": "刘远", "location": "计科楼 A302", "day": 5, "startNode": 3, "step": 2, "weeks": "1-16" },
+    { "name": "形势与政策", "teacher": "何静", "location": "文科楼 201", "day": 5, "startNode": 5, "step": 2, "weeks": [1, 2, 3, 4, 5, 6, 7, 8] },
+    { "name": "马克思主义基本原理", "teacher": "孙成", "location": "文科楼 105", "day": 3, "startNode": 1, "step": 2, "weeks": "1-16" }
+  ]
+}

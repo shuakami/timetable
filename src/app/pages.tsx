@@ -1,0 +1,922 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import type { Course, Occurrence, OverrideKind, Task, UserEntry } from '../domain/types'
+import { dateOf, fmtDuration, fmtMinutes, fromDate, weekdayOf } from '../domain/dates'
+import { occurrencesOn, type Snapshot } from '../domain/engine'
+import { maskHasWeek } from '../domain/weeks'
+import { uid } from '../domain/store'
+import { store, useStore } from './store'
+import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
+import {
+  BottomVeil, Card, Chips, EmptyBlock, Field, ICON, MenuRow, Page, PrimaryButton,
+  StickyHead, TextAction, TextInput, TopBar, WD, WD_SHORT, md, tint,
+  DateInput, TimeInput, SelectInput,
+} from './ui'
+
+function PageFooter({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">{children}</div>
+  )
+}
+
+/** 节次选择：横向 1..n，显示所选区间的钟点 */
+function PeriodPicker({
+  grid, sp, ep, onPick,
+}: {
+  grid: { index: number; start: number; end: number }[]
+  sp: number
+  ep: number
+  onPick: (sp: number, ep: number) => void
+}) {
+  const s = grid.find((t) => t.index === sp)
+  const e = grid.find((t) => t.index === ep)
+  return (
+    <div className="rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[12.5px] font-medium text-(--c-ink4)">节次</span>
+        <span className="text-[13px] font-bold tabular-nums text-(--c-ink)">
+          {sp === ep ? `第 ${sp} 节` : `第 ${sp}–${ep} 节`}
+          {s && e && <span className="ml-2 font-semibold text-(--c-ink4)">{fmtMinutes(s.start)} – {fmtMinutes(e.end)}</span>}
+        </span>
+      </div>
+      <div className="mt-2.5 flex gap-1">
+        {grid.map((t) => {
+          const on = t.index >= sp && t.index <= ep
+          return (
+            <button
+              key={t.index}
+              onClick={() => (t.index < sp ? onPick(t.index, ep) : t.index > ep ? onPick(sp, t.index) : onPick(t.index, t.index))}
+              className={`flex-1 rounded-[9px] py-[6px] text-[12px] font-bold tabular-nums transition-colors ${on ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink4)'}`}
+            >
+              {t.index}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const TASK_KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
+const TASK_LABEL: Record<Task['kind'], string> = { homework: '作业', exam: '考试', memo: '备忘' }
+
+function PageBody({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`flex-1 overflow-y-auto px-5 pb-[130px] [scrollbar-width:none] ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+/* ---------------- 待办 ---------------- */
+
+export function TodoView({ onCourse, onEdit }: { onCourse: (c: Course) => void; onEdit: (t: Task | null) => void }) {
+  const state = useStore()
+  const today = todayStr()
+  const weekEnd = useMemo(() => {
+    const d = new Date(`${today}T00:00:00`)
+    d.setDate(d.getDate() + 7)
+    return d.toISOString().slice(0, 10)
+  }, [today])
+
+  const colorOf = (t: Task) => state.courses.find((c) => c.id === t.courseId)?.color ?? '#8A8E97'
+  const courseOf = (t: Task) => state.courses.find((c) => c.id === t.courseId)
+
+  const open = state.tasks.filter((t) => !t.done)
+  const groups: [string, string, Task[]][] = [
+    ['今天到期', '', open.filter((t) => t.due === today)],
+    ['这一周', '', open.filter((t) => t.due && t.due > today && t.due <= weekEnd)],
+    ['以后', '', open.filter((t) => t.due && t.due > weekEnd)],
+    ['没有截止', '', open.filter((t) => !t.due)],
+    ['已完成', `${state.tasks.length - open.length} 项`, state.tasks.filter((t) => t.done)],
+  ]
+  const dueToday = open.filter((t) => t.due === today).length
+  const thisWeek = open.filter((t) => t.due && t.due <= weekEnd).length
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto pb-[150px] [scrollbar-width:none]">
+        <StickyHead className="px-5">
+          <div className="flex items-start justify-between">
+            <h1 className="text-[26px] font-extrabold tracking-[-.02em]">待办</h1>
+            <button
+              onClick={() => onEdit(null)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink2)' }} strokeWidth="2.2" strokeLinecap="round" className="h-[16px] w-[16px]"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+          </div>
+          <div className="mt-2 flex items-center gap-2.5 text-[12.5px] font-semibold text-(--c-ink3)">
+            <span>本周 {thisWeek} 项</span>
+            <span className="h-3 w-px bg-(--c-line)" />
+            <span>{dueToday} 项今天到期</span>
+            <span className="h-3 w-px bg-(--c-line)" />
+            <span className="text-(--c-ink5)">已完成 {state.tasks.length - open.length} 项</span>
+          </div>
+        </StickyHead>
+
+        {state.tasks.length === 0 ? (
+          <div className="mt-16">
+            <EmptyBlock kind="free" title="无待办" actions={[['添加', () => onEdit(null)]]} />
+          </div>
+        ) : (
+          <div className="mt-6 px-5">
+            {groups.filter(([, , l]) => l.length > 0).map(([g, count, list]) => (
+              <div key={g} className="mb-5">
+                <div className="flex items-baseline justify-between px-0.5">
+                  <span className="text-[13px] font-extrabold tracking-[-.01em]">{g}</span>
+                  {count && <span className="text-[11.5px] font-semibold tabular-nums text-(--c-ink5)">{count}</span>}
+                </div>
+                <div className="mt-2.5 space-y-2">
+                  {list.map((t) => {
+                    const color = colorOf(t)
+                    const course = courseOf(t)
+                    const late = !t.done && t.due && t.due < today
+                    return (
+                      <div key={t.id} className={`flex overflow-hidden rounded-[14px] bg-(--c-surface) px-3.5 py-3 ${t.done ? 'opacity-45' : ''}`}>
+                        <button onClick={() => store.editTask(t.id, { done: !t.done })} className="mt-[3px] mr-3 flex-none">
+                          <span
+                            className="flex h-[17px] w-[17px] items-center justify-center rounded-[6px] border-[1.8px] transition-colors"
+                            style={{ borderColor: t.done ? color : 'var(--c-line)', background: t.done ? color : 'transparent' }}
+                          >
+                            {t.done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-surface)' }} strokeWidth="3.6"><path d="m6 12.5 4 4 8-9" /></svg>}
+                          </span>
+                        </button>
+                        <button onClick={() => onEdit(t)} className="flex-1 text-left">
+                          <div className="flex items-start justify-between">
+                            <span className={`text-[14px] leading-[1.3] font-bold tracking-[-.01em] ${t.done ? 'line-through' : ''}`}>{t.title}</span>
+                            {t.kind === 'exam' && <span className="ml-2 flex-none rounded-[6px] bg-(--c-rose-soft) px-1.5 py-[2px] text-[10px] font-bold text-(--c-rose)">考试</span>}
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <i className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />
+                            <span className="text-[11.5px] font-semibold text-(--c-ink3)">{course?.name ?? TASK_LABEL[t.kind]}</span>
+                            <span className="text-[11.5px] font-medium tabular-nums text-(--c-ink5)">
+                              {t.due ? `${md(t.due)}${t.dueMinutes != null ? ` ${fmtMinutes(t.dueMinutes)}` : ''}` : '无截止'}
+                              {t.location ? `　${t.location}` : ''}
+                            </span>
+                          </div>
+                          {(late || t.note) && (
+                            <div className={`mt-1.5 text-[11.5px] font-bold tabular-nums ${late ? 'text-(--c-rose)' : 'text-(--c-ink3)'}`}>
+                              {late ? '已过截止' : t.note}
+                            </div>
+                          )}
+                        </button>
+                        {course && (
+                          <button onClick={() => onCourse(course)} className="ml-2 flex-none self-center pl-1">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink5)' }} strokeWidth="2.4" strokeLinecap="round"><path d="m9 5 7 7-7 7" /></svg>
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <BottomVeil height={150} />
+    </>
+  )
+}
+
+/* 待办编辑（内页） */
+export function TaskEditorPage({ task, courseId, onClose }: { task: Task | null; courseId?: string; onClose: () => void }) {
+  const state = useStore()
+  const [title, setTitle] = useState(task?.title ?? '')
+  const [kind, setKind] = useState(TASK_KINDS.indexOf(task?.kind ?? 'homework'))
+  const [cid, setCid] = useState(task?.courseId ?? courseId ?? '')
+  const [due, setDue] = useState(task?.due ?? '')
+  const [time, setTime] = useState(task?.dueMinutes != null ? fmtMinutes(task.dueMinutes) : '')
+  const [loc, setLoc] = useState(task?.location ?? '')
+  const [note, setNote] = useState(task?.note ?? '')
+  const courses = state.courses.filter((c) => !c.removedByImport)
+
+  const save = () => {
+    const [h, m] = time.split(':').map(Number)
+    const patch = {
+      title: title.trim(),
+      kind: TASK_KINDS[kind],
+      courseId: cid || undefined,
+      due: due || undefined,
+      dueMinutes: time && !Number.isNaN(h) ? h * 60 + (m || 0) : undefined,
+      location: loc.trim() || undefined,
+      note: note.trim() || undefined,
+    }
+    if (task) store.editTask(task.id, patch)
+    else store.addTask({ id: uid(), done: false, createdAt: Date.now(), ...patch })
+    onClose()
+  }
+
+  return (
+    <Page>
+      <PageBody>
+        <TopBar title={task ? '编辑待办' : '添加待办'} onBack={onClose} />
+        <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">类型</div>
+        <div className="mt-2.5"><Chips items={TASK_KINDS.map((k) => TASK_LABEL[k])} active={kind} onPick={setKind} /></div>
+
+        <div className="mt-4 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+          <Field k="名称"><TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如 习题册 P41–P45" /></Field>
+          <Field k="课程">
+            <SelectInput value={cid} onChange={setCid} title="课程" options={[['', '不关联'], ...courses.map((c): [string, string] => [c.id, c.name])]} />
+          </Field>
+          <Field k="截止"><DateInput value={due} onChange={setDue} /></Field>
+          <Field k="时间"><TimeInput value={time} onChange={setTime} /></Field>
+          {TASK_KINDS[kind] === 'exam' && <Field k="地点"><TextInput value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="考场、座位" /></Field>}
+          <Field k="备注"><TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="可选" /></Field>
+        </div>
+
+        {task && (
+          <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+            <button
+              onClick={() => { store.removeTask(task.id); onClose() }}
+              className="w-full px-4 py-3.5 text-left text-[13.5px] font-bold text-(--c-rose) transition-colors active:bg-(--c-bg)"
+            >
+              删除
+            </button>
+          </div>
+        )}
+      </PageBody>
+
+      <PageFooter>
+        <PrimaryButton disabled={!title.trim()} onClick={save}>{task ? '保存' : '添加'}</PrimaryButton>
+      </PageFooter>
+    </Page>
+  )
+}
+
+/* ---------------- 课程详情（内页） ---------------- */
+
+export function CourseDetailPage({
+  course, snap, onBack, onChanges, onEdit, onAddTask, onEditTask, onEditSession,
+}: {
+  course: Course
+  snap: Snapshot
+  onBack: () => void
+  onChanges: () => void
+  onEdit: () => void
+  onAddTask: () => void
+  onEditTask: (t: Task) => void
+  onEditSession: (ruleId: string) => void
+}) {
+  const state = useStore()
+  const cur = state.courses.find((c) => c.id === course.id) ?? course
+  const rules = state.rules.filter((r) => r.courseId === cur.id)
+  const today = todayStr()
+  const now = nowMinutes()
+  const sem = snap.semester
+
+  /** 这门课在整个学期展开出的每一次，用于进度与出勤 */
+  const sessions = useMemo(() => {
+    const out: { date: string; ruleId: string; startPeriod: number; endPeriod: number; start: number; end: number; location?: string }[] = []
+    for (const r of rules) {
+      for (let w = 1; w <= sem.totalWeeks; w++) {
+        if (!maskHasWeek(r.weeksMask, w)) continue
+        const date = dateOf(sem, w, r.weekday)
+        const s = sem.timeGrid.find((t) => t.index === r.startPeriod)
+        const e = sem.timeGrid.find((t) => t.index === r.endPeriod)
+        out.push({ date, ruleId: r.id, startPeriod: r.startPeriod, endPeriod: r.endPeriod, start: s?.start ?? 0, end: e?.end ?? 0, location: r.location })
+      }
+    }
+    return out.sort((a, b) => (a.date === b.date ? a.start - b.start : a.date < b.date ? -1 : 1))
+  }, [rules, sem])
+
+  const ovOf = (ruleId: string, date: string) => state.overrides.find((o) => o.ruleId === ruleId && o.date === date)
+  const passed = sessions.filter((s) => s.date < today || (s.date === today && s.end <= now))
+  const next = sessions.find((s) => s.date > today || (s.date === today && s.end > now))
+  const attended = passed.filter((s) => ovOf(s.ruleId, s.date)?.kind !== 'leave' && ovOf(s.ruleId, s.date)?.kind !== 'cancelled')
+  const absent = passed.filter((s) => ovOf(s.ruleId, s.date)?.kind === 'leave')
+  const rate = passed.length > 0 ? Math.round((attended.length / passed.length) * 100) : 0
+  const weeksSpan = (() => {
+    const all: number[] = []
+    for (const r of rules) for (let w = 1; w <= sem.totalWeeks; w++) if (maskHasWeek(r.weeksMask, w)) all.push(w)
+    if (all.length === 0) return ''
+    return `第 ${Math.min(...all)}–${Math.max(...all)} 周`
+  })()
+  const dayList = [...new Set(rules.map((r) => WD[r.weekday]))].join('、')
+  const tasks = state.tasks.filter((t) => t.courseId === cur.id)
+  const changes = state.changes.filter((c) => c.target === cur.id || rules.some((r) => r.id === c.target))
+
+  const relDay = next ? (next.date === today ? '今天' : `${Math.round((new Date(`${next.date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000)} 天后`) : ''
+  return (
+    <Page>
+      <div className="flex-1 overflow-y-auto px-4 pb-10 [scrollbar-width:none]">
+        <TopBar
+          title={cur.name}
+          onBack={onBack}
+          trail={
+            <button
+              onClick={onEdit}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-accent2)' }} strokeWidth="2" strokeLinecap="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+            </button>
+          }
+        />
+
+        <div className="mt-3 space-y-3">
+        <Card>
+          <div className="flex items-start justify-between">
+            <div className="text-[12.5px] font-medium text-(--c-ink3)">
+              {[cur.source === 'import' ? '规则导入' : '手动添加', cur.credit != null ? `${cur.credit} 学分` : '', weeksSpan].filter(Boolean).join('，')}
+            </div>
+            <i className="mt-1 ml-3 h-[10px] w-[10px] flex-none rounded-full" style={{ background: cur.color }} />
+          </div>
+          <div className="mt-5">
+            {([
+              ['下次上课', next ? `${WD[Number(new Date(`${next.date}T00:00:00`).getDay()) === 0 ? 7 : new Date(`${next.date}T00:00:00`).getDay()]} ${fmtMinutes(next.start)} – ${fmtMinutes(next.end)}（${relDay}）` : '无'],
+              ['地点', [...new Set(rules.map((r) => r.location).filter(Boolean))].join('、') || '—'],
+              ['老师', [...new Set([cur.teacher, ...rules.map((r) => r.teacher)].filter(Boolean))].join('、') || '—'],
+              ['上课日', dayList ? `每${dayList}` : '—'],
+              ['节次', rules.length > 0 ? rules.map((r) => (r.startPeriod === r.endPeriod ? `${r.startPeriod}` : `${r.startPeriod}–${r.endPeriod}`)).join('、') + ' 节' : '—'],
+            ] as [string, string][]).map(([k, v], i) => (
+              <div key={k} className={`flex items-baseline ${i > 0 ? 'mt-4' : ''}`}>
+                <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">{k}</span>
+                <span className="text-[14px] font-semibold text-(--c-ink)">{v}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-baseline">
+            <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">学期进度</span>
+            <span className="text-[14px] font-semibold tabular-nums text-(--c-ink)">{passed.length} / {sessions.length} 次</span>
+          </div>
+          <div className="mt-3 h-1 overflow-hidden rounded-full bg-(--c-surface2)">
+            <i className="block h-full rounded-full bg-(--c-accent)" style={{ width: `${sessions.length ? (passed.length / sessions.length) * 100 : 0}%` }} />
+          </div>
+          <div className="mt-4 flex items-baseline border-t border-(--c-surface2) pt-3.5">
+            <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">出勤</span>
+            <span className="text-[14px] font-semibold tabular-nums text-(--c-ink)">
+              {passed.length === 0 ? '—' : `${attended.length} / ${passed.length}，出勤率 ${rate}%`}
+            </span>
+          </div>
+          {passed.length > 0 && (
+            <div className="mt-3 flex gap-1.5">
+              {sessions.slice(0, 12).map((s) => {
+                const ov = ovOf(s.ruleId, s.date)
+                const done = s.date < today || (s.date === today && s.end <= now)
+                const cls = !done ? 'bg-(--c-surface2)' : ov?.kind === 'leave' ? 'bg-(--c-ink5)' : ov?.kind === 'cancelled' ? 'bg-(--c-surface2)' : 'bg-(--c-accent)'
+                return <div key={s.ruleId + s.date} className={`h-1 flex-1 rounded-full ${cls}`} />
+              })}
+            </div>
+          )}
+          {absent.length > 0 && <div className="mt-2.5 text-[11.5px] font-medium text-(--c-ink5)">请假 {absent.length} 次</div>}
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between">
+            <span className="text-[14px] font-bold text-(--c-ink)">作业与备忘</span>
+            <TextAction onClick={onAddTask}>添加</TextAction>
+          </div>
+          {tasks.length === 0 ? (
+            <div className="mt-3 text-[12.5px] font-medium text-(--c-ink4)">还没有作业或备忘</div>
+          ) : (
+            <div className="mt-1">
+              {tasks.map((t, i) => (
+                <button
+                  key={t.id}
+                  onClick={() => onEditTask(t)}
+                  className={`flex w-full items-baseline justify-between py-3 text-left ${i < tasks.length - 1 ? 'border-b border-(--c-surface2)' : ''} ${t.done ? 'opacity-45' : ''}`}
+                >
+                  <div className="min-w-0">
+                    <div className={`text-[14px] font-semibold text-(--c-ink) ${t.done ? 'line-through' : ''}`}>{t.title}</div>
+                    {t.note && <div className="mt-1 text-[12px] font-medium text-(--c-ink4)">{t.note}</div>}
+                  </div>
+                  <span className={`ml-3 flex-none text-[12px] font-bold ${t.due && t.due <= today && !t.done ? 'text-(--c-rose)' : 'text-(--c-ink4)'}`}>
+                    {t.due ? md(t.due) : TASK_LABEL[t.kind]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {rules.length > 0 && (
+          <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">
+            {rules.map((r) => (
+              <MenuRow
+                key={r.id}
+                icon={ICON.clock}
+                title={`每${WD[r.weekday]} ${r.startPeriod === r.endPeriod ? r.startPeriod : `${r.startPeriod}–${r.endPeriod}`} 节`}
+                desc={[r.location, r.teacher].filter(Boolean).join('，') || '调整这一段时间与地点'}
+                onClick={() => onEditSession(r.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">
+          <MenuRow icon={ICON.undo} title="变更记录" desc={changes.length > 0 ? `${changes.length} 条` : '还没有变更'} onClick={onChanges} />
+          <MenuRow icon={ICON.ban} title={cur.hidden ? '取消隐藏' : '隐藏这门课'} desc="隐藏后不出现在课表里，可恢复" onClick={() => store.setCourseHidden(cur.id, !cur.hidden)} />
+        </div>
+        </div>
+      </div>
+    </Page>
+  )
+}
+
+/* ---------------- 编辑课程（内页） ---------------- */
+
+const COLORS = ['#4F5BD5', '#5C8DDB', '#4FA3A1', '#69A85C', '#C9A227', '#D98452', '#C25B5B', '#A167C4', '#8A8E97']
+
+export function CourseEditPage({ course, onBack }: { course: Course; onBack: () => void }) {
+  const state = useStore()
+  const cur = state.courses.find((c) => c.id === course.id) ?? course
+  const [name, setName] = useState(cur.name)
+  const [teacher, setTeacher] = useState(cur.teacher ?? '')
+  const [credit, setCredit] = useState(cur.credit != null ? String(cur.credit) : '')
+  const [category, setCategory] = useState(cur.category ?? '')
+  const [color, setColor] = useState(cur.color)
+  const colorRow = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = colorRow.current
+    const i = COLORS.indexOf(cur.color)
+    if (el && i >= 0) el.scrollLeft = Math.max(0, i * 32 - 140)
+  }, [cur.color])
+  const rules = state.rules.filter((r) => r.courseId === cur.id)
+
+  const dirty =
+    name.trim() !== cur.name ||
+    teacher.trim() !== (cur.teacher ?? '') ||
+    credit.trim() !== (cur.credit != null ? String(cur.credit) : '') ||
+    category.trim() !== (cur.category ?? '') ||
+    color !== cur.color
+
+  const save = () => {
+    const n = Number(credit)
+    store.editCourse(cur.id, {
+      name: name.trim() || cur.name,
+      teacher: teacher.trim() || undefined,
+      credit: credit.trim() && !Number.isNaN(n) ? n : undefined,
+      category: category.trim() || undefined,
+      color,
+    })
+    onBack()
+  }
+
+  return (
+    <Page>
+      <PageBody>
+        <TopBar title="编辑课程" onBack={onBack} />
+
+        <div className="mt-5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+          <Field k="名称"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          <Field k="老师"><TextInput value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="可选" /></Field>
+          <Field k="学分"><TextInput value={credit} inputMode="decimal" onChange={(e) => setCredit(e.target.value)} placeholder="可选" /></Field>
+          <Field k="分类"><TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="必修、选修等，可选" /></Field>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+          <span className="flex-none text-[12.5px] font-medium whitespace-nowrap text-(--c-ink4)">颜色</span>
+          <div
+            className="flex w-[196px] flex-none items-center gap-2.5 overflow-x-auto px-[7px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ maskImage: 'linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent)' }}
+            ref={colorRow}
+          >
+            {COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full transition-transform duration-150 active:scale-[.9]"
+                style={{ background: tint(c, 22), boxShadow: color === c ? `inset 0 0 0 1.6px ${c}` : undefined }}
+              >
+                <i className="h-[8px] w-[8px] rounded-full" style={{ background: c }} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {rules.length > 0 && (
+          <>
+            <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">每周安排</div>
+            <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+              {rules.map((r) => (
+                <div key={r.id} className="flex items-baseline px-4 py-3">
+                  <span className="w-[62px] flex-none text-[12.5px] font-medium text-(--c-ink4)">每{WD[r.weekday]}</span>
+                  <div className="min-w-0 flex-1 text-[14px] font-semibold tabular-nums text-(--c-ink)">
+                    第 {r.startPeriod === r.endPeriod ? r.startPeriod : `${r.startPeriod}–${r.endPeriod}`} 节
+                    {r.location && <span className="ml-2 font-medium text-(--c-ink4)">{r.location}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+          <button
+            onClick={() => { store.setCourseHidden(cur.id, !cur.hidden); onBack() }}
+            className="w-full px-4 py-3.5 text-left text-[13.5px] font-bold text-(--c-rose) transition-colors active:bg-(--c-bg)"
+          >
+            {cur.hidden ? '取消隐藏' : '隐藏这门课'}
+          </button>
+        </div>
+      </PageBody>
+
+      <PageFooter>
+        <PrimaryButton disabled={!dirty} onClick={save}>保存</PrimaryButton>
+      </PageFooter>
+    </Page>
+  )
+}
+
+/* ---------------- 手动添加（内页） ---------------- */
+
+export function ManualAddPage({ snap, onBack }: { snap: Snapshot | null; onBack: () => void }) {
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState(0)
+  const [weekly, setWeekly] = useState(true)
+  const [weekday, setWeekday] = useState(weekdayOf(todayStr()))
+  const [date, setDate] = useState(todayStr())
+  const [sp, setSp] = useState(1)
+  const [ep, setEp] = useState(2)
+  const [loc, setLoc] = useState('')
+  const sem = snap?.semester
+  const grid = sem?.timeGrid
+  const timeText = (() => {
+    const s = grid?.find((t) => t.index === sp)
+    const e = grid?.find((t) => t.index === ep)
+    return s && e ? `${fmtMinutes(s.start)} – ${fmtMinutes(e.end)}` : ''
+  })()
+
+  /** 同一天已有的安排，用于提前提示重叠 */
+  const clash = useMemo(() => {
+    if (!snap) return []
+    const d = weekly
+      ? (() => {
+          const base = new Date(`${todayStr()}T00:00:00`)
+          const cur = base.getDay() === 0 ? 7 : base.getDay()
+          base.setDate(base.getDate() + (weekday - cur))
+          return base.toISOString().slice(0, 10)
+        })()
+      : date
+    return occurrencesOn(snap, d).filter((o) => o.startPeriod <= ep && o.endPeriod >= sp && o.status !== 'cancelled')
+  }, [snap, weekly, weekday, date, sp, ep])
+
+  const save = () => {
+    if (!store.state.semester) store.setSemester(defaultSemester(mondayOf(todayStr())))
+    const en: UserEntry = {
+      id: uid(),
+      semesterId: store.state.semester?.id ?? '',
+      name: name.trim(),
+      kind: kind === 1 ? 'study' : 'temp',
+      startPeriod: sp,
+      endPeriod: ep,
+      location: loc.trim() || undefined,
+      createdAt: Date.now(),
+      ...(weekly ? { weekday } : { date }),
+    }
+    store.addEntry(en)
+    onBack()
+  }
+
+  return (
+    <Page>
+      <PageBody>
+        <TopBar title="手动添加" onBack={onBack} />
+
+        <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">类型</div>
+        <div className="mt-2.5"><Chips items={['临时安排', '自习']} active={kind} onPick={setKind} /></div>
+
+        <div className="mt-4 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+          <Field k="名称"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="例如 数据结构复习" /></Field>
+          <Field k="重复">
+            <div className="flex gap-1.5">
+              <button onClick={() => setWeekly(false)} className={`rounded-[9px] px-2.5 py-[5px] text-[12px] font-bold ${!weekly ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink3)'}`}>仅本次</button>
+              <button onClick={() => setWeekly(true)} className={`rounded-[9px] px-2.5 py-[5px] text-[12px] font-bold ${weekly ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink3)'}`}>每周</button>
+            </div>
+          </Field>
+          {weekly ? (
+            <Field k="星期">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5, 6, 7].map((w) => (
+                  <button key={w} onClick={() => setWeekday(w)} className={`flex-1 rounded-[9px] py-[5px] text-[12px] font-bold ${weekday === w ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'text-(--c-ink3)'}`}>{WD_SHORT[w]}</button>
+                ))}
+              </div>
+            </Field>
+          ) : (
+            <Field k="日期"><DateInput value={date} onChange={setDate} /></Field>
+          )}
+          <Field k="地点"><TextInput value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="可选" /></Field>
+        </div>
+
+        {grid && (
+          <div className="mt-2.5">
+            <PeriodPicker grid={grid} sp={sp} ep={ep} onPick={(a, b) => { setSp(a); setEp(b) }} />
+          </div>
+        )}
+
+        {clash.length > 0 && (
+          <div className="mt-3 rounded-[16px] bg-(--c-amber-soft) px-4 py-3.5">
+            <div className="text-[12.5px] font-bold text-(--c-amber)">这个时间已有 {clash.length} 项安排</div>
+            <div className="mt-1 text-[12px] font-medium text-(--c-ink4)">
+              {clash.map((o) => `${o.name} ${o.startPeriod}–${o.endPeriod} 节`).join('；')}
+            </div>
+          </div>
+        )}
+
+      </PageBody>
+
+      <PageFooter>
+        <PrimaryButton disabled={!name.trim() || ep < sp} onClick={save}>添加</PrimaryButton>
+      </PageFooter>
+    </Page>
+  )
+}
+
+/* ---------------- 课程冲突（内页） ---------------- */
+
+export function ConflictPage({
+  occ, snap, onBack, onCourse,
+}: {
+  occ: Occurrence
+  snap: Snapshot
+  onBack: () => void
+  onCourse: (courseId: string) => void
+}) {
+  const state = useStore()
+  const [pick, setPick] = useState(false)
+  const sameDay = occurrencesOn(snap, occ.date).filter((o) => o.status !== 'cancelled')
+  const others = sameDay.filter((o) => o.key !== occ.key && o.startPeriod <= occ.endPeriod && o.endPeriod >= occ.startPeriod)
+  const group = [occ, ...others]
+  const overlapStart = Math.max(...group.map((o) => o.start))
+  const overlapEnd = Math.min(...group.map((o) => o.end))
+  const overlapPeriods = `${Math.max(...group.map((o) => o.startPeriod))}–${Math.min(...group.map((o) => o.endPeriod))}`
+
+  const keepOnly = (keepKey: string) => {
+    for (const o of group) {
+      if (o.key === keepKey) continue
+      if (o.ruleId) store.addOverride({ id: uid(), ruleId: o.ruleId, date: o.date, kind: 'cancelled', note: '冲突时只留一门', createdAt: Date.now() })
+    }
+    onBack()
+  }
+
+  return (
+    <Page>
+      <PageBody>
+        <TopBar title="课程冲突" sub={`${md(occ.date)} ${WD[occ.weekday]}，第 ${overlapPeriods} 节重叠`} onBack={onBack} />
+
+        <div className="mt-5 rounded-[16px] bg-(--c-amber-soft) px-4 py-3.5">
+          <div className="text-[12.5px] font-bold text-(--c-amber)">{group.length} 门课占用同一时段</div>
+          <div className="mt-1 text-[12px] font-medium text-(--c-ink4)">
+            重叠 {fmtMinutes(overlapStart)} – {fmtMinutes(overlapEnd)}，共 {fmtDuration(overlapEnd - overlapStart)}
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2.5">
+          {group.map((o) => {
+            const course = state.courses.find((c) => c.id === o.courseId)
+            return (
+              <div key={o.key} className="overflow-hidden rounded-[16px] bg-(--c-surface)">
+                <div className="flex items-start px-4 pt-4">
+                  <i className="mt-1 mr-3 h-[30px] w-[3px] flex-none rounded-full" style={{ background: o.color }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-extrabold tracking-[-.01em]">{o.name}</div>
+                    <div className="mt-1 text-[12.5px] font-medium text-(--c-ink3)">
+                      {fmtMinutes(o.start)} – {fmtMinutes(o.end)}，第 {o.startPeriod}–{o.endPeriod} 节
+                      {o.location ? `，${o.location}` : ''}
+                    </div>
+                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink5)">
+                      {[o.teacher, o.source === 'import' ? '规则导入' : '手动添加'].filter(Boolean).join('，')}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-5 px-4 pb-3.5">
+                  {course && <TextAction tone="mute" onClick={() => onCourse(course.id)}>课程详情</TextAction>}
+                  {pick && <TextAction onClick={() => keepOnly(o.key)}>只留这门</TextAction>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between px-1">
+          <span className="text-[12px] font-medium text-(--c-ink5)">{pick ? '其余几门仅本次停课' : '两门都保留时，课表里并列显示'}</span>
+          {pick ? (
+            <TextAction tone="mute" onClick={() => setPick(false)}>返回</TextAction>
+          ) : (
+            <TextAction onClick={() => setPick(true)}>只留一门</TextAction>
+          )}
+        </div>
+      </PageBody>
+    </Page>
+  )
+}
+
+/* ---------------- 变更记录（内页） ---------------- */
+
+const FIELD_LABEL: Record<string, string> = {
+  name: '名称', teacher: '老师', credit: '学分', color: '颜色',
+  location: '地点', weekday: '星期', startPeriod: '起始节次', endPeriod: '结束节次',
+}
+
+/** 单节状态：undefined 表示正常上课 */
+const STATUS: [OverrideKind | undefined, string][] = [
+  [undefined, '正常'],
+  ['leave', '请假'],
+  ['cancelled', '停课'],
+  ['muted', '静音'],
+]
+
+const OV_WHAT: Record<string, string> = {
+  moved: '调课', cancelled: '停课', leave: '请假', done: '已上', muted: '静音',
+}
+/** 与首页课程行同一套 Badge 配色 */
+const BADGE: Record<string, string> = {
+  moved: 'bg-(--c-accent-soft) text-(--c-accent)',
+  leave: 'bg-(--c-rose-soft) text-(--c-rose)',
+  edit: 'bg-(--c-amber-soft) text-(--c-amber)',
+}
+function Badge({ kind, children }: { kind: string; children: React.ReactNode }) {
+  return (
+    <span className={`flex-none rounded-[7px] px-2 py-[3px] text-[10.5px] font-bold ${BADGE[kind] ?? 'bg-(--c-surface2) text-(--c-ink3)'}`}>{children}</span>
+  )
+}
+
+export function ChangePage({ courseId, onBack }: { courseId?: string; onBack: () => void }) {
+  const state = useStore()
+  const courseOfTarget = (target: string) =>
+    state.courses.find((x) => x.id === target) ??
+    state.courses.find((x) => x.id === state.rules.find((r) => r.id === target)?.courseId)
+  const fmtVal = (field: string, v?: string) => (field === 'weekday' && v ? WD[Number(v)] : v || '空')
+  const periods = (a?: number, b?: number) => (a == null || b == null ? '' : a === b ? `${a} 节` : `${a}–${b} 节`)
+
+  type Row = { key: string; at: number; date: string; course: string; kind: string; what: string; why: string; undo?: () => void }
+  const rows: Row[] = []
+  for (const c of state.changes) {
+    const co = courseOfTarget(c.target)
+    if (courseId && co?.id !== courseId) continue
+    const label = FIELD_LABEL[c.field] ?? c.field
+    rows.push({
+      key: c.id, at: c.at, date: md(fromDate(new Date(c.at))), course: co?.name ?? '课程', kind: 'edit',
+      what: c.field === 'location' ? '换教室' : `改${label}`,
+      why: `${fmtVal(c.field, c.from)} → ${fmtVal(c.field, c.to)}，${c.actor === 'import' ? '导入' : '手动'}`,
+    })
+  }
+  for (const o of state.overrides) {
+    const rule = state.rules.find((r) => r.id === o.ruleId)
+    const co = rule && state.courses.find((x) => x.id === rule.courseId)
+    if (courseId && co?.id !== courseId) continue
+    const base = periods(rule?.startPeriod, rule?.endPeriod)
+    const why =
+      o.kind === 'moved'
+        ? [`${md(o.date)} ${base} → ${md(o.newDate ?? o.date)} ${periods(o.newStartPeriod ?? rule?.startPeriod, o.newEndPeriod ?? rule?.endPeriod)}`, o.newLocation && `改到 ${o.newLocation}`, o.note]
+        : [base, o.note]
+    rows.push({
+      key: o.id, at: o.createdAt, date: md(o.date), course: co?.name ?? '课程', kind: o.kind,
+      what: OV_WHAT[o.kind] ?? o.kind, why: why.filter(Boolean).join('，'),
+      undo: () => store.removeOverride(o.ruleId, o.date),
+    })
+  }
+  rows.sort((a, b) => b.at - a.at)
+  const courseName = courseId ? state.courses.find((c) => c.id === courseId)?.name : undefined
+
+  return (
+    <Page>
+      <PageBody>
+        <TopBar title="变更记录" sub={rows.length > 0 ? [courseName, `共 ${rows.length} 条`].filter(Boolean).join('，') : undefined} onBack={onBack} />
+        {rows.length === 0 ? (
+          <div className="mt-14"><EmptyBlock kind="free" title="还没有变更" /></div>
+        ) : (
+          <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+            {rows.map((r, i) => (
+              <div key={r.key} className={`flex items-baseline px-4 py-2.5 ${i > 0 ? 'border-t border-(--c-surface2)' : ''}`}>
+                <span className="w-[58px] flex-none text-[11.5px] font-semibold tabular-nums text-(--c-ink5)">{r.date}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-[13px] font-bold text-(--c-ink)">{courseId ? r.why || r.what : r.course}</span>
+                    <Badge kind={r.kind}>{r.what}</Badge>
+                  </div>
+                  {!courseId && r.why && <div className="mt-[3px] text-[11.5px] font-medium text-(--c-ink4)">{r.why}</div>}
+                </div>
+                {r.undo && <TextAction tone="mute" onClick={r.undo}>撤销</TextAction>}
+              </div>
+            ))}
+          </div>
+        )}
+      </PageBody>
+    </Page>
+  )
+}
+
+/* ---------------- 编辑单节（内页） ---------------- */
+
+export function EditSessionPage({
+  occ, snap, onBack,
+}: {
+  occ: { ruleId?: string; courseId?: string; name: string; date: string; startPeriod: number; endPeriod: number; location?: string; teacher?: string; start: number; end: number }
+  snap: Snapshot
+  onBack: () => void
+}) {
+  const state = useStore()
+  const rule = state.rules.find((r) => r.id === occ.ruleId)
+  const ov = state.overrides.find((o) => o.ruleId === occ.ruleId && o.date === occ.date)
+  const [scope, setScope] = useState(0) // 0 仅本次 1 每周
+  const [date, setDate] = useState(ov?.newDate ?? occ.date)
+  const [weekday, setWeekday] = useState<number>(rule?.weekday ?? 1)
+  const [sp, setSp] = useState(ov?.newStartPeriod ?? occ.startPeriod)
+  const [ep, setEp] = useState(ov?.newEndPeriod ?? occ.endPeriod)
+  const [loc, setLoc] = useState(ov?.newLocation ?? occ.location ?? '')
+  const [note, setNote] = useState(ov?.note ?? '')
+  const [status, setStatus] = useState<number>(() => {
+    const i = STATUS.findIndex(([k]) => k === ov?.kind)
+    return i > 0 ? i : 0
+  })
+  const sem = snap.semester
+
+  const changed =
+    date !== occ.date ||
+    sp !== occ.startPeriod ||
+    ep !== occ.endPeriod ||
+    loc.trim() !== (occ.location ?? '')
+  const dirty =
+    scope === 1
+      ? weekday !== rule?.weekday || sp !== occ.startPeriod || ep !== occ.endPeriod || loc.trim() !== (occ.location ?? '')
+      : changed || note.trim() !== (ov?.note ?? '') || STATUS[status][0] !== (ov?.kind === 'moved' ? undefined : ov?.kind)
+
+  const save = () => {
+    if (!occ.ruleId) return
+    if (scope === 1) {
+      store.editSessionRule(occ.ruleId, { weekday: weekday as 1 | 2 | 3 | 4 | 5 | 6 | 7, startPeriod: sp, endPeriod: ep, location: loc.trim() || undefined })
+      onBack()
+      return
+    }
+    const kind = STATUS[status][0]
+    if (!kind) {
+      if (changed) {
+        store.addOverride({
+          id: uid(), ruleId: occ.ruleId, date: occ.date, kind: 'moved',
+          newDate: date, newStartPeriod: sp, newEndPeriod: ep,
+          newLocation: loc.trim() || undefined, note: note.trim() || undefined,
+          createdAt: Date.now(),
+        })
+      } else if (ov) {
+        store.removeOverride(occ.ruleId, occ.date)
+      }
+    } else {
+      store.addOverride({
+        id: uid(), ruleId: occ.ruleId, date: occ.date, kind,
+        note: note.trim() || undefined, createdAt: Date.now(),
+      })
+    }
+    onBack()
+  }
+
+  return (
+    <Page>
+      <PageBody>
+        <TopBar title="编辑课程" sub={`${occ.name}，${md(occ.date)} ${WD[new Date(`${occ.date}T00:00:00`).getDay() === 0 ? 7 : new Date(`${occ.date}T00:00:00`).getDay()]} ${occ.startPeriod}–${occ.endPeriod} 节`} onBack={onBack} />
+
+        <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">生效范围</div>
+        <div className="mt-2.5"><Chips items={['仅本次', '每周']} active={scope} onPick={setScope} /></div>
+
+        {scope === 0 && (
+          <>
+            <div className="mt-4 text-[12.5px] font-semibold text-(--c-ink3)">状态</div>
+            <div className="mt-2.5"><Chips items={STATUS.map(([, l]) => l)} active={status} onPick={setStatus} /></div>
+          </>
+        )}
+
+        <div className="mt-4 text-[12.5px] font-semibold text-(--c-ink3)">时间与地点</div>
+        <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+          {scope === 0 ? (
+            <Field k="日期"><DateInput value={date} onChange={setDate} /></Field>
+          ) : (
+            <Field k="星期">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5, 6, 7].map((w) => (
+                  <button key={w} onClick={() => setWeekday(w)} className={`flex-1 rounded-[9px] py-[5px] text-[12px] font-bold ${weekday === w ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'text-(--c-ink3)'}`}>{WD_SHORT[w]}</button>
+                ))}
+              </div>
+            </Field>
+          )}
+          <Field k="地点"><TextInput value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="可选" /></Field>
+          <Field k="老师"><div className="text-[14px] font-semibold text-(--c-ink)">{occ.teacher ?? '—'}</div></Field>
+          <Field k="备注"><TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="可选" /></Field>
+        </div>
+
+        <div className="mt-2.5">
+          <PeriodPicker grid={sem.timeGrid} sp={sp} ep={ep} onPick={(a, b) => { setSp(a); setEp(b) }} />
+        </div>
+
+        {ov && (
+          <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+            <button
+              onClick={() => { store.removeOverride(occ.ruleId!, occ.date); onBack() }}
+              className="w-full px-4 py-3.5 text-left text-[13.5px] font-bold text-(--c-rose) transition-colors active:bg-(--c-bg)"
+            >
+              撤销本节改动
+            </button>
+          </div>
+        )}
+      </PageBody>
+
+      <PageFooter>
+        <PrimaryButton disabled={ep < sp || !dirty} onClick={save}>保存</PrimaryButton>
+      </PageFooter>
+    </Page>
+  )
+}
+
+export { PageBody, TASK_LABEL, tint }

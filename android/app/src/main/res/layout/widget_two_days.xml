@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="12dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="true">
+        <TextView android:id="@+id/w_day" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="28sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
+        <TextView android:id="@+id/w_wd" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/widgetAccent" android:layout_marginLeft="5dp" />
+        <TextView android:id="@+id/w_sub" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:gravity="right" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk4" />
+    </LinearLayout>
+    <FrameLayout android:id="@+id/row0" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+        <ImageView android:id="@+id/row0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_row_bg" android:contentDescription="@null" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingLeft="6dp" android:paddingRight="8dp">
+            <ImageView android:id="@+id/row0_bar" android:layout_width="3dp" android:layout_height="20dp" android:scaleType="fitXY" android:src="@drawable/widget_bar" android:contentDescription="@null" />
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginLeft="7dp">
+                <TextView android:id="@+id/row0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="13sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
+                <TextView android:id="@+id/row0_loc" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textColor="@color/widgetInk3" android:layout_marginTop="1dp" />
+            </LinearLayout>
+            <TextView android:id="@+id/row0_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginLeft="6dp" />
+        </LinearLayout>
+    </FrameLayout>
+    <FrameLayout android:id="@+id/row1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+        <ImageView android:id="@+id/row1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_row_bg" android:contentDescription="@null" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingLeft="6dp" android:paddingRight="8dp">
+            <ImageView android:id="@+id/row1_bar" android:layout_width="3dp" android:layout_height="20dp" android:scaleType="fitXY" android:src="@drawable/widget_bar" android:contentDescription="@null" />
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginLeft="7dp">
+                <TextView android:id="@+id/row1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="13sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
+                <TextView android:id="@+id/row1_loc" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textColor="@color/widgetInk3" android:layout_marginTop="1dp" />
+            </LinearLayout>
+            <TextView android:id="@+id/row1_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginLeft="6dp" />
+        </LinearLayout>
+    </FrameLayout>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical" android:layout_marginLeft="12dp">
+            <TextView android:id="@+id/w_sub2" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="11sp" android:textStyle="bold" android:textColor="@color/widgetInk4" android:paddingTop="6dp" android:paddingBottom="6dp" />
+    <FrameLayout android:id="@+id/trow0" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+        <ImageView android:id="@+id/trow0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_row_bg" android:contentDescription="@null" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingLeft="6dp" android:paddingRight="8dp">
+            <ImageView android:id="@+id/trow0_bar" android:layout_width="3dp" android:layout_height="20dp" android:scaleType="fitXY" android:src="@drawable/widget_bar" android:contentDescription="@null" />
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginLeft="7dp">
+                <TextView android:id="@+id/trow0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="13sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
+                <TextView android:id="@+id/trow0_loc" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textColor="@color/widgetInk3" android:layout_marginTop="1dp" />
+            </LinearLayout>
+            <TextView android:id="@+id/trow0_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginLeft="6dp" />
+        </LinearLayout>
+    </FrameLayout>
+    <FrameLayout android:id="@+id/trow1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+        <ImageView android:id="@+id/trow1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_row_bg" android:contentDescription="@null" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingLeft="6dp" android:paddingRight="8dp">
+            <ImageView android:id="@+id/trow1_bar" android:layout_width="3dp" android:layout_height="20dp" android:scaleType="fitXY" android:src="@drawable/widget_bar" android:contentDescription="@null" />
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginLeft="7dp">
+                <TextView android:id="@+id/trow1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="13sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
+                <TextView android:id="@+id/trow1_loc" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textColor="@color/widgetInk3" android:layout_marginTop="1dp" />
+            </LinearLayout>
+            <TextView android:id="@+id/trow1_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginLeft="6dp" />
+        </LinearLayout>
+    </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="appBackground">#F7F7F6</color>
+    <color name="appStatusBar">#F7F7F6</color>
+    <color name="widgetSurface">#FFFFFF</color>
+    <color name="widgetInk">#16171A</color>
+    <color name="widgetInk3">#8A8E97</color>
+    <color name="widgetInk4">#A2A6AF</color>
+    <color name="widgetAccent">#3B8BF5</color>
+</resources>

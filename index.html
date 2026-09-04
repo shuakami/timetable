@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#F7F7F6" />
+    <title>嘎嘎课程表</title>
+    <script>
+      (function () {
+        var t = localStorage.getItem('tt.theme')
+        if (t !== 'light' && t !== 'dark' && t !== 'black') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        if (t !== 'light') document.documentElement.dataset.theme = t
+      })()
+    </script>
+    <link rel="preload" as="image" href="/wall.jpg" />
+    <link rel="preload" as="image" href="/mascot.png" />
+    <link rel="preload" as="image" href="/intro-bg.jpg" />
+    <link rel="preload" as="image" href="/avatar.jpg" />
+    <style>
+      html, body { margin: 0; background: #F7F7F6; }
+      [data-theme='dark'], [data-theme='dark'] body { background: #111214; }
+      [data-theme='black'], [data-theme='black'] body { background: #000; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

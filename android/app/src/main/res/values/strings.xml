@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">嘎嘎课程表</string>
+    <string name="title_activity_main">嘎嘎课程表</string>
+    <string name="package_name">app.timetable</string>
+    <string name="custom_url_scheme">app.timetable</string>
+    <string name="widget_today_label">今日课程</string>
+    <string name="widget_next_label">下一节</string>
+    <string name="widget_two_days_label">今天与明天</string>
+    <string name="widget_week_label">本周课表</string>
+</resources>
