@@ -1,5 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, useTransform } from 'motion/react'
+import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react'
+import { flushSync } from 'react-dom'
 import { App as CapApp } from '@capacitor/app'
 import type { Course, Occurrence, Semester, Task, OverrideKind, WidgetStyle } from '../domain/types'
 import { addDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
@@ -593,17 +594,22 @@ const HOUR = 42
 const MIN_CARD = 44
 const MAX_HOUR = 120
 
-function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }: { snap: Snapshot; anchor: string; setAnchor: (d: string) => void; onPick: (o: Occurrence) => void; onMenu: (o: Occurrence, r: Rect, el: HTMLElement) => void; onSearch: () => void; liftKey?: string }) {
+/** 一周的日期条 + 时间网格；左右滑时相邻周也各渲染一份 */
+function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, liftKey, gridRef, onGeometry }: {
+  snap: Snapshot
+  week: number
+  anchor: string
+  today: string
+  now: number
+  setAnchor: (d: string) => void
+  onPick: (o: Occurrence) => void
+  onMenu: (o: Occurrence, r: Rect, el: HTMLElement) => void
+  liftKey?: string
+  gridRef?: React.RefObject<HTMLDivElement>
+  onGeometry?: (todayIdx: number, nowTop: number) => void
+}) {
   const sem = snap.semester
-  const today = todayStr()
-  const [cal, setCal] = useState(false)
-  const week = Math.min(Math.max(weekOf(sem, anchor), 1), sem.totalWeeks)
   const byDay = useMemo(() => occurrencesInWeek(snap, week), [snap, week])
-  const [now, setNow] = useState(nowMinutes)
-  useEffect(() => {
-    const t = setInterval(() => setNow(nowMinutes()), 30_000)
-    return () => clearInterval(t)
-  }, [])
   const monday = dateOf(sem, week, 1)
   const days = [1, 2, 3, 4, 5, 6, 7].map((wd) => dateOf(sem, week, wd))
   const todayIdx = days.indexOf(today)
@@ -618,12 +624,125 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
   const hour = Number.isFinite(shortest) ? Math.min(MAX_HOUR, Math.max(HOUR, Math.ceil(((MIN_CARD + 2) * 60) / shortest))) : HOUR
   const gridH = ((dayEnd - dayStart) / 60) * hour + 8
   const nowTop = ((now - dayStart) / 60) * hour
+  useEffect(() => {
+    onGeometry?.(todayIdx, nowTop)
+  }, [todayIdx, nowTop, onGeometry])
+
+  return (
+    <>
+      <div className="flex items-stretch gap-[5px]">
+        <div className="-mr-[5px] flex w-8 flex-none items-center justify-center text-[10.5px] font-semibold text-(--c-ink4)">
+          {Number(monday.slice(5, 7))}月
+        </div>
+        {days.map((d) => {
+          const on = d === anchor
+          const isToday = d === today
+          const n = (byDay.get(weekdayOf(d)) ?? []).length
+          return (
+            <button key={d} onClick={() => setAnchor(d)} className="relative flex flex-1 flex-col items-center py-[5px]">
+              {on && <motion.i layoutId="week-strip-indicator" transition={SPRING} className="absolute inset-x-[-4px] inset-y-0 rounded-[13px] bg-(--c-accent-soft)" />}
+              <span className={`relative z-10 flex h-[24px] w-[24px] items-center justify-center text-[17px] leading-none font-bold tabular-nums ${isToday || on ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{Number(d.slice(8))}</span>
+              <span className={`relative z-10 mt-0.5 text-[10.5px] font-semibold ${on || isToday ? 'text-(--c-accent)' : 'text-(--c-ink4)'}`}>{isToday ? '今天' : WD[weekdayOf(d)]}</span>
+              {n > 0 && <span className={`absolute top-[3px] right-[2px] z-10 text-[9px] font-bold tabular-nums ${on ? 'text-(--c-accent2)' : 'text-(--c-ink5)'}`}>{n}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="relative mt-2">
+        {hours.map((h, i) => (
+          <div key={h} className="absolute right-0 left-8 h-px bg-(--c-surface2)" style={{ top: i * 2 * hour + 6 }} />
+        ))}
+        <div className="flex pt-1.5">
+          <div className="relative w-8 flex-none">
+            {hours.map((h) => (
+              <div key={h} className="pr-1.5 text-right text-[9.5px] font-semibold tabular-nums text-(--c-ink5)" style={{ height: 2 * hour }}>{h}:00</div>
+            ))}
+            {/* 时间刻度跟随真实课程范围 */}
+            {todayIdx >= 0 && nowTop > 0 && hours.every((h) => Math.abs(now - h * 60) >= 20) && (
+              <div className="absolute right-1.5 text-[9.5px] font-bold tabular-nums text-(--c-accent)" style={{ top: nowTop - 6 }}>{fmtMinutes(now)}</div>
+            )}
+          </div>
+          <div ref={gridRef} className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
+            {days.map((d, i) => {
+              const occ = byDay.get(weekdayOf(d)) ?? []
+              const pastCol = d < today
+              return (
+                <div key={d} className={`relative flex-1 ${pastCol ? 'opacity-45' : ''}`}>
+                  {occ.map((o) => {
+                    const lanes = occ.filter((x) => x !== o && x.start < o.end && o.start < x.end)
+                    const half = lanes.length > 0
+                    const lane = half ? occ.filter((x) => x.start < o.end && o.start < x.end).indexOf(o) : 0
+                    const done = d < today || (d === today && o.end <= now)
+                    const nowOn = d === today && o.start <= now && now < o.end
+                    const lift = liftKey === o.key
+                    const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : 'none'
+                    return (
+                      <div
+                        key={o.key}
+                        className="absolute"
+                        style={{
+                          top: ((o.start - dayStart) / 60) * hour,
+                          height: ((o.end - o.start) / 60) * hour - 2,
+                          left: half ? `${lane * 50}%` : 0,
+                          width: half ? '50%' : '100%',
+                        }}
+                      >
+                      <button
+                        {...pressProps(() => onPick(o), (r, el) => onMenu(o, r, el))}
+                        className={`relative h-full w-full overflow-hidden rounded-[9px] px-1 py-1.5 text-left text-[9.5px] leading-[1.35] font-bold transition-transform duration-150 ${lift ? '' : 'active:scale-[.97]'} ${o.status === 'cancelled' ? 'line-through' : ''}`}
+                        style={{
+                          background: tint(o.color, nowOn ? 22 : done ? 7 : 10),
+                          color: `color-mix(in srgb, ${o.color} 85%, var(--c-ink))`,
+                          boxShadow: ring,
+                          opacity: done && !pastCol ? 0.55 : 1,
+                        }}
+                      >
+                        <span className="line-clamp-2">{o.name}</span>
+                        {o.location && <div className="mt-0.5 line-clamp-1 text-[8.5px] leading-[1.3] font-semibold opacity-60">{o.location}</div>}
+                        {nowOn && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: ((now - o.start) / 60) * hour }} />}
+                      </button>
+                      </div>
+                    )
+                  })}
+                  {i === todayIdx && nowTop > 0 && (
+                    <div className="pointer-events-none absolute right-[-2px] left-[-2px] z-20" style={{ top: nowTop }}>
+                      <i className="block h-[1.5px] w-full rounded-full bg-(--c-accent)" />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* 横滑翻周：方向锁定后手指跟随，松手按位移/速度吸附到相邻周 */
+const SWIPE_LOCK = 8
+const SWIPE_RATIO = 0.3
+const SWIPE_VELOCITY = 0.5
+const SWIPE_EASE = [0.25, 1, 0.5, 1] as const
+
+function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }: { snap: Snapshot; anchor: string; setAnchor: (d: string) => void; onPick: (o: Occurrence) => void; onMenu: (o: Occurrence, r: Rect, el: HTMLElement) => void; onSearch: () => void; liftKey?: string }) {
+  const sem = snap.semester
+  const today = todayStr()
+  const [cal, setCal] = useState(false)
+  const week = Math.min(Math.max(weekOf(sem, anchor), 1), sem.totalWeeks)
+  const [now, setNow] = useState(nowMinutes)
+  useEffect(() => {
+    const t = setInterval(() => setNow(nowMinutes()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  const monday = dateOf(sem, week, 1)
 
   /* 首次进入且本周含今天：滚到当前时刻附近 */
   const scroller = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const scrolled = useRef(false)
-  useEffect(() => {
+  const onGeometry = useCallback((todayIdx: number, nowTop: number) => {
     const sc = scroller.current
     const grid = gridRef.current
     if (scrolled.current || !sc || !grid || todayIdx < 0 || nowTop <= 0) return
@@ -631,19 +750,77 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
     const gridTop = grid.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop
     const target = gridTop + nowTop - sc.clientHeight * 0.4
     if (target > 0) sc.scrollTop = target
-  }, [todayIdx, nowTop])
+  }, [])
 
-  const shift = (delta: number) => setAnchor(addDays(monday, delta * 7))
-
-  /* 换周时整块网格按方向平移 */
+  /* 换周时整块网格按方向平移；横滑翻过来的那次已经滑到位，不再播 */
   const seen = useRef(week)
+  const swiped = useRef(false)
   const [dir, setDir] = useState(0)
   useEffect(() => {
     if (seen.current !== week) {
       setDir(week > seen.current ? 1 : -1)
       seen.current = week
     }
+    swiped.current = false
   }, [week])
+
+  const x = useMotionValue(0)
+  const box = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ x0: number; y0: number; w: number; state: 'pending' | 'drag' | 'off'; last: number; t: number; v: number } | null>(null)
+
+  const settle = (delta: -1 | 0 | 1, from: number, w: number) => {
+    const to = -delta * w
+    const dist = Math.abs(to - from)
+    animate(x, to, { type: 'tween', ease: SWIPE_EASE, duration: Math.min(0.4, Math.max(0.2, dist / w * 0.4)) }).then(() => {
+      if (!delta) return
+      swiped.current = true
+      x.jump(0)
+      flushSync(() => setAnchor(addDays(monday, delta * 7)))
+    })
+  }
+
+  const onDown = (e: React.PointerEvent) => {
+    if (drag.current?.state === 'drag') return
+    const pane = box.current
+    if (!pane) return
+    drag.current = { x0: e.clientX, y0: e.clientY, w: pane.clientWidth - 20, state: 'pending', last: 0, t: e.timeStamp, v: 0 }
+  }
+  const onMove = (e: React.PointerEvent) => {
+    const d = drag.current
+    if (!d || d.state === 'off') return
+    const dx = e.clientX - d.x0
+    const dy = e.clientY - d.y0
+    if (d.state === 'pending') {
+      if (Math.abs(dy) > SWIPE_LOCK && Math.abs(dy) >= Math.abs(dx)) {
+        d.state = 'off'
+        return
+      }
+      if (Math.abs(dx) <= SWIPE_LOCK) return
+      d.state = 'drag'
+      clearPress()
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    }
+    const dt = e.timeStamp - d.t
+    if (dt > 0) d.v = (dx - d.last) / dt
+    d.last = dx
+    d.t = e.timeStamp
+    const blocked = (dx > 0 && week <= 1) || (dx < 0 && week >= sem.totalWeeks)
+    x.set(blocked ? dx * 0.25 : dx)
+  }
+  const onUp = (e: React.PointerEvent) => {
+    const d = drag.current
+    drag.current = null
+    if (!d || d.state !== 'drag') return
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    const dx = d.last
+    let delta: -1 | 0 | 1 = 0
+    if (dx < -d.w * SWIPE_RATIO || (dx < 0 && d.v < -SWIPE_VELOCITY)) delta = 1
+    else if (dx > d.w * SWIPE_RATIO || (dx > 0 && d.v > SWIPE_VELOCITY)) delta = -1
+    if ((delta === 1 && week >= sem.totalWeeks) || (delta === -1 && week <= 1)) delta = 0
+    settle(delta, x.get(), d.w)
+  }
+
+  const panes = [week - 1, week, week + 1]
 
   return (
     <>
@@ -664,103 +841,42 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
         </StickyHead>
 
         <div className="mt-1 px-2">
-          <div className="overflow-hidden rounded-[22px] bg-(--c-surface) p-2.5 pb-4">
-            <AnimatePresence mode="wait" initial={false}>
+          <div
+            ref={box}
+            onPointerDown={onDown}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+            className="overflow-hidden rounded-[22px] bg-(--c-surface) p-2.5 pb-4 [touch-action:pan-y]"
+          >
             <motion.div
               key={week}
-              initial={{ opacity: 0, transform: `translateX(${dir * 28}px)` }}
+              initial={swiped.current ? false : { opacity: 0, transform: `translateX(${dir * 28}px)` }}
               animate={{ opacity: 1, transform: 'translateX(0px)' }}
-              exit={{ opacity: 0, transform: `translateX(${dir * -28}px)` }}
-              transition={{ type: 'tween', ease: [0.25, 1, 0.5, 1], duration: 0.22 }}
+              transition={{ type: 'tween', ease: SWIPE_EASE, duration: 0.22 }}
             >
-            <div className="flex items-stretch gap-[5px]">
-              <button onClick={() => shift(-1)} className="-mr-[5px] flex w-8 flex-none items-center justify-center text-[10.5px] font-semibold text-(--c-ink4)">
-                {Number(monday.slice(5, 7))}月
-              </button>
-              {days.map((d) => {
-                const on = d === anchor
-                const isToday = d === today
-                const n = (byDay.get(weekdayOf(d)) ?? []).length
-                return (
-                  <button key={d} onClick={() => setAnchor(d)} className="relative flex flex-1 flex-col items-center py-[5px]">
-                    {on && <motion.i layoutId="week-strip-indicator" transition={SPRING} className="absolute inset-x-[-4px] inset-y-0 rounded-[13px] bg-(--c-accent-soft)" />}
-                    <span className={`relative z-10 flex h-[24px] w-[24px] items-center justify-center text-[17px] leading-none font-bold tabular-nums ${isToday || on ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{Number(d.slice(8))}</span>
-                    <span className={`relative z-10 mt-0.5 text-[10.5px] font-semibold ${on || isToday ? 'text-(--c-accent)' : 'text-(--c-ink4)'}`}>{isToday ? '今天' : WD[weekdayOf(d)]}</span>
-                    {n > 0 && <span className={`absolute top-[3px] right-[2px] z-10 text-[9px] font-bold tabular-nums ${on ? 'text-(--c-accent2)' : 'text-(--c-ink5)'}`}>{n}</span>}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="relative mt-2">
-              {hours.map((h, i) => (
-                <div key={h} className="absolute right-0 left-8 h-px bg-(--c-surface2)" style={{ top: i * 2 * hour + 6 }} />
-              ))}
-              <div className="flex pt-1.5">
-                <div className="relative w-8 flex-none">
-                  {hours.map((h) => (
-                    <div key={h} className="pr-1.5 text-right text-[9.5px] font-semibold tabular-nums text-(--c-ink5)" style={{ height: 2 * hour }}>{h}:00</div>
-                  ))}
-                  {/* 时间刻度跟随真实课程范围 */}
-                  {todayIdx >= 0 && nowTop > 0 && hours.every((h) => Math.abs(now - h * 60) >= 20) && (
-                    <div className="absolute right-1.5 text-[9.5px] font-bold tabular-nums text-(--c-accent)" style={{ top: nowTop - 6 }}>{fmtMinutes(now)}</div>
-                  )}
-                </div>
-                <div ref={gridRef} className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
-                  {days.map((d, i) => {
-                    const occ = byDay.get(weekdayOf(d)) ?? []
-                    const pastCol = d < today
-                    return (
-                      <div key={d} className={`relative flex-1 ${pastCol ? 'opacity-45' : ''}`}>
-                        {occ.map((o) => {
-                          const lanes = occ.filter((x) => x !== o && x.start < o.end && o.start < x.end)
-                          const half = lanes.length > 0
-                          const lane = half ? occ.filter((x) => x.start < o.end && o.start < x.end).indexOf(o) : 0
-                          const done = d < today || (d === today && o.end <= now)
-                          const nowOn = d === today && o.start <= now && now < o.end
-                          const lift = liftKey === o.key
-                          const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : 'none'
-                          return (
-                            <div
-                              key={o.key}
-                              className="absolute"
-                              style={{
-                                top: ((o.start - dayStart) / 60) * hour,
-                                height: ((o.end - o.start) / 60) * hour - 2,
-                                left: half ? `${lane * 50}%` : 0,
-                                width: half ? '50%' : '100%',
-                              }}
-                            >
-                            <button
-                              {...pressProps(() => onPick(o), (r, el) => onMenu(o, r, el))}
-                              className={`relative h-full w-full overflow-hidden rounded-[9px] px-1 py-1.5 text-left text-[9.5px] leading-[1.35] font-bold transition-transform duration-150 ${lift ? '' : 'active:scale-[.97]'} ${o.status === 'cancelled' ? 'line-through' : ''}`}
-                              style={{
-                                background: tint(o.color, nowOn ? 22 : done ? 7 : 10),
-                                color: `color-mix(in srgb, ${o.color} 85%, var(--c-ink))`,
-                                boxShadow: ring,
-                                opacity: done && !pastCol ? 0.55 : 1,
-                              }}
-                            >
-                              <span className="line-clamp-2">{o.name}</span>
-                              {o.location && <div className="mt-0.5 line-clamp-1 text-[8.5px] leading-[1.3] font-semibold opacity-60">{o.location}</div>}
-                              {nowOn && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: ((now - o.start) / 60) * hour }} />}
-                            </button>
-                            </div>
-                          )
-                        })}
-                        {i === todayIdx && nowTop > 0 && (
-                          <div className="pointer-events-none absolute right-[-2px] left-[-2px] z-20" style={{ top: nowTop }}>
-                            <i className="block h-[1.5px] w-full rounded-full bg-(--c-accent)" />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+              <motion.div className="flex w-[300%] -ml-[100%] items-start" style={{ x }}>
+                {panes.map((w) => (
+                  <div key={w} className="w-1/3 flex-none">
+                    {w >= 1 && w <= sem.totalWeeks && (
+                      <WeekGrid
+                        snap={snap}
+                        week={w}
+                        anchor={anchor}
+                        today={today}
+                        now={now}
+                        setAnchor={setAnchor}
+                        onPick={onPick}
+                        onMenu={onMenu}
+                        liftKey={liftKey}
+                        gridRef={w === week ? gridRef : undefined}
+                        onGeometry={w === week ? onGeometry : undefined}
+                      />
+                    )}
+                  </div>
+                ))}
+              </motion.div>
             </motion.div>
-            </AnimatePresence>
           </div>
         </div>
       </div>
