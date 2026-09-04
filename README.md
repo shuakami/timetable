@@ -21,6 +21,10 @@
 
 ![今天、日历面板、周视图、课程详情](docs/screenshots/group1.png)
 
+### 下课随手记 / 拍板书 / 待办
+
+![刚下课、拍板书、拍完、待办详情、待办](docs/screenshots/group8.png)
+
 ### 导入 / AI 转换 / 待办 / 我的
 
 ![导入课表、从链接添加、让 AI 生成规则、待办、我的](docs/screenshots/group2.png)
