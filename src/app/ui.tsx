@@ -486,10 +486,10 @@ export function Chip({ color, children, tone = 'plain', onClick }: {
   return (
     <Tag
       onClick={onClick}
-      className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'} ${onClick ? 'transition-transform duration-150 active:scale-[.96]' : ''}`}
+      className={`inline-flex h-[30px] max-w-[160px] min-w-0 flex-none items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold ${tone === 'accent' ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-surface2) text-(--c-ink2)'} ${onClick ? 'transition-transform duration-150 active:scale-[.96]' : ''}`}
     >
-      {color && <span className="h-[7px] w-[7px] rounded-full" style={{ background: color }} />}
-      {children}
+      {color && <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />}
+      <span className="min-w-0 truncate">{children}</span>
     </Tag>
   )
 }
@@ -1066,6 +1066,8 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
   const mdays = useMemo(() => Array.from({ length: daysInMonth(dy, dm) }, (_, i) => `${i + 1}日`), [dy, dm])
   const setYmd = (y: number, mo: number, day: number) => pick(ymd(y, mo, Math.min(day, daysInMonth(y, mo))))
   const cells = useMemo(() => calendarCells(month), [month])
+  /* 选中日的主题色圆按行列定位、在格子间滑动；不用 layoutId，卡片推入时不会被量到半路的位置 */
+  const selIdx = ymOf(d) === month ? cells.indexOf(d) : -1
 
   return (
     <div className="relative" style={{ height: CAL_H }}>
@@ -1099,13 +1101,20 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
                   transition={SHEET}
                   className="absolute inset-0 grid grid-cols-7"
                 >
+                  {selIdx >= 0 && (
+                    <motion.span
+                      initial={false}
+                      animate={{ left: `${((selIdx % 7) + 0.5) * (100 / 7)}%`, top: (Math.floor(selIdx / 7) + 0.5) * CAL_ROW }}
+                      transition={SHEET}
+                      className="pointer-events-none absolute -mt-[17px] -ml-[17px] h-[34px] w-[34px] rounded-full bg-(--c-accent)"
+                    />
+                  )}
                   {cells.map((c) => {
                     const inMonth = ymOf(c) === month
                     const sel = c === d && inMonth
                     const isToday = c === today
                     return (
                       <button key={c} onClick={() => pick(c)} className="relative flex items-center justify-center" style={{ height: CAL_ROW }}>
-                        {sel && <motion.span layoutId="cal-day" transition={SHEET} className="absolute h-[34px] w-[34px] rounded-full bg-(--c-accent)" />}
                         <span className={`relative text-[15px] tabular-nums ${sel ? 'font-bold text-white' : isToday ? 'font-bold text-(--c-accent)' : inMonth ? 'font-medium text-(--c-ink)' : 'font-medium text-(--c-ink5)'}`}>
                           {Number(c.slice(8))}
                         </span>

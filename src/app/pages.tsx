@@ -77,23 +77,39 @@ function PeriodPicker({
 }) {
   const s = grid.find((t) => t.index === sp)
   const e = grid.find((t) => t.index === ep)
+  /* 和颜色选择器同一套：固定宽横向滚动 + 两端渐变；挂载时把所选区间滚到中间 */
+  const row = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const a = el.querySelector<HTMLElement>(`[data-p="${sp}"]`)
+    const b = el.querySelector<HTMLElement>(`[data-p="${ep}"]`)
+    if (!a || !b) return
+    el.scrollLeft = Math.max(0, (a.offsetLeft + b.offsetLeft + b.offsetWidth) / 2 - el.clientWidth / 2)
+  }, [])
+  const fade = 'linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent)'
   return (
-    <div className="rounded-[16px] bg-(--c-surface) px-4 py-3.5">
-      <div className="flex items-baseline justify-between">
+    <div className="rounded-[16px] bg-(--c-surface) py-3.5">
+      <div className="flex items-baseline justify-between px-4">
         <span className="text-[12.5px] font-medium text-(--c-ink4)">节次</span>
         <span className="text-[13px] font-bold tabular-nums text-(--c-ink)">
           {sp === ep ? `第 ${sp} 节` : `第 ${sp}–${ep} 节`}
           {s && e && <span className="ml-2 font-semibold text-(--c-ink4)">{fmtMinutes(s.start)} – {fmtMinutes(e.end)}</span>}
         </span>
       </div>
-      <div className="mt-2.5 flex gap-1">
+      <div
+        ref={row}
+        className="mt-2.5 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ maskImage: fade, WebkitMaskImage: fade }}
+      >
         {grid.map((t) => {
           const on = t.index >= sp && t.index <= ep
           return (
             <button
               key={t.index}
+              data-p={t.index}
               onClick={() => (t.index < sp ? onPick(t.index, ep) : t.index > ep ? onPick(sp, t.index) : onPick(t.index, t.index))}
-              className={`flex-1 rounded-[9px] py-[6px] text-[12px] font-bold tabular-nums transition-colors ${on ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink4)'}`}
+              className={`h-[30px] w-[38px] flex-none rounded-[9px] text-[12px] font-bold tabular-nums transition-colors ${on ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink4)'}`}
             >
               {t.index}
             </button>
@@ -638,7 +654,7 @@ export function ChangePage({ courseId, onBack }: { courseId?: string; onBack: ()
     const base = periods(rule?.startPeriod, rule?.endPeriod)
     const why =
       o.kind === 'moved'
-        ? [`${md(o.date)} ${base} → ${md(o.newDate ?? o.date)} ${periods(o.newStartPeriod ?? rule?.startPeriod, o.newEndPeriod ?? rule?.endPeriod)}`, o.newLocation && `改到 ${o.newLocation}`, o.note]
+        ? [`${md(o.date)} ${base} → ${md(o.newDate ?? o.date)} ${periods(o.newStartPeriod ?? rule?.startPeriod, o.newEndPeriod ?? rule?.endPeriod)}`, o.newLocation && `改到 ${o.newLocation}`, o.newTeacher && `老师 ${o.newTeacher}`, o.note]
         : [base, o.note]
     rows.push({
       key: o.id, at: o.createdAt, date: md(o.date), course: co?.name ?? '课程', kind: o.kind,
@@ -695,6 +711,8 @@ export function EditSessionPage({
   const [sp, setSp] = useState(ov?.newStartPeriod ?? occ.startPeriod)
   const [ep, setEp] = useState(ov?.newEndPeriod ?? occ.endPeriod)
   const [loc, setLoc] = useState(ov?.newLocation ?? occ.location ?? '')
+  const teacher0 = rule?.teacher ?? occ.teacher ?? ''
+  const [teacher, setTeacher] = useState(ov?.newTeacher ?? teacher0)
   const [note, setNote] = useState(ov?.note ?? '')
   const [status, setStatus] = useState<number>(() => {
     const i = STATUS.findIndex(([k]) => k === ov?.kind)
@@ -706,16 +724,17 @@ export function EditSessionPage({
     date !== occ.date ||
     sp !== occ.startPeriod ||
     ep !== occ.endPeriod ||
-    loc.trim() !== (occ.location ?? '')
+    loc.trim() !== (occ.location ?? '') ||
+    teacher.trim() !== teacher0
   const dirty =
     scope === 1
-      ? weekday !== rule?.weekday || sp !== occ.startPeriod || ep !== occ.endPeriod || loc.trim() !== (occ.location ?? '')
+      ? weekday !== rule?.weekday || sp !== occ.startPeriod || ep !== occ.endPeriod || loc.trim() !== (occ.location ?? '') || teacher.trim() !== teacher0
       : changed || note.trim() !== (ov?.note ?? '') || STATUS[status][0] !== (ov?.kind === 'moved' ? undefined : ov?.kind)
 
   const save = () => {
     if (!occ.ruleId) return
     if (scope === 1) {
-      store.editSessionRule(occ.ruleId, { weekday: weekday as 1 | 2 | 3 | 4 | 5 | 6 | 7, startPeriod: sp, endPeriod: ep, location: loc.trim() || undefined })
+      store.editSessionRule(occ.ruleId, { weekday: weekday as 1 | 2 | 3 | 4 | 5 | 6 | 7, startPeriod: sp, endPeriod: ep, location: loc.trim() || undefined, ...(teacher.trim() !== teacher0 ? { teacher: teacher.trim() || undefined } : {}) })
       onBack()
       return
     }
@@ -725,7 +744,7 @@ export function EditSessionPage({
         store.addOverride({
           id: uid(), ruleId: occ.ruleId, date: occ.date, kind: 'moved',
           newDate: date, newStartPeriod: sp, newEndPeriod: ep,
-          newLocation: loc.trim() || undefined, note: note.trim() || undefined,
+          newLocation: loc.trim() || undefined, newTeacher: teacher.trim() !== teacher0 ? teacher.trim() : undefined, note: note.trim() || undefined,
           createdAt: Date.now(),
         })
       } else if (ov) {
@@ -769,7 +788,7 @@ export function EditSessionPage({
             </Field>
           )}
           <Field k="地点"><TextInput value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="可选" /></Field>
-          <Field k="老师"><div className="text-[14px] font-semibold text-(--c-ink)">{occ.teacher ?? '—'}</div></Field>
+          <Field k="老师"><TextInput value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="可选" /></Field>
           <Field k="备注"><TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="可选" /></Field>
         </div>
 

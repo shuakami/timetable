@@ -68,6 +68,7 @@ export interface Override {
   newStartPeriod?: number
   newEndPeriod?: number
   newLocation?: string
+  newTeacher?: string
   note?: string
   createdAt: number
 }

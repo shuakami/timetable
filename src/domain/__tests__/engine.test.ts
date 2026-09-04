@@ -84,6 +84,18 @@ describe('occurrencesOn', () => {
     expect(occ[0].status).toBe('moved')
     expect(occ[0].start).toBe(600)
   })
+  it('moved override may replace teacher for that session only', () => {
+    const s = snap({
+      courses: [{ ...course, teacher: '张老师' }], rules: [rule],
+      overrides: [
+        { id: 'o1', ruleId: 'r1', date: '2026-08-31', kind: 'moved', newTeacher: '李老师', createdAt: 0 },
+        { id: 'o2', ruleId: 'r1', date: '2026-09-07', kind: 'moved', newDate: '2026-09-08', newTeacher: '王老师', createdAt: 0 },
+      ],
+    })
+    expect(occurrencesOn(s, '2026-08-31')[0].teacher).toBe('李老师')
+    expect(occurrencesOn(s, '2026-09-08')[0].teacher).toBe('王老师')
+    expect(occurrencesOn(s, '2026-09-14')[0].teacher).toBe('张老师')
+  })
   it('user entry weekly + conflict detection', () => {
     const s = snap({
       courses: [course], rules: [rule],

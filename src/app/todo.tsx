@@ -1,5 +1,5 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, useIsPresent, useMotionValue } from 'motion/react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useIsPresent } from 'motion/react'
 import type { Course, Task, TaskPhoto } from '../domain/types'
 import { fmtMinutes, weekdayOf } from '../domain/dates'
 import type { Snapshot } from '../domain/engine'
@@ -9,6 +9,7 @@ import { store, useStore } from './store'
 import { nowMinutes, todayStr } from './semester'
 import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './camera'
 import { TaskPhotoImg } from './photo'
+import { useImeY } from './ime'
 import {
   ActionSheet, ArrowUpIcon, BottomVeil, CAL_H, COMPOSE_RADIUS, Calendar, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
   QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, SWAP, TimeWheels, WD, addDaysStr, composeLayoutId, dockStyle, md, type ActionItem,
@@ -301,21 +302,8 @@ export function ComposeOverlay({
     return () => window.clearTimeout(t)
   }, [])
 
-  /*
-   * 键盘跟随：卡片挂在一个高度定死（挂载时视口高）的层里，视口被键盘压短也不动；
-   * 原生逐帧把键盘露出的高度（ImeFollow）喂进来，卡片按它平移，和系统键盘动画同步。
-   */
-  const y = useMotionValue(0)
-  const dock = useRef<HTMLDivElement>(null)
-  const [dockH, setDockH] = useState<number | null>(null)
-  useLayoutEffect(() => {
-    setDockH(dock.current?.parentElement?.clientHeight ?? null)
-  }, [])
-  useEffect(() => {
-    const w = window as Window & { __ttIme?: (kb: number) => void }
-    w.__ttIme = (kb) => y.set(-kb)
-    return () => { delete w.__ttIme }
-  }, [y])
+  /* 键盘跟随：卡片贴着视口底，按原生逐帧喂进来的键盘高度平移（见 ime.ts） */
+  const y = useImeY()
 
   const send = () => {
     const title = text.trim()
@@ -339,7 +327,7 @@ export function ComposeOverlay({
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={FADE} className="absolute inset-0 z-[50]">
       <button onClick={onClose} className="absolute inset-0 bg-(--c-bg)/55" />
-      <div ref={dock} className="pointer-events-none absolute inset-x-0 top-0" style={{ height: dockH ?? '100%' }}>
+      <div className="pointer-events-none absolute inset-0">
       <motion.div
         layoutId={composeLayoutId(courseId)}
         transition={SHEET}
