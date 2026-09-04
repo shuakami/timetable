@@ -676,7 +676,7 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
                               className="absolute"
                               style={{
                                 top: ((o.start - dayStart) / 60) * HOUR,
-                                height: ((o.end - o.start) / 60) * HOUR - 2,
+                                height: Math.max(40, ((o.end - o.start) / 60) * HOUR - 2),
                                 left: half ? `${lane * 50}%` : 0,
                                 width: half ? '50%' : '100%',
                               }}

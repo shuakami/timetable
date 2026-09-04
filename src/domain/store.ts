@@ -179,7 +179,7 @@ export class Store {
     this.commit()
   }
 
-  editCourse(courseId: string, patch: Partial<Pick<Course, 'name' | 'teacher' | 'color' | 'credit' | 'category'>>) {
+  editCourse(courseId: string, patch: Partial<Pick<Course, 'name' | 'teacher' | 'teacherPhone' | 'color' | 'credit' | 'category'>>) {
     const before = this.state.courses.find((c) => c.id === courseId)
     if (!before) return
     const changes: ChangeEntry[] = Object.entries(patch)

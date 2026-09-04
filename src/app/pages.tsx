@@ -13,6 +13,12 @@ import {
   DateInput, TimeInput, SelectInput,
 } from './ui'
 
+/** 格式化手机号：138 **** 1234 */
+function formatPhone(phone: string): string {
+  if (phone.length < 7) return phone
+  return `${phone.slice(0, 3)} **** ${phone.slice(-4)}`
+}
+
 function PageFooter({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">{children}</div>
@@ -326,12 +332,20 @@ export function CourseDetailPage({
               ['下次上课', next ? `${WD[Number(new Date(`${next.date}T00:00:00`).getDay()) === 0 ? 7 : new Date(`${next.date}T00:00:00`).getDay()]} ${fmtMinutes(next.start)} – ${fmtMinutes(next.end)}（${relDay}）` : '无'],
               ['地点', [...new Set(rules.map((r) => r.location).filter(Boolean))].join('、') || '—'],
               ['老师', [...new Set([cur.teacher, ...rules.map((r) => r.teacher)].filter(Boolean))].join('、') || '—'],
+              ['教师电话', cur.teacherPhone ? (
+                <a href={`tel:${cur.teacherPhone}`} className="inline-flex items-center gap-1 text-(--c-accent)">
+                  <span className="font-semibold tabular-nums">{formatPhone(cur.teacherPhone)}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                </a>
+              ) : '—'],
               ['上课日', dayList ? `每${dayList}` : '—'],
               ['节次', rules.length > 0 ? rules.map((r) => (r.startPeriod === r.endPeriod ? `${r.startPeriod}` : `${r.startPeriod}–${r.endPeriod}`)).join('、') + ' 节' : '—'],
-            ] as [string, string][]).map(([k, v], i) => (
+            ] as [string, React.ReactNode][]).map(([k, v], i) => (
               <div key={k} className={`flex items-baseline ${i > 0 ? 'mt-4' : ''}`}>
                 <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">{k}</span>
-                <span className="text-[14px] font-semibold text-(--c-ink)">{v}</span>
+                <span className="text-[14px] text-(--c-ink)">{v}</span>
               </div>
             ))}
           </div>
@@ -425,6 +439,7 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
   const cur = state.courses.find((c) => c.id === course.id) ?? course
   const [name, setName] = useState(cur.name)
   const [teacher, setTeacher] = useState(cur.teacher ?? '')
+  const [teacherPhone, setTeacherPhone] = useState(cur.teacherPhone ?? '')
   const [credit, setCredit] = useState(cur.credit != null ? String(cur.credit) : '')
   const [category, setCategory] = useState(cur.category ?? '')
   const [color, setColor] = useState(cur.color)
@@ -439,15 +454,18 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
   const dirty =
     name.trim() !== cur.name ||
     teacher.trim() !== (cur.teacher ?? '') ||
+    teacherPhone.trim() !== (cur.teacherPhone ?? '') ||
     credit.trim() !== (cur.credit != null ? String(cur.credit) : '') ||
     category.trim() !== (cur.category ?? '') ||
     color !== cur.color
 
   const save = () => {
     const n = Number(credit)
+    const cleanPhone = teacherPhone.replace(/[\s\-]/g, '').replace(/^\+?86/, '') || undefined
     store.editCourse(cur.id, {
       name: name.trim() || cur.name,
       teacher: teacher.trim() || undefined,
+      teacherPhone: cleanPhone && /^1[3-9]\d{9}$/.test(cleanPhone) ? cleanPhone : undefined,
       credit: credit.trim() && !Number.isNaN(n) ? n : undefined,
       category: category.trim() || undefined,
       color,
@@ -463,6 +481,7 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
         <div className="mt-5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
           <Field k="名称"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field k="老师"><TextInput value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="可选" /></Field>
+          <Field k="教师电话"><TextInput value={teacherPhone} inputMode="tel" onChange={(e) => setTeacherPhone(e.target.value)} placeholder="可选，用于一键拨号" /></Field>
           <Field k="学分"><TextInput value={credit} inputMode="decimal" onChange={(e) => setCredit(e.target.value)} placeholder="可选" /></Field>
           <Field k="分类"><TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="必修、选修等，可选" /></Field>
         </div>
@@ -489,13 +508,13 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
 
         {rules.length > 0 && (
           <>
-            <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">每周安排</div>
+            <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">上课时间</div>
             <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
               {rules.map((r) => (
                 <div key={r.id} className="flex items-baseline px-4 py-3">
-                  <span className="w-[62px] flex-none text-[12.5px] font-medium text-(--c-ink4)">每{WD[r.weekday]}</span>
+                  <span className="w-[68px] flex-none text-[12.5px] font-medium text-(--c-ink4)">{WD[r.weekday]} ·</span>
                   <div className="min-w-0 flex-1 text-[14px] font-semibold tabular-nums text-(--c-ink)">
-                    第 {r.startPeriod === r.endPeriod ? r.startPeriod : `${r.startPeriod}–${r.endPeriod}`} 节
+                    {r.startPeriod === r.endPeriod ? `第 ${r.startPeriod} 节` : `第 ${r.startPeriod}–${r.endPeriod} 节`}
                     {r.location && <span className="ml-2 font-medium text-(--c-ink4)">{r.location}</span>}
                   </div>
                 </div>

@@ -7,6 +7,7 @@ import { parsePeriodRange, parseWeekExpr } from './weeks'
 export interface RuleCourse {
   name: string
   teacher?: string
+  teacherPhone?: string
   location?: string
   weekday: number
   startPeriod: number
@@ -46,6 +47,7 @@ function parseTimeSlots(raw: unknown): TimeSlot[] | undefined {
 export interface CsvMapping {
   name: number
   teacher?: number
+  teacherPhone?: number
   location?: number
   weekday: number
   periods: number
@@ -80,8 +82,9 @@ export function parseCsv(text: string, map: CsvMapping): RuleOutput {
     }
     courses.push({
       name,
-      teacher: map.teacher != null ? cells[map.teacher] || undefined : undefined,
-      location: map.location != null ? cells[map.location] || undefined : undefined,
+      teacher: map.teacher != null ? cells[map.teacher]?.trim() || undefined : undefined,
+      teacherPhone: map.teacherPhone != null ? cells[map.teacherPhone]?.trim() || undefined : undefined,
+      location: map.location != null ? cells[map.location]?.trim() || undefined : undefined,
       weekday,
       startPeriod: pr.start,
       endPeriod: pr.end,
@@ -172,6 +175,7 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
         course: {
           name: rc.name,
           teacher: rc.teacher,
+          teacherPhone: rc.teacherPhone,
           color: colorByName.get(rc.name)!,
           identityKey: key,
           hidden: false,
@@ -180,6 +184,8 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
         rules: [],
       }
       byKey.set(key, nc)
+    } else if (nc.course.teacherPhone == null && rc.teacherPhone) {
+      nc.course.teacherPhone = rc.teacherPhone
     }
     nc.rules.push({
       weekday: rc.weekday as SessionRule['weekday'],
@@ -188,6 +194,7 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
       weeksMask: wk.mask,
       location: rc.location,
       teacher: rc.teacher,
+      teacherPhone: rc.teacherPhone,
     })
   }
   return { courses: [...byKey.values()], diagnostics: diags }

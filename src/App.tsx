@@ -286,7 +286,8 @@ const weekCols: Ev[][] = [
   [
     { name: '大学英语', loc: '外语楼105', color: C.eng, top: 0, h: 72 },
     { name: '高等数学', loc: '教三302', color: C.math, top: 84, h: 72 },
-    { name: '思想道德', loc: '教二404', color: C.pol, top: 252, h: 72 },
+    { name: '短课演示', loc: '40分钟', color: C.pol, top: 252, h: 28 },
+    { name: '思想道德', loc: '教二404', color: C.pol, top: 322, h: 72 },
   ],
   [
     { name: '大学英语', loc: '外语楼105', color: C.eng, top: 0, h: 72 },
@@ -362,7 +363,7 @@ function WeekScreen({ overlay }: { overlay?: React.ReactNode }) {
                               className="absolute inset-x-0 overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
                               style={{
                                 top: ev.top,
-                                height: ev.h,
+                                height: Math.max(40, ev.h),
                                 background: tint(ev.color, ev.now ? 22 : done ? 7 : 10),
                                 color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
                                 boxShadow: ev.now ? `inset 0 0 0 1.5px ${ev.color}` : undefined,
@@ -498,14 +499,15 @@ function DetailScreen() {
           <div className="text-[22px] font-extrabold tracking-[-.01em] text-(--c-ink)">高等数学（下）</div>
           <div className="mt-1.5 text-[12.5px] font-medium text-(--c-ink3)">必修课，5 学分，第 1–16 周</div>
           <div className="mt-5">
-            {[
+            {([
               ['下次上课', '周四 08:00 – 09:40（2 天后）'],
               ['地点', '教学三楼 302'],
               ['老师', '王立群，数学学院'],
+              ['教师电话', <a key="p" href="tel:13845214521" className="inline-flex items-center gap-1 font-semibold text-(--c-accent)">138 <span>****</span> 4521<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg></a>],
               ['上课日', '每周二、周四'],
               ['考核', '期末 60%，平时 40%'],
               ['提醒', '上课前 20 分钟'],
-            ].map(([k, v], i) => (
+            ] as [string, React.ReactNode][]).map(([k, v], i) => (
               <div key={k} className={`flex items-baseline ${i > 0 ? 'mt-4' : ''}`}>
                 <span className="w-[72px] flex-none text-[13px] font-medium text-(--c-ink4)">{k}</span>
                 <span className="text-[14px] font-semibold text-(--c-ink)">{v}</span>

@@ -7,6 +7,13 @@ import { parsePeriodRange } from '../weeks'
    两种形态：
    - table：一行一条课，列映射同 CSV
    - grid：课表网格，行=节次、列=星期，格内多行文本按模板拆字段 */
+
+const PHONE_RE = /(?:\+?86[- ]?)?1[3-9]\d(?:[ \-]?\d){8}/
+function extractPhone(s: string | undefined): string | undefined {
+  if (!s) return undefined
+  const m = s.match(PHONE_RE)
+  return m ? m[0].replace(/[\s\-]/g, '').replace(/^\+?86/, '') : undefined
+}
  
 interface Cell {
   text: string
@@ -122,6 +129,9 @@ function parseTableMode(grid: string[][], opts: HtmlTableOptions): RuleOutput {
     courses.push({
       name,
       teacher: map.teacher != null ? cells[map.teacher]?.trim() || undefined : undefined,
+      teacherPhone: map.teacherPhone != null
+        ? cells[map.teacherPhone]?.trim() || undefined
+        : extractPhone(cells[map.teacher]),
       location: map.location != null ? cells[map.location]?.trim() || undefined : undefined,
       weekday,
       startPeriod: pr.start,
@@ -159,16 +169,21 @@ function parseGridMode(grid: string[][], opts: HtmlGridOptions): RuleOutput {
           diags.push({ level: 'warn', code: 'NO_WEEKS', message: `「${name}」没有识别出周次，按整学期处理`, at: { snippet: block } })
         }
         const weeks = wm ? wm[1].replace(/周/g, '').replace(/[（(]/, '').replace(/[)）]/, '') : '1-52'
-        const teacher = lines.slice(1).find((l) => !weeksRe.test(l) && !/楼|馆|室|区|号|[A-Z]\d{2,}/.test(l))
         const location = lines.slice(1).find((l) => /楼|馆|室|区|号|[A-Z]\d{2,}/.test(l))
+        const cleanPhone = extractPhone(block)
+        const phoneLine = cleanPhone ? lines.find((l) => l.replace(/[\s\-]/g, '').includes(cleanPhone)) : undefined
+        const teacher = lines.slice(1).find((l) => l !== location && l !== phoneLine && !weeksRe.test(l) && !/楼|馆|室|区|号|[A-Z]\d{2,}/.test(l) && !(cleanPhone && l.replace(/[\s\-]/g, '').includes(cleanPhone)))
         // rowspan 展开后同一门课出现在连续多行：合并为一个节次区间
         const key = `${name}|${wd}|${weeks}`
         const prev = seen.get(key)
         if (prev && pr.start <= prev.endPeriod + 1) {
           prev.endPeriod = Math.max(prev.endPeriod, pr.end)
+          if (!prev.teacher && teacher) prev.teacher = teacher
+          if (!prev.teacherPhone && cleanPhone) prev.teacherPhone = cleanPhone
+          if (!prev.location && location) prev.location = location
           continue
         }
-        const rc: RuleCourse = { name, teacher, location, weekday: wd, startPeriod: pr.start, endPeriod: pr.end, weeks }
+        const rc: RuleCourse = { name, teacher, teacherPhone: cleanPhone, location, weekday: wd, startPeriod: pr.start, endPeriod: pr.end, weeks }
         seen.set(key, rc)
         courses.push(rc)
       }

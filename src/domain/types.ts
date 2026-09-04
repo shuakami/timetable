@@ -30,6 +30,7 @@ export interface Course {
   semesterId: string
   name: string
   teacher?: string
+  teacherPhone?: string
   credit?: number
   category?: string
   color: string
