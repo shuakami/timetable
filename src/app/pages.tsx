@@ -34,6 +34,44 @@ function sortRules<T extends { weekday: number; startPeriod: number }>(rules: T[
   return [...rules].sort((a, b) => a.weekday - b.weekday || a.startPeriod - b.startPeriod)
 }
 
+/** 周次描述：第 3–19 周（第 6、13 周不上） */
+function weeksLabel(mask: bigint, totalWeeks: number): string {
+  const on: number[] = []
+  for (let w = 1; w <= totalWeeks; w++) if (maskHasWeek(mask, w)) on.push(w)
+  if (on.length === 0) return ''
+  const lo = on[0]
+  const hi = on[on.length - 1]
+  if (lo === hi) return `仅第 ${lo} 周`
+  const off: number[] = []
+  for (let w = lo; w <= hi; w++) if (!maskHasWeek(mask, w)) off.push(w)
+  const span = `第 ${lo}–${hi} 周`
+  return off.length === 0 || off.length > 4 ? span : `${span}（第 ${off.join('、')} 周不上）`
+}
+
+/** 同一天前后相连、地点与周次相同的规则合并成一段：第 6–7 节 + 第 8–9 节 → 14:30 – 17:40 */
+function mergeRules<T extends { weekday: number; startPeriod: number; endPeriod: number; location?: string; weeksMask: bigint }>(rules: T[]) {
+  const out: { weekday: number; startPeriod: number; endPeriod: number; location?: string; weeksMask: bigint }[] = []
+  for (const r of sortRules(rules)) {
+    const last = out[out.length - 1]
+    if (last && last.weekday === r.weekday && last.endPeriod + 1 === r.startPeriod && last.location === r.location && last.weeksMask === r.weeksMask) {
+      last.endPeriod = r.endPeriod
+    } else {
+      out.push({ weekday: r.weekday, startPeriod: r.startPeriod, endPeriod: r.endPeriod, location: r.location, weeksMask: r.weeksMask })
+    }
+  }
+  return out
+}
+
+/** 具体某天的口语化说法：今天 / 明天 / 9月7日 周一 */
+function dayLabel(date: string, today: string): string {
+  const diff = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000)
+  if (diff === 0) return '今天'
+  if (diff === 1) return '明天'
+  if (diff === 2) return '后天'
+  const wd = WD[weekdayOf(date)]
+  return `${md(date)} ${wd}`
+}
+
 function PageFooter({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">{children}</div>
@@ -316,7 +354,8 @@ export function CourseDetailPage({
   const tasks = state.tasks.filter((t) => t.courseId === cur.id)
   const changes = state.changes.filter((c) => c.target === cur.id || rules.some((r) => r.id === c.target))
 
-  const relDay = next ? (next.date === today ? '今天' : `${Math.round((new Date(`${next.date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000)} 天后`) : ''
+  const merged = mergeRules(rules)
+  const sameWeeks = merged.every((m) => m.weeksMask === merged[0].weeksMask)
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-4 pb-10 [scrollbar-width:none]">
@@ -343,7 +382,7 @@ export function CourseDetailPage({
           </div>
           <div className="mt-5">
             {([
-              ['下次上课', next ? `${WD[Number(new Date(`${next.date}T00:00:00`).getDay()) === 0 ? 7 : new Date(`${next.date}T00:00:00`).getDay()]} ${fmtMinutes(next.start)} – ${fmtMinutes(next.end)}（${relDay}）` : '无'],
+              ['下次上课', next ? <span className="tabular-nums">{dayLabel(next.date, today)} {fmtMinutes(next.start)} – {fmtMinutes(next.end)}</span> : '本学期已上完'],
               ['地点', [...new Set(rules.map((r) => r.location).filter(Boolean))].join('、') || '—'],
               ['老师', [...new Set([cur.teacher, ...rules.map((r) => r.teacher)].filter(Boolean))].join('、') || '—'],
               ['教师电话', cur.teacherPhone ? (
@@ -354,11 +393,15 @@ export function CourseDetailPage({
                   </svg>
                 </a>
               ) : '—'],
-              ['上课时间', rules.length > 0 ? (
-                <span className="block space-y-1">
-                  {sortRules(rules).map((r) => (
-                    <span key={r.id} className="block tabular-nums">{WD[r.weekday]} {ruleClock(sem.timeGrid, r)}</span>
+              ['上课时间', merged.length > 0 ? (
+                <span className="block space-y-1.5">
+                  {merged.map((m, i) => (
+                    <span key={i} className="block">
+                      <span className="block tabular-nums">每{WD[m.weekday]} {ruleClock(sem.timeGrid, m)}</span>
+                      {!sameWeeks && <span className="mt-0.5 block text-[12px] font-medium text-(--c-ink4)">{weeksLabel(m.weeksMask, sem.totalWeeks)}</span>}
+                    </span>
                   ))}
+                  {sameWeeks && <span className="block text-[12px] font-medium text-(--c-ink4)">{weeksLabel(merged[0].weeksMask, sem.totalWeeks)}</span>}
                 </span>
               ) : '—'],
             ] as [string, React.ReactNode][]).map(([k, v], i) => (
@@ -431,7 +474,7 @@ export function CourseDetailPage({
               <MenuRow
                 key={r.id}
                 icon={ICON.clock}
-                title={`${WD[r.weekday]} ${ruleClock(sem.timeGrid, r)}`}
+                title={`每${WD[r.weekday]} ${ruleClock(sem.timeGrid, r)}`}
                 desc={[rulePeriods(r), r.location].filter(Boolean).join('，')}
                 onClick={() => onEditSession(r.id)}
               />
@@ -531,10 +574,9 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
             <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
               {sortRules(rules).map((r) => (
                 <div key={r.id} className="flex items-baseline px-4 py-3">
-                  <span className="w-[68px] flex-none text-[12.5px] font-medium text-(--c-ink4)">{WD[r.weekday]}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">{ruleClock(state.semester?.timeGrid, r)}</div>
-                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{[rulePeriods(r), r.location].filter(Boolean).join('，')}</div>
+                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">每{WD[r.weekday]} {ruleClock(state.semester?.timeGrid, r)}</div>
+                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{[rulePeriods(r), state.semester ? weeksLabel(r.weeksMask, state.semester.totalWeeks) : '', r.location].filter(Boolean).join('，')}</div>
                   </div>
                 </div>
               ))}
