@@ -314,7 +314,7 @@ export function TaskEditorPage({ task, courseId, onClose }: { task: Task | null;
 /* ---------------- 课程详情（内页） ---------------- */
 
 export function CourseDetailPage({
-  course, snap, onBack, onChanges, onEdit, onAddTask, onEditTask, onEditSession,
+  course, snap, onBack, onChanges, onEdit, onAddTask, onEditTask,
 }: {
   course: Course
   snap: Snapshot
@@ -323,7 +323,6 @@ export function CourseDetailPage({
   onEdit: () => void
   onAddTask: () => void
   onEditTask: (t: Task) => void
-  onEditSession: (ruleId: string) => void
 }) {
   const state = useStore()
   const cur = state.courses.find((c) => c.id === course.id) ?? course
@@ -405,7 +404,7 @@ export function CourseDetailPage({
           </div>
 
           {merged.length > 0 && (
-            <div className="mt-5 border-t border-(--c-surface2) pt-4">
+            <div className="mt-5">
               <div className="grid grid-cols-7 gap-1">
                 {[1, 2, 3, 4, 5, 6, 7].map((wd) => {
                   const segs = merged.filter((m) => m.weekday === wd)
@@ -498,20 +497,6 @@ export function CourseDetailPage({
           )}
         </Card>
 
-        {rules.length > 0 && (
-          <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">
-            {sortRules(rules).map((r) => (
-              <MenuRow
-                key={r.id}
-                icon={ICON.clock}
-                title={`每${WD[r.weekday]} ${ruleClock(sem.timeGrid, r)}`}
-                desc={[datesLabel(ruleDates(sem, r)), r.location].filter(Boolean).join('，')}
-                onClick={() => onEditSession(r.id)}
-              />
-            ))}
-          </div>
-        )}
-
         <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">
           <MenuRow icon={ICON.undo} title="变更记录" desc={changes.length > 0 ? `${changes.length} 条` : '还没有变更'} onClick={onChanges} />
           <MenuRow icon={ICON.ban} title={cur.hidden ? '取消隐藏' : '隐藏这门课'} desc="隐藏后不出现在课表里，可恢复" onClick={() => store.setCourseHidden(cur.id, !cur.hidden)} />
@@ -526,7 +511,7 @@ export function CourseDetailPage({
 
 const COLORS = ['#4F5BD5', '#5C8DDB', '#4FA3A1', '#69A85C', '#C9A227', '#D98452', '#C25B5B', '#A167C4', '#8A8E97']
 
-export function CourseEditPage({ course, onBack }: { course: Course; onBack: () => void }) {
+export function CourseEditPage({ course, onBack, onEditSession }: { course: Course; onBack: () => void; onEditSession: (ruleId: string) => void }) {
   const state = useStore()
   const cur = state.courses.find((c) => c.id === course.id) ?? course
   const [name, setName] = useState(cur.name)
@@ -603,12 +588,13 @@ export function CourseEditPage({ course, onBack }: { course: Course; onBack: () 
             <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">上课时间</div>
             <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
               {sortRules(rules).map((r) => (
-                <div key={r.id} className="flex items-baseline px-4 py-3">
+                <button key={r.id} onClick={() => onEditSession(r.id)} className="flex w-full items-center px-4 py-3 text-left active:bg-(--c-surface2)">
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">每{WD[r.weekday]} {ruleClock(state.semester?.timeGrid, r)}</div>
-                    <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{[state.semester ? datesLabel(ruleDates(state.semester, r)) : rulePeriods(r), r.location].filter(Boolean).join('，')}</div>
+                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">{WD[r.weekday]} {ruleClock(state.semester?.timeGrid, r)}</div>
+                    {r.location && <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{r.location}</div>}
                   </div>
-                </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                </button>
               ))}
             </div>
           </>

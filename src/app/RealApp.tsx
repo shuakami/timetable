@@ -1754,14 +1754,20 @@ export default function RealApp() {
             onEdit={() => push({ k: 'courseEdit', course: r.course })}
             onAddTask={() => push({ k: 'task', task: null, courseId: r.course.id })}
             onEditTask={(t) => push({ k: 'task', task: t })}
+          />
+        )
+      case 'courseEdit':
+        return (
+          <CourseEditPage
+            key={key}
+            course={r.course}
+            onBack={pop}
             onEditSession={(ruleId) => {
               const occ = occurrenceOfRule(snap, ruleId)
               if (occ) push({ k: 'session', occ })
             }}
           />
         )
-      case 'courseEdit':
-        return <CourseEditPage key={key} course={r.course} onBack={pop} />
       case 'session':
         return <EditSessionPage key={key} occ={r.occ} snap={snap} onBack={pop} />
       case 'conflict':

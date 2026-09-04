@@ -513,7 +513,7 @@ function DetailScreen() {
               </div>
             ))}
           </div>
-          <div className="mt-5 border-t border-(--c-surface2) pt-4">
+          <div className="mt-5">
             <div className="grid grid-cols-7 gap-1">
               {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => {
                 const on = i === 1 || i === 3
