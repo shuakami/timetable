@@ -26,6 +26,9 @@
     <link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png" />
     <link rel="apple-touch-icon" href="assets/favicon-180.png" />
     <link href="site.css" rel="stylesheet" />
+    <link rel="preload" as="image" href="assets/shots/today.png" media="(prefers-color-scheme: light)" fetchpriority="high" />
+    <link rel="preload" as="image" href="assets/shots-dark/today.png" media="(prefers-color-scheme: dark)" fetchpriority="high" />
+    <link rel="preload" as="image" href="assets/mascot.png" />
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -131,7 +134,7 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/lock.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-l" src="assets/shots/lock.png" alt="锁屏通知：今天 5 节课，08:00 第一节；下面列出今天的课程。" width="375" height="812" loading="lazy" />
+              <img class="phone tilt-l" src="assets/shots/lock.png" alt="锁屏通知：今天 5 节课，08:00 第一节；下面列出今天的课程。" width="375" height="812" />
             </picture>
             </figure>
             <div class="stop-text">
@@ -154,7 +157,7 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/longpress.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-r" src="assets/shots/longpress.png" alt="长按高等数学课程卡片，卡片抬起，下方出现菜单：静音本节、调课、编辑等。" width="375" height="812" loading="lazy" />
+              <img class="phone tilt-r" src="assets/shots/longpress.png" alt="长按高等数学课程卡片，卡片抬起，下方出现菜单：静音本节、调课、编辑等。" width="375" height="812" />
             </picture>
             </figure>
           </li>
@@ -167,7 +170,7 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/change.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-l" src="assets/shots/change.png" alt="调课差异页：重新导入后，逐条列出时间变化、教室变化和新增课程，可逐条确认。" width="375" height="812" loading="lazy" />
+              <img class="phone tilt-l" src="assets/shots/change.png" alt="调课差异页：重新导入后，逐条列出时间变化、教室变化和新增课程，可逐条确认。" width="375" height="812" />
             </picture>
             </figure>
             <div class="stop-text">
@@ -190,7 +193,7 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/conflict.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-r" src="assets/shots/conflict.png" alt="课程冲突页：数据结构与大学物理在同一节并排显示，可选择只留一门。" width="375" height="812" loading="lazy" />
+              <img class="phone tilt-r" src="assets/shots/conflict.png" alt="课程冲突页：数据结构与大学物理在同一节并排显示，可选择只留一门。" width="375" height="812" />
             </picture>
             </figure>
           </li>
@@ -203,7 +206,7 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/todo.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-l" src="assets/shots/todo.png" alt="待办页：按课程分组的作业与截止时间，今天到期的排在最前。" width="375" height="812" loading="lazy" />
+              <img class="phone tilt-l" src="assets/shots/todo.png" alt="待办页：按课程分组的作业与截止时间，今天到期的排在最前。" width="375" height="812" />
             </picture>
             </figure>
             <div class="stop-text">
@@ -226,7 +229,7 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/widget.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-r" src="assets/shots/widget.png" alt="桌面上放着今日和下一节两个小组件。" width="375" height="812" loading="lazy" />
+              <img class="phone tilt-r" src="assets/shots/widget.png" alt="桌面上放着今日和下一节两个小组件。" width="375" height="812" />
             </picture>
             </figure>
           </li>
@@ -265,7 +268,7 @@
           <figure class="funnel-phone">
             <picture>
               <source srcset="assets/shots-dark/airule.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/airule.png" alt="让 AI 转换课表：一段可复制的 Prompt，以及粘贴 AI 输出的输入框。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/airule.png" alt="让 AI 转换课表：一段可复制的 Prompt，以及粘贴 AI 输出的输入框。" width="375" height="812" />
             </picture>
             <figcaption class="hand hand-note">本地解析，预览后导入</figcaption>
           </figure>
@@ -273,7 +276,7 @@
           <figure class="funnel-result">
             <picture>
               <source srcset="assets/shots-dark/today.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/today.png" alt="导入完成后回到今天页面。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/today.png" alt="导入完成后回到今天页面。" width="375" height="812" />
             </picture>
             <figcaption class="hand hand-note note-purple">回到「今天」</figcaption>
           </figure>
@@ -312,28 +315,28 @@
             <li>
               <picture>
               <source srcset="assets/shots-dark/vacation.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/vacation.png" alt="假期周：显示当前是国庆假期，课表暂停。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/vacation.png" alt="假期周：显示当前是国庆假期，课表暂停。" width="375" height="812" />
             </picture>
               <p class="hand hand-note"><span class="wk">第 5 周</span>假期</p>
             </li>
             <li>
               <picture>
               <source srcset="assets/shots-dark/freeday.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/freeday.png" alt="今天没有课：显示下一次上课的时间。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/freeday.png" alt="今天没有课：显示下一次上课的时间。" width="375" height="812" />
             </picture>
               <p class="hand hand-note"><span class="wk">周六</span>无课</p>
             </li>
             <li>
               <picture>
               <source srcset="assets/shots-dark/examweek.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/examweek.png" alt="考试周：课表顶部标注考试周，列出考试安排。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/examweek.png" alt="考试周：课表顶部标注考试周，列出考试安排。" width="375" height="812" />
             </picture>
               <p class="hand hand-note"><span class="wk">第 19 周</span>考试周</p>
             </li>
             <li>
               <picture>
               <source srcset="assets/shots-dark/outofterm.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/outofterm.png" alt="超出学期：提示当前日期已在学期范围之外。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/outofterm.png" alt="超出学期：提示当前日期已在学期范围之外。" width="375" height="812" />
             </picture>
               <p class="hand hand-note"><span class="wk">第 21 周</span>学期外</p>
             </li>
@@ -349,19 +352,19 @@
 
         <div class="widget-board">
           <figure class="w w-today">
-            <img src="assets/widgets/today.png" alt="今日小组件：14 周二，高等数学 10:00 教三 302，数据结构 14:00 教一 201。" width="486" height="486" loading="lazy" />
+            <img src="assets/widgets/today.png" alt="今日小组件：14 周二，高等数学 10:00 教三 302，数据结构 14:00 教一 201。" width="486" height="486" />
             <figcaption class="hand hand-note">今日</figcaption>
           </figure>
           <figure class="w w-two">
-            <img src="assets/widgets/two_days.png" alt="两日小组件：今天和明天的课程并排。" width="1029" height="486" loading="lazy" />
+            <img src="assets/widgets/two_days.png" alt="两日小组件：今天和明天的课程并排。" width="1029" height="486" />
             <figcaption class="hand hand-note">两日</figcaption>
           </figure>
           <figure class="w w-next">
-            <img src="assets/widgets/next.png" alt="下一节小组件：15 分钟后，高等数学（下），教三 302，王立群。" width="486" height="486" loading="lazy" />
+            <img src="assets/widgets/next.png" alt="下一节小组件：15 分钟后，高等数学（下），教三 302，王立群。" width="486" height="486" />
             <figcaption class="hand hand-note">下一节</figcaption>
           </figure>
           <figure class="w w-week">
-            <img src="assets/widgets/week.png" alt="本周小组件：第 7 周，周一至周五的课程网格，今天高亮。" width="1029" height="678" loading="lazy" />
+            <img src="assets/widgets/week.png" alt="本周小组件：第 7 周，周一至周五的课程网格，今天高亮。" width="1029" height="678" />
             <figcaption class="hand hand-note">本周</figcaption>
           </figure>
         </div>
@@ -384,15 +387,15 @@
         <ol class="onboard">
           <li><picture>
               <source srcset="assets/shots-dark/onboard-0.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/onboard-0.png" alt="引导第一页：嘎嘎课程表，你的课表，理应如此。开始按钮。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/onboard-0.png" alt="引导第一页：嘎嘎课程表，你的课表，理应如此。开始按钮。" width="375" height="812" />
             </picture></li>
           <li><picture>
               <source srcset="assets/shots-dark/onboard-1.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/onboard-1.png" alt="引导第二页：开学日期，选择 8 月 31 日周一。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/onboard-1.png" alt="引导第二页：开学日期，选择 8 月 31 日周一。" width="375" height="812" />
             </picture></li>
           <li><picture>
               <source srcset="assets/shots-dark/onboard-2.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone" src="assets/shots/onboard-2.png" alt="引导第三页：课表来源列表，包括让 AI 转换、JSON、教务系统、Excel、日历、CSV、手动添加。" width="375" height="812" loading="lazy" />
+              <img class="phone" src="assets/shots/onboard-2.png" alt="引导第三页：课表来源列表，包括让 AI 转换、JSON、教务系统、Excel、日历、CSV、手动添加。" width="375" height="812" />
             </picture></li>
         </ol>
       </section>
