@@ -20,6 +20,8 @@ export interface CalendarEventBody {
   allDay: boolean
   tz: string
   busy: boolean
+  /** 停课 / 请假：事件留在日历里，标为取消，不提醒也不占时间 */
+  cancelled?: boolean
   /** 系统日历事件详情里「在应用中打开」的目标 */
   link?: string
 }
@@ -29,6 +31,7 @@ export type DesiredKind = 'course' | 'task' | 'exam' | 'week'
 /** 每门课一本日历（用课程自己的颜色），作业、考试、周次各一本 */
 export type CalendarSlug = string
 export const courseCalendar = (courseId: string): CalendarSlug => `tt.c.${courseId}`
+export const isCourseCalendar = (slug: CalendarSlug): boolean => slug.startsWith('tt.c.')
 export const TASK_CALENDAR: CalendarSlug = 'tt.task'
 export const EXAM_CALENDAR: CalendarSlug = 'tt.exam'
 export const WEEK_CALENDAR: CalendarSlug = 'tt.week'
@@ -125,11 +128,18 @@ interface SeriesItem {
   name: string
   location?: string
   teacher?: string
+  teacherPhone?: string
   startPeriod: number
   endPeriod: number
   link?: string
   courseId?: string
   reminders: Minutes[]
+}
+
+/** 事件描述：老师一行，电话一行（系统日历会把号码变成可点拨号） */
+function describe(it: Pick<SeriesItem, 'teacher' | 'teacherPhone'>): string | undefined {
+  const lines = [it.teacher?.trim(), it.teacherPhone?.trim()].filter((s): s is string => !!s)
+  return lines.length > 0 ? lines.join('\n') : undefined
 }
 
 const courseSlug = (courseId?: string): CalendarSlug => (courseId ? courseCalendar(courseId) : OTHER_CALENDAR)
@@ -140,7 +150,7 @@ function classReminders(prefs: Prefs, start: Minutes): Minutes[] {
   return uniqSorted(out)
 }
 
-function single(key: string, it: SeriesItem, tz: string, suffix = ''): DesiredEvent {
+function single(key: string, it: SeriesItem, tz: string, suffix = '', cancelled = false): DesiredEvent {
   return {
     key,
     kind: 'course',
@@ -148,15 +158,16 @@ function single(key: string, it: SeriesItem, tz: string, suffix = ''): DesiredEv
     event: {
       title: `${it.name}${suffix}`,
       location: it.location,
-      description: it.teacher?.trim() || undefined,
+      description: describe(it),
       start: atMinutes(it.date, it.start),
       end: atMinutes(it.date, it.end),
       allDay: false,
       tz,
-      busy: true,
+      busy: !cancelled,
+      ...(cancelled ? { cancelled: true } : {}),
       link: it.link,
     },
-    reminders: it.reminders,
+    reminders: cancelled ? [] : it.reminders,
   }
 }
 
@@ -190,7 +201,7 @@ function series(keyBase: string, items: SeriesItem[], tz: string): DesiredEvent[
     event: {
       title: first.name,
       location: first.location,
-      description: first.teacher?.trim() || undefined,
+      description: describe(first),
       start: atMinutes(first.date, first.start),
       duration: `PT${Math.max(1, first.end - first.start)}M`,
       rrule,
@@ -211,21 +222,24 @@ function planCourses(snap: Snapshot, prefs: Prefs, tz: string): DesiredEvent[] {
   for (const ov of snap.overrides) if (ov.kind === 'moved' && ov.newDate) { if (ov.newDate < from) from = ov.newDate; if (ov.newDate > to) to = ov.newDate }
   for (const en of snap.entries) if (en.date) { if (en.date < from) from = en.date; if (en.date > to) to = en.date }
 
+  const phones = new Map(snap.courses.map((c) => [c.id, c.teacherPhone]))
   const groups = new Map<string, SeriesItem[]>()
   const out: DesiredEvent[] = []
   const days = diffDays(to, from)
   for (let i = 0; i <= days; i++) {
     const date = addDays(from, i)
     for (const o of occurrencesOn(snap, date)) {
-      if (o.status === 'cancelled' || o.status === 'leave') continue
       const link = o.courseId ? `timetable://open/course/${o.courseId}` : `timetable://open/day/${date}`
       const item: SeriesItem = {
         date, start: o.start, end: o.end, name: o.name,
-        location: o.location, teacher: o.teacher,
+        location: o.location, teacher: o.teacher, teacherPhone: o.courseId ? phones.get(o.courseId) : undefined,
         startPeriod: o.startPeriod, endPeriod: o.endPeriod, link, courseId: o.courseId,
         reminders: o.muted ? [] : classReminders(prefs, o.start),
       }
-      if (o.status === 'moved') {
+      if (o.status === 'cancelled' || o.status === 'leave') {
+        // 本来有课、停了：留在日历里作为记录，不提醒
+        out.push(single(`x:${o.key}`, item, tz, o.status === 'leave' ? '（请假）' : '（停课）', true))
+      } else if (o.status === 'moved') {
         out.push(single(`mv:${o.key}`, item, tz, '（调课）'))
       } else if (o.muted) {
         // 这一次不提醒：从系列里挖出来，单独写一条没有提醒的
@@ -327,7 +341,7 @@ export function summarize(events: DesiredEvent[]): CalendarSummary {
   for (const e of events) {
     if (e.kind === 'exam') exams++
     else if (e.kind === 'task') tasks++
-    else if (e.kind === 'course') courses.add(e.event.title.replace(/（调课）$/, ''))
+    else if (e.kind === 'course') courses.add(e.event.title.replace(/（(调课|停课|请假)）$/, ''))
   }
   return { courses: courses.size, tasks, exams }
 }

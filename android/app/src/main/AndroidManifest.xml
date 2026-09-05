@@ -29,6 +29,38 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="timetable" android:host="open" />
             </intent-filter>
+            <!-- 收到的 .ics 课表文件：微信等应用里「用其他应用打开」可以选 课程表 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="text/calendar" />
+                <data android:mimeType="text/x-vcalendar" />
+                <data android:mimeType="application/ics" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.ics" />
+                <data android:pathPattern=".*\\..*\\.ics" />
+                <data android:pathPattern=".*\\..*\\..*\\.ics" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.ics" />
+                <data android:pathPattern=".*\\.ICS" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/calendar" />
+                <data android:mimeType="text/x-vcalendar" />
+                <data android:mimeType="application/ics" />
+            </intent-filter>
 
         </activity>
 

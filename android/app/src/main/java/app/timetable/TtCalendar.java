@@ -54,6 +54,8 @@ import java.util.Map;
 public class TtCalendar extends Plugin {
 
     private static final String ACCOUNT_NAME = "课程表";
+    /** 每门课一本日历的 slug 前缀，与 calendar-plan.ts 的 courseCalendar 一致 */
+    private static final String COURSE_PREFIX = "tt.c.";
     private static final String ACCOUNT_TYPE = CalendarContract.ACCOUNT_TYPE_LOCAL;
     /** 单批操作上限：Binder 事务有 1MB 限制，事件 + 提醒一起算 */
     private static final int BATCH = 120;
@@ -173,6 +175,7 @@ public class TtCalendar extends Plugin {
         HashMap<String, String> written = new HashMap<>();
         HashMap<String, Long> have = findCalendars(written);
         JSObject ids = new JSObject();
+        JSArray archived = new JSArray();
         try {
             HashSet<String> keep = new HashSet<>();
             for (int i = 0; i < wanted.length(); i++) {
@@ -180,7 +183,8 @@ public class TtCalendar extends Plugin {
                 String slug = w.getString("slug");
                 String name = w.optString("name", ACCOUNT_NAME);
                 String hex = w.optString("color", "");
-                int color = parseColor(hex, 0xFF4F5BD5);
+                int color = parseColor(hex, 0xFF4A55C7);
+                int visible = w.optBoolean("visible", true) ? 1 : 0;
                 keep.add(slug);
                 Long id = have.get(slug);
                 if (id != null) {
@@ -190,7 +194,7 @@ public class TtCalendar extends Plugin {
                         v.put(Calendars.CALENDAR_COLOR, color);
                         v.put(Calendars.CAL_SYNC1, hex);
                     }
-                    v.put(Calendars.VISIBLE, 1);
+                    v.put(Calendars.VISIBLE, visible);
                     v.put(Calendars.SYNC_EVENTS, 1);
                     cr.update(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, id)), v, null, null);
                 } else {
@@ -203,7 +207,7 @@ public class TtCalendar extends Plugin {
                     v.put(Calendars.CAL_SYNC1, hex);
                     v.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_OWNER);
                     v.put(Calendars.OWNER_ACCOUNT, ACCOUNT_NAME);
-                    v.put(Calendars.VISIBLE, 1);
+                    v.put(Calendars.VISIBLE, visible);
                     v.put(Calendars.SYNC_EVENTS, 1);
                     v.put(Calendars.MAX_REMINDERS, 5);
                     v.put(Calendars.ALLOWED_REMINDERS, Reminders.METHOD_DEFAULT + "," + Reminders.METHOD_ALERT);
@@ -221,9 +225,19 @@ public class TtCalendar extends Plugin {
                 }
                 ids.put(slug, (long) id);
             }
+            long now = System.currentTimeMillis();
             for (Map.Entry<String, Long> e : have.entrySet()) {
-                if (!keep.contains(e.getKey())) {
-                    cr.delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, e.getValue())), null, null);
+                if (keep.contains(e.getKey())) continue;
+                Uri u = asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, e.getValue()));
+                if (e.getKey().startsWith(COURSE_PREFIX) && allPast(cr, e.getValue(), now)) {
+                    // 上学期的课：从日历列表里隐起来，记录留着；删中的还有课的才真删
+                    ContentValues v = new ContentValues();
+                    v.put(Calendars.VISIBLE, 0);
+                    v.put(Calendars.SYNC_EVENTS, 0);
+                    cr.update(u, v, null, null);
+                    archived.put((long) e.getValue());
+                } else {
+                    cr.delete(u, null, null);
                 }
             }
         } catch (Exception e) {
@@ -232,10 +246,32 @@ public class TtCalendar extends Plugin {
         }
         JSObject o = new JSObject();
         o.put("ids", ids);
+        o.put("archived", archived);
         call.resolve(o);
     }
 
     /** 账户下全部事件：id + calendarId + key + hash，页面拿去和期望集合比 */
+    /** 这本日历里的事件是否全部已经结束（空日历不算） */
+    private static boolean allPast(ContentResolver cr, long calendarId, long now) {
+        boolean any = false;
+        try (Cursor c = cr.query(
+                Events.CONTENT_URI,
+                new String[]{ Events.DTSTART, Events.DTEND, Events.LAST_DATE },
+                Events.CALENDAR_ID + "=? AND " + Events.DELETED + "=0",
+                new String[]{ String.valueOf(calendarId) },
+                null)) {
+            if (c == null) return false;
+            while (c.moveToNext()) {
+                any = true;
+                long end = !c.isNull(2) ? c.getLong(2) : !c.isNull(1) ? c.getLong(1) : c.isNull(0) ? Long.MAX_VALUE : c.getLong(0);
+                if (end >= now) return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return any;
+    }
+
     @PluginMethod
     public void readAll(PluginCall call) {
         if (!has()) {
@@ -303,6 +339,7 @@ public class TtCalendar extends Plugin {
         v.put(Events.HAS_ALARM, hasAlarm ? 1 : 0);
         v.put(Events.AVAILABILITY, ev.optBoolean("busy", true) ? Events.AVAILABILITY_BUSY : Events.AVAILABILITY_FREE);
         v.put(Events.ACCESS_LEVEL, Events.ACCESS_PRIVATE);
+        // 停课 / 请假也写 CONFIRMED：STATUS_CANCELED 的事件不进 Instances 表，任何日历应用都看不到
         v.put(Events.STATUS, Events.STATUS_CONFIRMED);
         v.put(Events.GUESTS_CAN_MODIFY, 0);
         v.put(Events.GUESTS_CAN_INVITE_OTHERS, 0);

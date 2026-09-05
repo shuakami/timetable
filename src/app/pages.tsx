@@ -4,6 +4,7 @@ import type { Course, Occurrence, OverrideKind, Task, UserEntry } from '../domai
 import { dateOf, fmtDuration, fmtMinutes, fromDate, weekdayOf } from '../domain/dates'
 import { occurrencesOn, type Snapshot } from '../domain/engine'
 import { maskHasWeek } from '../domain/weeks'
+import { COURSE_COLORS } from '../domain/palette'
 import { uid } from '../domain/store'
 import { store, useStore } from './store'
 import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
@@ -306,8 +307,6 @@ export function CourseDetailPage({
 
 /* ---------------- 编辑课程（内页） ---------------- */
 
-const COLORS = ['#4F5BD5', '#5C8DDB', '#4FA3A1', '#69A85C', '#C9A227', '#D98452', '#C25B5B', '#A167C4', '#8A8E97']
-
 export function CourseEditPage({ course, onBack, onEditSession }: { course: Course; onBack: () => void; onEditSession: (ruleId: string) => void }) {
   const state = useStore()
   const cur = state.courses.find((c) => c.id === course.id) ?? course
@@ -318,6 +317,8 @@ export function CourseEditPage({ course, onBack, onEditSession }: { course: Cour
   const [category, setCategory] = useState(cur.category ?? '')
   const [color, setColor] = useState(cur.color)
   const colorRow = useRef<HTMLDivElement>(null)
+  /* 老数据里不在色板上的颜色放在最前面，让当前颜色总有一个被选中 */
+  const COLORS = COURSE_COLORS.includes(cur.color) ? COURSE_COLORS : [cur.color, ...COURSE_COLORS]
   useEffect(() => {
     const el = colorRow.current
     const i = COLORS.indexOf(cur.color)

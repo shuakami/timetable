@@ -25,6 +25,7 @@ import { justEndedClass } from '../domain/next-class'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { calendarPermission, calendarSupported, scheduleCalendarSync, syncCalendar } from './calendar'
 import { nativeToast, syncWidgets } from './widgets'
+import { onIncomingIcs, shareIcs } from './files'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
   BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
@@ -1150,7 +1151,7 @@ function ParsedRow({ nc, sem }: { nc: NormalizedCourse; sem: Semester }) {
 }
 
 /* 导入流程（内页）：输入 → 解析结果 → 回到课表 */
-function ImportRunPage({ rule, initialText, onBack, onDone }: { rule: RuleManifest; initialText?: string; onBack: () => void; onDone: () => void }) {
+function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: RuleManifest; initialText?: string; autoRun?: boolean; onBack: () => void; onDone: () => void }) {
   const [stage, setStage] = useState<ImportStage>('input')
   const [text, setText] = useState(initialText ?? '')
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
@@ -1170,7 +1171,11 @@ function ImportRunPage({ rule, initialText, onBack, onDone }: { rule: RuleManife
       const out: RuleOutput = await runRule(rule, { text, bytes: fileBytes ?? undefined }, sem)
       let target = store.state.semester ?? sem
       const need = Math.min(20, Math.max(0, ...out.courses.map((c) => c.endPeriod)))
-      if (out.timeGrid && out.timeGrid.length > target.timeGrid.length) {
+      if (out.semester) {
+        // 课程表自己导出的文件：学期、节次表照单全收
+        target = { ...target, ...out.semester, timeGrid: out.timeGrid ?? target.timeGrid }
+        store.setSemester(target)
+      } else if (out.timeGrid && out.timeGrid.length > target.timeGrid.length) {
         target = { ...target, timeGrid: out.timeGrid }
         store.setSemester(target)
       }
@@ -1224,6 +1229,14 @@ function ImportRunPage({ rule, initialText, onBack, onDone }: { rule: RuleManife
   }
 
   const errors = pending?.diagnostics.filter((d) => d.level === 'error') ?? []
+
+  /* 文件是用课程表直接打开的：不经过粘贴页，直接给预览 */
+  const auto = useRef(autoRun && !!initialText)
+  useEffect(() => {
+    if (!auto.current) return
+    auto.current = false
+    void parse()
+  }, [])
 
   return (
     <Page>
@@ -1404,7 +1417,7 @@ function RuleEditorPage({ rule, onBack }: { rule: RuleManifest | null; onBack: (
 
 /* ---------------- 我的 ---------------- */
 
-type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'changes' | 'notif' | 'widget' | 'theme'
+type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'share' | 'changes' | 'notif' | 'widget' | 'theme'
 
 const WIDGET_LABEL: Record<WidgetStyle, string> = {
   today: '今日课程',
@@ -1427,6 +1440,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
       ['学期', sem ? `${sem.name}，第 ${Math.max(0, Math.min(sem.totalWeeks, week))} / ${sem.totalWeeks} 周` : '未设置', 'semester'],
       ['课程', `${live.length} 门`, 'courses'],
       ['导入课表', '', 'import'],
+      ['分享课表', '', 'share'],
     ]],
     ['提醒', [
       ['上课提醒', `课前 ${state.prefs.classLead} 分钟`, 'notif'],
@@ -1748,7 +1762,7 @@ type Route =
   | { k: 'todoReview'; photos: CapturedPhoto[]; courseId?: string }
   | { k: 'manual' }
   | { k: 'import' }
-  | { k: 'importRun'; ruleId: string; text?: string }
+  | { k: 'importRun'; ruleId: string; text?: string; auto?: boolean }
   | { k: 'aiImport' }
   | { k: 'rule'; rule: RuleManifest | null }
   | { k: 'semester' }
@@ -1832,8 +1846,15 @@ export default function RealApp() {
         setStack([])
       }
     })
+    /* 别人发来的 .ics 用课程表打开：直接进导入预览 */
+    const offIcs = onIncomingIcs((text) => {
+      setMenu(null)
+      setTab(3)
+      setStack([{ k: 'importRun', ruleId: 'builtin-ics', text, auto: true }])
+    })
     return () => {
       off()
+      offIcs()
       if (timer != null) window.clearTimeout(timer)
       void onResume.then((h) => h.remove())
       void onUrl.then((h) => h.remove())
@@ -2036,7 +2057,7 @@ export default function RealApp() {
         return <AiImportPage key={key} onBack={pop} onNext={(text) => push({ k: 'importRun', ruleId: 'builtin-json', text })} />
       case 'importRun': {
         const rule = state.savedRules.find((x) => x.id === r.ruleId)
-        return rule ? <ImportRunPage key={key} rule={rule} initialText={r.text} onBack={pop} onDone={backToTimetable} /> : null
+        return rule ? <ImportRunPage key={key} rule={rule} initialText={r.text} autoRun={r.auto} onBack={pop} onDone={backToTimetable} /> : null
       }
       case 'rule':
         return <RuleEditorPage key={key} rule={r.rule} onBack={pop} />
@@ -2139,7 +2160,7 @@ export default function RealApp() {
               onText={() => setCompose({})}
             />
           )}
-          {tab === 3 && <MeView onPage={(p) => push({ k: p } as Route)} />}
+          {tab === 3 && <MeView onPage={(p) => { if (p === 'share') void shareIcs().then((ok) => { if (!ok) nativeToast('先设置学期') }); else push({ k: p } as Route) }} />}
         </motion.div>
       </AnimatePresence>
 

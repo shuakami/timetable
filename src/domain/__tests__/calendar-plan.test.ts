@@ -85,6 +85,21 @@ describe('课程', () => {
     expect(moved.event.title).toBe('高等数学（调课）')
     const muted = ev.find((e) => e.key.startsWith('mu:'))!
     expect(muted.reminders).toEqual([])
+    // 停课的那次留在日历里：原时间、标题带（停课）、不提醒不占时间
+    const off = ev.find((e) => e.key.startsWith('x:'))!
+    expect(off.event.title).toBe('高等数学（停课）')
+    expect(off.event.start).toBe(new Date('2026-09-07T08:00:00').getTime())
+    expect(off.event.cancelled).toBe(true)
+    expect(off.event.busy).toBe(false)
+    expect(off.reminders).toEqual([])
+    expect(off.calendar).toBe(courseCalendar('c1'))
+    expect(summarize(ev).courses).toBe(1)
+  })
+
+  it('老师电话单独一行写进描述', () => {
+    const c = { ...course, teacherPhone: '13800138000' }
+    const [e] = planCalendar(snap({ courses: [c], rules: [weekly] }), [], prefs, now)
+    expect(e.event.description).toBe('王立群\n13800138000')
   })
 
   it('晚课不加早课提醒', () => {

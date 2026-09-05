@@ -1,5 +1,6 @@
 package app.timetable;
 
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -22,10 +23,18 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WidgetBridge.class);
         registerPlugin(TtCamera.class);
         registerPlugin(TtCalendar.class);
+        registerPlugin(TtFiles.class);
         super.onCreate(savedInstanceState);
+        TtFiles.handleIntent(this, getIntent());
         ThemeApply.applySaved(this, getBridge().getWebView());
         ImeFollow.install(this, getBridge().getWebView());
         resumeCover = new ResumeCover(this, getBridge().getWebView());
+    }
+
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        TtFiles.handleIntent(this, intent);
     }
 
     @Override

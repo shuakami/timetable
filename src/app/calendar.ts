@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { EXAM_CALENDAR, TASK_CALENDAR, WEEK_CALENDAR, calendarsFor, eventHash, planCalendar, summarize, type CalendarEventBody, type CalendarSpec, type CalendarSummary, type DesiredEvent } from '../domain/calendar-plan'
+import { EXAM_CALENDAR, TASK_CALENDAR, WEEK_CALENDAR, calendarsFor, eventHash, isCourseCalendar, planCalendar, summarize, type CalendarEventBody, type CalendarSpec, type CalendarSummary, type DesiredEvent } from '../domain/calendar-plan'
+import { dateOf, fromDate } from '../domain/dates'
+import { DEFAULT_COURSE_COLOR } from '../domain/palette'
 import { store } from './store'
 
 /* 系统日历：课、作业、考试各写进应用自己的一本本地日历，提醒由系统日历发出。
@@ -27,7 +29,8 @@ interface WriteItem {
 interface TtCalendarPlugin {
   checkPermission(): Promise<{ status: CalendarPermission }>
   requestPermission(): Promise<{ status: CalendarPermission }>
-  ensureCalendars(o: { calendars: (CalendarSpec & { color: string })[] }): Promise<{ ids: Record<string, number> }>
+  /** archived：不在期望集合里、但课已全部上完的课程日历，原生隐起来而不删，里面的事件不参与同步 */
+  ensureCalendars(o: { calendars: (CalendarSpec & { color: string; visible: boolean })[] }): Promise<{ ids: Record<string, number>; archived?: number[] }>
   readAll(): Promise<{ events: RemoteEvent[] }>
   apply(o: { inserts: WriteItem[]; updates: (WriteItem & { id: number })[]; deletes: number[] }): Promise<{ inserted: number; updated: number; deleted: number }>
   hasCalendarApp(): Promise<{ available: boolean }>
@@ -104,14 +107,16 @@ export async function requestCalendarPermission(): Promise<CalendarPermission> {
 /* 日历颜色是日历自己的属性，不随应用深浅色 / 系统配色变：固定一套，写进去后就不再动 */
 const FIXED_COLORS: Record<string, string> = {
   [TASK_CALENDAR]: '#B98A2F',
-  [EXAM_CALENDAR]: '#DE5B78',
+  [EXAM_CALENDAR]: '#C9526C',
   [WEEK_CALENDAR]: '#8A8E97',
 }
-const DEFAULT_COLOR = '#4F5BD5'
-
-/** 每门课一本（课程颜色），作业 / 考试 / 周次各一本 */
-function withColors(specs: CalendarSpec[]): (CalendarSpec & { color: string })[] {
-  return specs.map((c) => ({ ...c, color: c.color ?? FIXED_COLORS[c.slug] ?? DEFAULT_COLOR }))
+/** 每门课一本（课程颜色），作业 / 考试 / 周次各一本；学期结束后课程日历从日历列表里隐起来 */
+function withColors(specs: CalendarSpec[], semesterEnded: boolean): (CalendarSpec & { color: string; visible: boolean })[] {
+  return specs.map((c) => ({
+    ...c,
+    color: c.color ?? FIXED_COLORS[c.slug] ?? DEFAULT_COURSE_COLOR,
+    visible: !(semesterEnded && isCourseCalendar(c.slug)),
+  }))
 }
 
 function toWrite(e: DesiredEvent, ids: Record<string, number>): WriteItem {
@@ -134,12 +139,15 @@ async function doSync(): Promise<void> {
   try {
     const snap = store.snapshot()
     const desired = planCalendar(snap, store.state.tasks, store.state.prefs, new Date())
-    const { ids } = await TtCalendar.ensureCalendars({ calendars: withColors(calendarsFor(desired, snap)) })
+    const ended = !!snap && fromDate(new Date()) > dateOf(snap.semester, snap.semester.totalWeeks, 7)
+    const { ids, archived = [] } = await TtCalendar.ensureCalendars({ calendars: withColors(calendarsFor(desired, snap), ended) })
     const { events: remote } = await TtCalendar.readAll()
 
+    const skip = new Set(archived)
     const byKey = new Map<string, RemoteEvent>()
     const deletes: number[] = []
     for (const r of remote) {
+      if (skip.has(r.calendarId)) continue
       // 同一个 key 出现两次（异常情况）：留一条，其余删掉
       if (!r.key || byKey.has(r.key)) deletes.push(r.id)
       else byKey.set(r.key, r)

@@ -1,6 +1,7 @@
 import type { Course, Diagnostic, SessionRule, Semester, TimeSlot } from './types'
 import { identityKey } from './engine'
 import { parsePeriodRange, parseWeekExpr } from './weeks'
+import { COURSE_COLORS } from './palette'
 
 /* ---------- 规则输出契约 ---------- */
 
@@ -13,6 +14,7 @@ export interface RuleCourse {
   startPeriod: number
   endPeriod: number
   weeks: string // 周次表达式，引擎负责解析
+  color?: string // 来源自带颜色（课程表自己导出的文件）
   raw?: Record<string, string>
 }
 
@@ -20,6 +22,8 @@ export interface RuleOutput {
   courses: RuleCourse[]
   diagnostics: Diagnostic[]
   timeGrid?: TimeSlot[] // 课表自带节次表时覆盖学期设置
+  /** 来源自带学期信息（开学日、周数）时覆盖学期设置 */
+  semester?: Pick<Semester, 'name' | 'startDate' | 'totalWeeks'>
 }
 
 const PHONE_RE = /(?:\+?86[- ]?)?1[3-9]\d(?:[ \-]?\d){8}/
@@ -163,8 +167,6 @@ export interface NormalizedCourse {
   rules: Omit<SessionRule, 'id' | 'courseId'>[]
 }
 
-const PALETTE = ['#4F5BD5', '#C2703D', '#3D8A63', '#7A4FB0', '#B04F6E', '#3D7A9E', '#8A7A3D']
-
 export function normalize(out: RuleOutput, sem: Semester): { courses: NormalizedCourse[]; diagnostics: Diagnostic[] } {
   const diags = [...out.diagnostics]
   const byKey = new Map<string, NormalizedCourse>()
@@ -180,7 +182,7 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
       diags.push({ level: 'error', code: 'PERIOD_OUT_OF_GRID', message: `「${rc.name}」节次 ${rc.startPeriod}-${rc.endPeriod} 超出节次表（共 ${sem.timeGrid.length} 节）` })
       continue
     }
-    if (!colorByName.has(rc.name)) colorByName.set(rc.name, PALETTE[colorIdx++ % PALETTE.length])
+    if (!colorByName.has(rc.name)) colorByName.set(rc.name, rc.color ?? COURSE_COLORS[colorIdx++ % COURSE_COLORS.length])
     const key = identityKey(rc.name, rc.teacher, rc.weekday, rc.startPeriod)
     const nameKey = rc.name + '|' + (rc.teacher ?? '')
     let nc = [...byKey.values()].find((x) => x.course.name + '|' + (x.course.teacher ?? '') === nameKey)
