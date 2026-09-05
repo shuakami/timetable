@@ -889,10 +889,17 @@ export function MenuRow({ icon, title, desc, onClick, danger, first }: { icon: R
   )
 }
 
-export function TextAction({ children, onClick, tone = 'brand', disabled }: { children: React.ReactNode; onClick?: () => void; tone?: 'brand' | 'mute' | 'danger'; disabled?: boolean }) {
+const EASE_CSS = 'cubic-bezier(.25,1,.5,1)'
+
+export function TextAction({ children, onClick, tone = 'brand', disabled, busy }: { children: React.ReactNode; onClick?: () => void; tone?: 'brand' | 'mute' | 'danger'; disabled?: boolean; busy?: boolean }) {
   const color = tone === 'brand' ? 'text-(--c-accent)' : tone === 'danger' ? 'text-(--c-danger)' : 'text-(--c-ink3)'
   return (
-    <button onClick={onClick} disabled={disabled} className={`flex-none text-[13px] font-bold whitespace-nowrap transition-opacity active:opacity-60 disabled:opacity-30 ${color}`}>{children}</button>
+    <button onClick={onClick} disabled={disabled || busy} className={`grid flex-none place-items-center text-[13px] font-bold whitespace-nowrap transition-opacity active:opacity-60 ${busy ? '' : 'disabled:opacity-30'} ${color}`}>
+      <span className={`[grid-area:1/1] transition-opacity duration-200 ${busy ? 'opacity-0' : ''}`} style={{ transitionTimingFunction: EASE_CSS }}>{children}</span>
+      <span className={`flex [grid-area:1/1] transition-opacity duration-200 ${busy ? '' : 'opacity-0'}`} style={{ transitionTimingFunction: EASE_CSS }}>
+        <Loader size={14} />
+      </span>
+    </button>
   )
 }
 
@@ -919,8 +926,8 @@ export function PrimaryButton({ children, onClick, disabled, busy, onDark }: { c
       disabled={disabled || busy}
       className={`grid w-full place-items-center rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] ${busy ? 'disabled:bg-(--c-accent) disabled:text-white' : onDark ? 'disabled:bg-white/12 disabled:text-white/35' : 'disabled:bg-(--c-line) disabled:text-(--c-ink5)'}`}
     >
-      <span className={`[grid-area:1/1] transition-opacity duration-200 ${busy ? 'opacity-0' : ''}`} style={{ transitionTimingFunction: 'cubic-bezier(.25,1,.5,1)' }}>{children}</span>
-      <span className={`flex [grid-area:1/1] transition-opacity duration-200 ${busy ? '' : 'opacity-0'}`} style={{ transitionTimingFunction: 'cubic-bezier(.25,1,.5,1)' }}>
+      <span className={`[grid-area:1/1] transition-opacity duration-200 ${busy ? 'opacity-0' : ''}`} style={{ transitionTimingFunction: EASE_CSS }}>{children}</span>
+      <span className={`flex [grid-area:1/1] transition-opacity duration-200 ${busy ? '' : 'opacity-0'}`} style={{ transitionTimingFunction: EASE_CSS }}>
         <Loader size={18} />
       </span>
     </button>

@@ -561,6 +561,51 @@ section {
   height: auto;
 }
 
+/* ============ 日历 ============ */
+.cal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 640px;
+  gap: 32px;
+  align-items: center;
+}
+.cal-lede {
+  margin-top: 20px;
+  max-width: 22em;
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.cal-scene {
+  position: relative;
+  width: 640px;
+  height: 600px;
+}
+.cal-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.cal-a,
+.cal-b {
+  position: absolute;
+  width: 250px;
+}
+.cal-a {
+  left: 0;
+  top: 20px;
+}
+.cal-b {
+  left: 390px;
+  top: 0;
+}
+.cal-a figcaption,
+.cal-b figcaption {
+  margin-top: 16px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* ============ 导入 ============ */
 .funnel {
   position: relative;
@@ -894,6 +939,12 @@ section {
   .hero-proof {
     zoom: 0.875;
   }
+  .cal {
+    grid-template-columns: minmax(0, 1fr) 560px;
+  }
+  .cal-scene {
+    zoom: 0.875;
+  }
 }
 
 @media (max-width: 960px) {
@@ -905,6 +956,13 @@ section {
     padding-top: 0;
   }
   .hero-proof {
+    justify-self: center;
+  }
+  .cal {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .cal-scene {
     justify-self: center;
   }
   .stop {
@@ -999,6 +1057,27 @@ section {
     top: 0;
     bottom: 0;
     border-left: 2.5px dashed var(--pencil);
+  }
+
+  .cal-scene {
+    zoom: 1;
+    width: 100%;
+    height: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .cal-lines {
+    display: none;
+  }
+  .cal-a,
+  .cal-b {
+    position: static;
+    width: 100%;
+  }
+  .cal-b {
+    margin-top: 40px;
   }
 
   .funnel {

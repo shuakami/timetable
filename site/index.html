@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>嘎嘎课程表 — 免费无广告的 Android 课程表 App｜多源导入 · AI 转换 · 桌面小组件</title>
-    <meta name="description" content="嘎嘎课程表：轻量无广告的大学生课程表应用。支持教务系统、Excel、ICS、CSV 多源导入，AI 一键转换课表，时间冲突检测，四款桌面小组件，上课提醒。数据只存本机，开源免费。" />
+    <meta name="description" content="嘎嘎课程表：轻量无广告的大学生课程表应用。支持教务系统、Excel、ICS、CSV 多源导入，AI 一键转换课表，时间冲突检测，四款桌面小组件，课表写入系统日历，手表平板同步提醒。数据只存本机，开源免费。" />
     <meta name="keywords" content="课程表,课程表app,大学生课程表,安卓课程表,wakeup课程表,超级课程表替代,免费课程表,无广告课程表,课表导入,桌面小组件课表,嘎嘎课程表" />
     <link rel="canonical" href="https://shuakami.github.io/timetable/" />
     <meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)" />
@@ -35,11 +35,11 @@
       "@type": "SoftwareApplication",
       "name": "嘎嘎课程表",
       "alternateName": "Gaga Timetable",
-      "description": "轻量无广告的 Android 课程表应用。支持教务系统、Excel、ICS、CSV 多源导入，AI 转换，冲突检测，桌面小组件，上课提醒。数据只存本机。",
+      "description": "轻量无广告的 Android 课程表应用。支持教务系统、Excel、ICS、CSV 多源导入，AI 转换，冲突检测，桌面小组件，课表写入系统日历。数据只存本机。",
       "url": "https://shuakami.github.io/timetable/",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Android 8.0+",
-      "softwareVersion": "1.4.2",
+      "softwareVersion": "1.4.35",
       "isAccessibleForFree": true,
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
       "featureList": [
@@ -47,7 +47,7 @@
         "AI 一键转换课表",
         "时间冲突检测",
         "四款桌面小组件",
-        "上课提醒",
+        "写入系统日历，手表平板同步提醒",
         "待办与作业",
         "变更记录"
       ],
@@ -85,6 +85,7 @@
       </a>
       <nav class="top-nav" aria-label="页面">
         <a href="#day">一天</a>
+        <a href="#calendar">日历</a>
         <a href="#capture">随手记</a>
         <a href="#import">导入</a>
         <a href="#term">学期</a>
@@ -135,13 +136,13 @@
             <figure class="stop-fig">
               <picture>
               <source srcset="assets/shots-dark/lock.png" media="(prefers-color-scheme: dark)" />
-              <img class="phone tilt-l" src="assets/shots/lock.png" alt="锁屏通知：今天 5 节课，08:00 第一节；下面列出今天的课程。" width="375" height="812" />
+              <img class="phone tilt-l" src="assets/shots/lock.png" alt="锁屏：来自系统日历的提醒依次排开，高等数学 10:00 开始、期中考试、大学英语，以及今晚截止的作业。" width="375" height="812" />
             </picture>
             </figure>
             <div class="stop-text">
               <p class="time"><span class="hand time-num">07:20</span><svg class="ring" viewBox="0 0 160 64" aria-hidden="true"><path d="M52 6 C 100 -2, 158 10, 154 34 C 150 58, 96 66, 46 58 C 6 52, 2 22, 40 10 C 48 8, 58 7, 66 7" /></svg></p>
-              <h3>一条通知，今日课程了然于胸。</h3>
-              <p>第一节几点、全天几节，醒来扫一眼便全知晓。课前 15 分钟，为你准时提醒。</p>
+              <h3>来自系统的提醒，了然于胸。</h3>
+              <p>第一节几点、全天几节，醒来扫一眼便全知晓。课前 15 分钟，系统日历准时提醒，一次不落。</p>
             </div>
           </li>
 
@@ -235,6 +236,36 @@
             </figure>
           </li>
         </ol>
+      </section>
+
+      <!-- ============ 日历 ============ -->
+      <section class="cal" id="calendar" aria-labelledby="cal-h">
+        <div class="cal-copy">
+          <header class="sec-head">
+            <h2 id="cal-h">生在日历，<br />长在系统。</h2>
+          </header>
+          <p class="cal-lede">课表直接写入手机日历。不驻后台，不多耗一格电。手表、平板、车机，日历到哪，课表就到哪。</p>
+        </div>
+
+        <div class="cal-scene">
+          <svg class="cal-lines" viewBox="0 0 640 600" aria-hidden="true">
+            <path class="thread grad" d="M262 143 C 324 143, 316 250, 376 250" />
+            <path class="thread grad solid" d="M364 240 L 378 250 L 364 260" />
+          </svg>
+
+          <figure class="cal-a">
+            <picture>
+              <source srcset="assets/shots-dark/notif.png" media="(prefers-color-scheme: dark)" />
+              <img class="phone tilt-l" src="assets/shots/notif.png" alt="提醒设置页：已同步至系统日历，可打开日历；上课前、首节课额外、作业截止前、考试前的提醒时间。" width="375" height="812" loading="lazy" />
+            </picture>
+            <figcaption class="hand hand-note">只开一次</figcaption>
+          </figure>
+
+          <figure class="cal-b">
+            <img class="phone tilt-r" src="assets/shots/syscal.png" alt="手机系统日历：9 月 14 日当天排开「第 3 周」全天事件，以及大学语文、信息数学基础等课程的时间与教室。" width="375" height="812" loading="lazy" />
+            <figcaption class="hand hand-note note-purple">剩下交给系统</figcaption>
+          </figure>
+        </div>
       </section>
 
       <!-- ============ 随手记 ============ -->

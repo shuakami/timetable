@@ -1257,7 +1257,7 @@ function ImportRunPage({ rule, initialText, onBack, onDone }: { rule: RuleManife
                   <>
                     <div className="flex items-center gap-3 rounded-[16px] bg-(--c-surface) px-4 py-2.5">
                       <TextInput value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https:// 链接" className="min-w-0 flex-1 text-[13px]" />
-                      <TextAction disabled={!url.trim() || busy !== ''} onClick={grab}>{busy === 'fetch' ? '抓取中' : '抓取'}</TextAction>
+                      <TextAction disabled={!url.trim() || busy !== ''} busy={busy === 'fetch'} onClick={grab}>抓取</TextAction>
                     </div>
                     <textarea
                       value={text}
@@ -1316,9 +1316,7 @@ function ImportRunPage({ rule, initialText, onBack, onDone }: { rule: RuleManife
 
       <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">
         {stage === 'input' ? (
-          <PrimaryButton disabled={busy !== '' || (rule.input === 'xlsx' ? !fileBytes : !text.trim())} onClick={parse}>
-            {busy === 'parse' ? '解析中' : '解析'}
-          </PrimaryButton>
+          <PrimaryButton disabled={busy === 'fetch' || (rule.input === 'xlsx' ? !fileBytes : !text.trim())} busy={busy === 'parse'} onClick={parse}>解析</PrimaryButton>
         ) : (
           <PrimaryButton disabled={(pending?.courses.length ?? 0) === 0} onClick={confirm}>导入</PrimaryButton>
         )}

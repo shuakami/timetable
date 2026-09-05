@@ -1463,29 +1463,26 @@ type Notif = {
 const notifs: Notif[] = [
   {
     tone: 'now', time: '09:45',
-    title: '高等数学（下） 10:00 开始',
-    body: '教学三楼 302，王立群',
-    meta: '还有 15 分钟，走过去约 6 分钟',
-    acts: ['静音本节', '看今天'],
+    title: '高等数学',
+    body: '10:00 – 11:40',
+    meta: '教学三楼 302',
   },
   {
     tone: 'warn', time: '09:00',
-    title: '习题册 P41–P45 今晚 23:00 截止',
-    body: '高等数学（下）',
-    meta: '还剩 14 小时',
-    acts: ['标记完成', '晚上再提醒'],
+    title: '期中考试（线性代数）',
+    body: '10月17日 周五 09:00 – 11:00',
+    meta: '教学一楼 101',
   },
   {
-    tone: 'change', time: '昨天 21:12',
-    title: '明天 大学物理 换到 理科楼 A305',
-    body: '21:10 已更新到课表',
-    acts: ['看变更'],
+    tone: 'plain', time: '07:30',
+    title: '大学英语',
+    body: '08:00 – 09:40',
+    meta: '外语楼 105',
   },
   {
-    tone: 'plain', time: '07:20',
-    title: '今天 5 节课，08:00 开始',
-    body: '第一节 大学英语（外语楼 105），晚上还有线代习题课',
-    meta: '11:40 之后有 2 小时 20 分钟空档',
+    tone: 'warn', time: '昨天 23:00',
+    title: '习题册 P41–P45（高等数学）',
+    body: '今天 23:00',
   },
 ]
 
@@ -1503,7 +1500,7 @@ function NotifCard({ n }: { n: Notif }) {
         <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[5px] bg-(--c-accent)">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6"><rect x="3" y="4" width="18" height="17" rx="4" /><path d="M3 9h18" /></svg>
         </span>
-        <span className="ml-1.5 flex-1 text-[11.5px] font-semibold tracking-[-.01em] text-white/75">课程表</span>
+        <span className="ml-1.5 flex-1 text-[11.5px] font-semibold tracking-[-.01em] text-white/75">日历</span>
         <span className="text-[11.5px] font-medium tabular-nums text-white/60">{n.time}</span>
       </div>
       <div className="mt-1.5 text-[14px] leading-[1.32] font-semibold tracking-[-.01em] text-white">{n.title}</div>
@@ -1547,7 +1544,10 @@ function NotifPrefScreen() {
     <Phone>
       <div className="flex-1 overflow-hidden pt-12">
         <div className="px-5">
-          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">提醒</h1>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19 8 12l7-7" /></svg>
+          </div>
+          <h1 className="mt-4 text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">提醒</h1>
         </div>
         <div className="mt-6 px-5">
           <div className="flex items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5">
@@ -1572,11 +1572,6 @@ function NotifPrefScreen() {
           ))}
         </div>
       </div>
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[7] h-[150px]"
-        style={{ background: 'var(--c-fade)' }}
-      />
-      <Nav active={3} />
     </Phone>
   )
 }

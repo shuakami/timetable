@@ -741,7 +741,7 @@ export function PickerPage({ onBack, onDone }: { onBack: () => void; onDone: (ph
       </div>
 
       <div className="flex-none px-5 pt-3 pb-8">
-        <PrimaryButton onDark disabled={picked.length === 0} onClick={() => void add()}>添加 {picked.length} 张</PrimaryButton>
+        <PrimaryButton onDark disabled={picked.length === 0} busy={busy} onClick={() => void add()}>添加 {picked.length} 张</PrimaryButton>
       </div>
     </Page>
   )

@@ -188,6 +188,25 @@
     });
   });
 
+  /* ---------- 日历：从「开启同步」一笔画到「已同步至系统日历」 ---------- */
+  (function calendar() {
+    var root = document.querySelector(".cal-scene");
+    if (!root) return;
+    var arrowCover = penPath(root.querySelector(".thread.grad:not(.solid)"));
+    var headCover = penPath(root.querySelector(".thread.grad.solid"));
+    var captions = gsap.utils.toArray(".cal-scene figcaption");
+    if (!arrowCover) return;
+    gsap.set(captions, { opacity: 0 });
+
+    once(root, "top 70%", function () {
+      var tl = gsap.timeline();
+      if (captions[0]) tl.to(captions[0], { opacity: 1, duration: 0.25, ease: "none" }, 0);
+      stroke(tl, arrowCover, 0.2, 0.9);
+      stroke(tl, headCover, 0.98, 0.22, "tip");
+      if (captions[1]) tl.to(captions[1], { opacity: 1, duration: 0.25, ease: "none" }, 1.1);
+    });
+  })();
+
   /* ---------- 导入：汇入线 → 箭头 ---------- */
   (function funnel() {
     var root = document.querySelector(".funnel");
