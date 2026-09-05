@@ -897,14 +897,32 @@ export function TextAction({ children, onClick, tone = 'brand', disabled }: { ch
 }
 
 /* 底部主操作：大号实心主题色 */
-export function PrimaryButton({ children, onClick, disabled, onDark }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; onDark?: boolean }) {
+const LOADER_SPOKES: [string, number][] = [
+  ['M8 0V4', 1], ['M8 16V12', 0.5], ['M3.29773 1.52783L5.64887 4.7639', 0.9], ['M12.7023 1.52783L10.3511 4.7639', 0.1],
+  ['M12.7023 14.472L10.3511 11.236', 0.4], ['M3.29773 14.472L5.64887 11.236', 0.6], ['M15.6085 5.52783L11.8043 6.7639', 0.2],
+  ['M0.391602 10.472L4.19583 9.23598', 0.7], ['M15.6085 10.4722L11.8043 9.2361', 0.3], ['M0.391602 5.52783L4.19583 6.7639', 0.8],
+]
+
+/** 加载指示：12 向辐条渐隐，跟随 currentColor */
+export function Loader({ size = 16, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg className={`loader-spin ${className}`} width={size} height={size} viewBox="0 0 16 16" strokeLinejoin="round" style={{ color: 'currentcolor' }}>
+      {LOADER_SPOKES.map(([d, o]) => <path key={d} d={d} opacity={o} stroke="currentColor" strokeWidth="1.5" />)}
+    </svg>
+  )
+}
+
+export function PrimaryButton({ children, onClick, disabled, busy, onDark }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; busy?: boolean; onDark?: boolean }) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
-      className={`w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] ${onDark ? 'disabled:bg-white/12 disabled:text-white/35' : 'disabled:bg-(--c-line) disabled:text-(--c-ink5)'}`}
+      disabled={disabled || busy}
+      className={`grid w-full place-items-center rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] ${busy ? 'disabled:bg-(--c-accent) disabled:text-white' : onDark ? 'disabled:bg-white/12 disabled:text-white/35' : 'disabled:bg-(--c-line) disabled:text-(--c-ink5)'}`}
     >
-      {children}
+      <span className={`[grid-area:1/1] transition-opacity duration-200 ${busy ? 'opacity-0' : ''}`} style={{ transitionTimingFunction: 'cubic-bezier(.25,1,.5,1)' }}>{children}</span>
+      <span className={`flex [grid-area:1/1] transition-opacity duration-200 ${busy ? '' : 'opacity-0'}`} style={{ transitionTimingFunction: 'cubic-bezier(.25,1,.5,1)' }}>
+        <Loader size={18} />
+      </span>
     </button>
   )
 }

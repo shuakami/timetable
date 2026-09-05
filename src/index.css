@@ -208,6 +208,8 @@ button {
 @keyframes sheetOut { from { transform: translateY(0); opacity: 1 } to { transform: translateY(16%); opacity: 0 } }
 @keyframes popIn { from { transform: scale(.965) translateY(6px); opacity: 0 } to { transform: scale(1) translateY(0); opacity: 1 } }
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes loaderSpin { to { transform: rotate(360deg) } }
+.loader-spin { animation: loaderSpin 1s steps(12, end) infinite; }
 
 .anim-scrim-in { animation: scrimIn .2s ease-out both }
 .anim-scrim-out { animation: scrimOut .19s ease-in both }

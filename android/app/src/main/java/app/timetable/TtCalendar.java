@@ -6,6 +6,8 @@ import android.content.ContentProviderResult;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -17,6 +19,7 @@ import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Reminders;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSArray;
@@ -57,9 +60,26 @@ public class TtCalendar extends Plugin {
 
     /* ---------------- 权限 ---------------- */
 
+    private static final String PREFS = "tt_calendar";
+    private static final String KEY_ASKED = "asked";
+
     private boolean has() {
         return ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
                 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private SharedPreferences prefs() {
+        return getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    /** 已经问过、系统又不再展示弹窗：只能去设置里开 */
+    private boolean blocked() {
+        if (!prefs().getBoolean(KEY_ASKED, false)) return false;
+        return !ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), Manifest.permission.WRITE_CALENDAR);
+    }
+
+    private String current() {
+        return has() ? "granted" : blocked() ? "denied" : "prompt";
     }
 
     private JSObject status(String s) {
@@ -70,15 +90,17 @@ public class TtCalendar extends Plugin {
 
     @PluginMethod
     public void checkPermission(PluginCall call) {
-        call.resolve(status(has() ? "granted" : "prompt"));
+        call.resolve(status(current()));
     }
 
     @PluginMethod
     public void requestPermission(PluginCall call) {
-        if (has()) {
-            call.resolve(status("granted"));
+        String now = current();
+        if (!"prompt".equals(now)) {
+            call.resolve(status(now));
             return;
         }
+        prefs().edit().putBoolean(KEY_ASKED, true).apply();
         requestPermissionForAlias("calendar", call, "permissionResult");
     }
 

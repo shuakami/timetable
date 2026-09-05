@@ -187,7 +187,7 @@ export function CalendarIntroPage({ onDone }: { onDone: () => void }) {
   const denied = cal.permission === 'denied'
 
   useEffect(() => {
-    if (cal.permission === 'granted') onDone()
+    if (cal.permission === 'granted' && !busy) onDone()
   }, [cal.permission])
 
   const go = async () => {
@@ -196,7 +196,11 @@ export function CalendarIntroPage({ onDone }: { onDone: () => void }) {
       return
     }
     setBusy(true)
-    await requestCalendarPermission()
+    const s = await requestCalendarPermission()
+    if (s === 'granted') {
+      onDone()
+      return
+    }
     setBusy(false)
   }
 
@@ -216,7 +220,7 @@ export function CalendarIntroPage({ onDone }: { onDone: () => void }) {
         {denied && <div className="mt-3 px-1 text-[12px] leading-[1.5] font-medium text-(--c-rose)">日历权限已关闭。</div>}
       </div>
       <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">
-        <PrimaryButton disabled={busy} onClick={() => void go()}>{denied ? '去系统设置允许' : '开启同步'}</PrimaryButton>
+        <PrimaryButton busy={busy} onClick={() => void go()}>{denied ? '去系统设置允许' : '开启同步'}</PrimaryButton>
       </div>
     </Page>
   )

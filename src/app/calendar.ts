@@ -84,13 +84,14 @@ export async function calendarPermission(): Promise<CalendarPermission> {
   }
 }
 
-/** 弹系统权限框；拿到后立刻把课表写进去 */
+/** 弹系统权限框；拿到后立刻写入；系统已不再弹框时直接去设置 */
 export async function requestCalendarPermission(): Promise<CalendarPermission> {
   if (!calendarSupported()) return 'unsupported'
   try {
     const { status: s } = await TtCalendar.requestPermission()
     setStatus({ permission: s })
     if (s === 'granted') await syncCalendar()
+    else if ((await TtCalendar.checkPermission()).status === 'denied') await openCalendarSettings()
     return s
   } catch {
     setStatus({ permission: 'denied' })
