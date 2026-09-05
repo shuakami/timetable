@@ -28,7 +28,7 @@ import { nativeToast, syncWidgets } from './widgets'
 import { onIncomingIcs, shareIcs } from './files'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
-  ActionSheet, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
+  ActionSheet, BackPill, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
   TextAction, TextInput, TopBar, WD, WD_SHORT, dockStyle, md, tint, type Ghost, type Rect,
   DateInput, TimeInput,
 } from './ui'
@@ -579,6 +579,7 @@ function TodayView({
       </div>
 
       <BottomVeil height={210} />
+      <BackPill show={!cal && view !== today} label="回到今天" bottom="calc(152px + max(24px, env(safe-area-inset-bottom)))" onClick={() => pickDay(today)} />
       <AnimatePresence initial={false}>
         {!cal && <DateStrip snap={snap} anchor={view} onPick={pickDay} onCalendar={() => setCal(true)} />}
       </AnimatePresence>
@@ -731,6 +732,7 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
   const today = todayStr()
   const [cal, setCal] = useState(false)
   const week = Math.min(Math.max(weekOf(sem, anchor), 1), sem.totalWeeks)
+  const thisWeek = Math.min(Math.max(weekOf(sem, today), 1), sem.totalWeeks)
   const [now, setNow] = useState(nowMinutes)
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000)
@@ -882,6 +884,7 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
           </div>
         </div>
       </div>
+      <BackPill show={!cal && week !== thisWeek} label="回到本周" bottom="calc(80px + max(24px, env(safe-area-inset-bottom)))" onClick={() => setAnchor(today)} />
       {cal && <CalendarSheet snap={snap} mode="week" anchor={anchor} onPick={setAnchor} onClose={() => setCal(false)} />}
     </>
   )

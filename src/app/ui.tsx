@@ -591,6 +591,34 @@ export function FloatPills({ actions }: { actions: [string, () => void][] }) {
   )
 }
 
+/** 离开了「现在」时浮出的回位胶囊；bottom 由页面按自己的底部控件高度给 */
+export function BackPill({ show, label, bottom, onClick }: { show: boolean; label: string; bottom: string; onClick: () => void }) {
+  return (
+    <AnimatePresence initial={false}>
+      {show && (
+        <motion.div
+          key="back"
+          initial={{ y: 14, opacity: 0, scale: 0.94 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 14, opacity: 0, scale: 0.94 }}
+          transition={{ type: 'spring', bounce: 0.18, duration: 0.4 }}
+          className="pointer-events-none absolute inset-x-0 z-[9] flex justify-center"
+          style={{ bottom }}
+        >
+          <button
+            onClick={onClick}
+            className="pointer-events-auto flex h-[36px] items-center gap-1.5 rounded-full pr-4 pl-3 text-[13px] font-bold text-(--c-accent) transition-transform duration-150 active:scale-[.96]"
+            style={dockStyle}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+            {label}
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /* 底部抽屉（照 vaul 的做法）：只有一个合成层，进出与拖拽都只改这一层的 transform；
    遮罩的透明度跟着抽屉位置走；拖拽期间直接写 style，不经过 React；松手后按 vaul 的阈值决定关闭或回弹 */
 const SHEET_EASE: [number, number, number, number] = [0.32, 0.72, 0, 1]
