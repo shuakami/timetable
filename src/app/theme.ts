@@ -63,7 +63,7 @@ function apply() {
   else root.dataset.theme = r
   applyDynamic(r)
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', BG[r])
-  syncNativeTheme(BG[r], r === 'light')
+  syncNativeTheme(BG[r], r === 'light', pref === 'system')
   listeners.forEach((l) => l())
 }
 

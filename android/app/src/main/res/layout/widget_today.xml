@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@drawable/widget_bg"
-    android:padding="12dp">
+    android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_root_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_bg" android:contentDescription="@null" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="12dp">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="true">
         <TextView android:id="@+id/w_day" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="28sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
         <TextView android:id="@+id/w_wd" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/widgetAccent" android:layout_marginLeft="5dp" />
@@ -33,4 +32,5 @@
             <TextView android:id="@+id/row1_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginLeft="6dp" />
         </LinearLayout>
     </FrameLayout>
-</LinearLayout>
+    </LinearLayout>
+</FrameLayout>

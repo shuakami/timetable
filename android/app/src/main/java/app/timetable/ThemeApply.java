@@ -25,8 +25,9 @@ public final class ThemeApply {
         return isSystemDark(ctx.getResources().getConfiguration());
     }
 
-    public static void remember(Context ctx, int color, boolean light) {
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("bg", color).putBoolean("light", light).apply();
+    /** system：用户选的是「跟随系统」，小组件据此在系统切换深浅时自行跟随 */
+    public static void remember(Context ctx, int color, boolean light, boolean system) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("bg", color).putBoolean("light", light).putBoolean("system", system).apply();
     }
 
     /** 启动时先按上次的主题铺好，等页面首帧前不露出默认白底 */

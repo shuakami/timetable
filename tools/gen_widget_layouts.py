@@ -5,6 +5,13 @@ import os
 OUT = os.path.join(os.path.dirname(__file__), '..', 'android', 'app', 'src', 'main', 'res', 'layout')
 HEAD = '<?xml version="1.0" encoding="utf-8"?>\n'
 NS = 'xmlns:android="http://schemas.android.com/apk/res/android"'
+# 布局里的字色只是浅色默认值，渲染时 WidgetRender 会按 App 主题整体重设
+COLORS = {
+    '#16171A': '@color/widgetInk',
+    '#8A8E97': '@color/widgetInk3',
+    '#A2A6AF': '@color/widgetInk4',
+    '#4F5BD5': '@color/widgetAccent',
+}
 
 
 def row(i, name_sp='13sp', loc=True, time=True, prefix='row'):
@@ -37,19 +44,22 @@ def head_block(day='w_day', wd='w_wd', sub='w_sub', day_sp='28sp'):
 
 
 def wrap(body, pad='12dp'):
-    return f'''{HEAD}<LinearLayout {NS}
+    # 卡片底是一张可 setColorFilter 的 ImageView：颜色由原生按 App 主题在渲染时决定，不走资源限定符
+    return f'''{HEAD}<FrameLayout {NS}
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@drawable/widget_bg"
-    android:padding="{pad}">
+    android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_root_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_bg" android:contentDescription="@null" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="{pad}">
 {body}
-</LinearLayout>
+    </LinearLayout>
+</FrameLayout>
 '''
 
 
 def write(name, text):
+    for hex_, ref in COLORS.items():
+        text = text.replace(f'android:textColor="{hex_}"', f'android:textColor="{ref}"')
     with open(os.path.join(OUT, name), 'w', encoding='utf-8') as f:
         f.write(text)
     print('wrote', name)

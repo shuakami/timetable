@@ -8,7 +8,7 @@ interface WidgetBridgePlugin {
   isPinSupported(): Promise<{ supported: boolean }>
   requestPin(o: { style: WidgetStyle }): Promise<{ requested: boolean }>
   ready(): Promise<void>
-  setTheme(o: { bg: string; light: boolean }): Promise<void>
+  setTheme(o: { bg: string; light: boolean; system: boolean }): Promise<void>
   systemDark(): Promise<{ dark: boolean }>
   dynamicColors(): Promise<DynamicColors>
   toast(o: { text: string }): Promise<void>
@@ -32,10 +32,10 @@ export function notifyWebReady(): void {
   WidgetBridge.ready().catch(() => undefined)
 }
 
-/** 窗口底色与系统栏跟随页面主题 */
-export function syncNativeTheme(bg: string, light: boolean): void {
+/** 窗口底色、系统栏和桌面小组件跟随页面主题；system 表示用户选的是「跟随系统」 */
+export function syncNativeTheme(bg: string, light: boolean, system: boolean): void {
   if (!native()) return
-  WidgetBridge.setTheme({ bg, light }).catch(() => undefined)
+  WidgetBridge.setTheme({ bg, light, system }).catch(() => undefined)
 }
 
 export function nativeToast(text: string): void {

@@ -212,9 +212,10 @@ public class WidgetBridge extends Plugin {
             call.reject("bad color");
             return;
         }
-        ThemeApply.remember(getContext(), color, light);
+        ThemeApply.remember(getContext(), color, light, Boolean.TRUE.equals(call.getBoolean("system")));
         Activity act = getActivity();
         if (act != null) act.runOnUiThread(() -> ThemeApply.apply(act, getBridge().getWebView(), color, light));
+        BaseWidget.updateAll(getContext());
         call.resolve();
     }
 

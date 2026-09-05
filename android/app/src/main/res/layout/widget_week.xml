@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@drawable/widget_bg"
-    android:padding="12dp">
+    android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_root_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_bg" android:contentDescription="@null" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="12dp">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="true">
         <TextView android:id="@+id/w_week" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
         <TextView android:id="@+id/w_date" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="11sp" android:textStyle="bold" android:textColor="@color/widgetInk4" android:layout_marginLeft="7dp" />
@@ -147,4 +146,5 @@
             </FrameLayout>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+    </LinearLayout>
+</FrameLayout>

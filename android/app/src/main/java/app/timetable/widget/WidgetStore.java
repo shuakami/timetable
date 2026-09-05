@@ -146,22 +146,12 @@ public final class WidgetStore {
         }
     }
 
-    /** 颜色按比例混白，对应原型里的 tint() */
-    /** 课程色与卡片底色按比例混合（深色下底色随之变深） */
-    public static int tint(Context ctx, int color, int percent) {
-        return mix(color, 0xFFFFFFFF, percent / 100f);
-    }
-
-    /** 课名字色：把课程色压深，保证在浅色卡片上可读 */
-    public static int deepen(Context ctx, int color, int percent) {
-        return mix(color, 0xFF000000, percent / 100f);
-    }
-
     public static boolean isNight(Context ctx) {
         return (ctx.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
-    private static int mix(int a, int b, float k) {
+    /** a 占 k，b 占 1-k */
+    static int mix(int a, int b, float k) {
         int r = Math.round(((a >> 16) & 0xFF) * k + ((b >> 16) & 0xFF) * (1 - k));
         int g = Math.round(((a >> 8) & 0xFF) * k + ((b >> 8) & 0xFF) * (1 - k));
         int bl = Math.round((a & 0xFF) * k + (b & 0xFF) * (1 - k));
