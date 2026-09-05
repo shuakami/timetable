@@ -200,7 +200,7 @@ export function CourseDetailPage({
         <Card>
           <div className="flex items-start justify-between">
             <div className="text-[12.5px] font-medium text-(--c-ink3)">
-              {[cur.source === 'import' ? '规则导入' : '手动添加', cur.credit != null ? `${cur.credit} 学分` : '', weeksSpan].filter(Boolean).join('，')}
+              {[cur.source === 'import' ? '规则导入' : '手动添加', weeksSpan].filter(Boolean).join('，')}
             </div>
             <i className="mt-1 ml-3 h-[10px] w-[10px] flex-none rounded-full" style={{ background: cur.color }} />
           </div>
@@ -313,7 +313,6 @@ export function CourseEditPage({ course, onBack, onEditSession }: { course: Cour
   const [name, setName] = useState(cur.name)
   const [teacher, setTeacher] = useState(cur.teacher ?? '')
   const [teacherPhone, setTeacherPhone] = useState(cur.teacherPhone ?? '')
-  const [credit, setCredit] = useState(cur.credit != null ? String(cur.credit) : '')
   const [category, setCategory] = useState(cur.category ?? '')
   const [color, setColor] = useState(cur.color)
   const colorRow = useRef<HTMLDivElement>(null)
@@ -330,18 +329,15 @@ export function CourseEditPage({ course, onBack, onEditSession }: { course: Cour
     name.trim() !== cur.name ||
     teacher.trim() !== (cur.teacher ?? '') ||
     teacherPhone.trim() !== (cur.teacherPhone ?? '') ||
-    credit.trim() !== (cur.credit != null ? String(cur.credit) : '') ||
     category.trim() !== (cur.category ?? '') ||
     color !== cur.color
 
   const save = () => {
-    const n = Number(credit)
     const cleanPhone = teacherPhone.replace(/[\s\-]/g, '').replace(/^\+?86/, '') || undefined
     store.editCourse(cur.id, {
       name: name.trim() || cur.name,
       teacher: teacher.trim() || undefined,
       teacherPhone: cleanPhone && /^1[3-9]\d{9}$/.test(cleanPhone) ? cleanPhone : undefined,
-      credit: credit.trim() && !Number.isNaN(n) ? n : undefined,
       category: category.trim() || undefined,
       color,
     })
@@ -357,7 +353,6 @@ export function CourseEditPage({ course, onBack, onEditSession }: { course: Cour
           <Field k="名称"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field k="老师"><TextInput value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="可选" /></Field>
           <Field k="教师电话"><TextInput value={teacherPhone} inputMode="tel" onChange={(e) => setTeacherPhone(e.target.value)} placeholder="可选，用于一键拨号" /></Field>
-          <Field k="学分"><TextInput value={credit} inputMode="decimal" onChange={(e) => setCredit(e.target.value)} placeholder="可选" /></Field>
           <Field k="分类"><TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="必修、选修等，可选" /></Field>
         </div>
 
