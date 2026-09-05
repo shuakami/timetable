@@ -31,6 +31,7 @@ interface TtCameraPlugin {
   capture(): Promise<CapturedPhoto>
   listRecent(o: { limit: number; page: number }): Promise<{ items: GalleryItem[] }>
   importPicked(o: { ids: string[] }): Promise<{ items: CapturedPhoto[] }>
+  importData(o: { data: string }): Promise<CapturedPhoto>
   resolve(o: { path: string }): Promise<{ uri: string }>
   saveToGallery(o: { path: string }): Promise<void>
   deleteFiles(o: { paths: string[] }): Promise<void>
@@ -216,8 +217,20 @@ export const camera = {
     return r.items
   },
 
+  /** 系统选择器；原生下选出的图落盘到私有目录，否则只活在内存里，重启就没了 */
   async pick(): Promise<CapturedPhoto[]> {
-    return webPick()
+    const picked = await webPick()
+    if (!nativeCamera()) return picked
+    const out: CapturedPhoto[] = []
+    for (const p of picked) {
+      try {
+        out.push(await TtCamera.importData({ data: p.uri }))
+      } catch {
+        // 写不进去的这张跳过
+      }
+      webPhotos.delete(p.path)
+    }
+    return out
   },
 
   /** 浏览器降级时的预览元素：相机页把它挂进取景框 */

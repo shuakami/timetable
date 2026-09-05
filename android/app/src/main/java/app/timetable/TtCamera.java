@@ -575,6 +575,39 @@ public class TtCamera extends Plugin {
         });
     }
 
+    /** 系统选择器选出的图以 data URL 传进来，落到私有目录 */
+    @PluginMethod
+    public void importData(PluginCall call) {
+        String data = call.getString("data", "");
+        int comma = data.indexOf(',');
+        if (comma < 0) {
+            call.reject("bad-data");
+            return;
+        }
+        final String b64 = data.substring(comma + 1);
+        io.execute(() -> {
+            try {
+                byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                String name = "d" + System.nanoTime() + ".jpg";
+                File dst = new File(photoDir(), name);
+                try (FileOutputStream fos = new FileOutputStream(dst)) {
+                    fos.write(bytes);
+                }
+                android.graphics.BitmapFactory.Options opt = new android.graphics.BitmapFactory.Options();
+                opt.inJustDecodeBounds = true;
+                android.graphics.BitmapFactory.decodeFile(dst.getAbsolutePath(), opt);
+                JSObject o = new JSObject();
+                o.put("path", DIR + "/" + name);
+                o.put("uri", Uri.fromFile(dst).toString());
+                o.put("width", opt.outWidth);
+                o.put("height", opt.outHeight);
+                call.resolve(o);
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
+        });
+    }
+
     /* ---------------- 文件 ---------------- */
 
     /** 相对路径转 WebView 能加载的地址 */
