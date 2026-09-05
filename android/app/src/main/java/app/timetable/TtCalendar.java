@@ -130,18 +130,27 @@ public class TtCalendar extends Plugin {
 
     /** 账户下现有的日历：NAME -> _ID */
     private HashMap<String, Long> findCalendars() {
+        return findCalendars(null);
+    }
+
+    /** 同上；顺带读出上次写进去的颜色（CAL_SYNC1），NAME -> hex */
+    private HashMap<String, Long> findCalendars(HashMap<String, String> colors) {
         HashMap<String, Long> out = new HashMap<>();
         ContentResolver cr = getContext().getContentResolver();
         try (Cursor c = cr.query(
                 Calendars.CONTENT_URI,
-                new String[]{ Calendars._ID, Calendars.NAME },
+                new String[]{ Calendars._ID, Calendars.NAME, Calendars.CAL_SYNC1 },
                 Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=?",
                 new String[]{ ACCOUNT_NAME, ACCOUNT_TYPE },
                 null)) {
             while (c != null && c.moveToNext()) {
                 String name = c.isNull(1) ? "" : c.getString(1);
-                if (!out.containsKey(name)) out.put(name, c.getLong(0));
-                else cr.delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, c.getLong(0))), null, null);
+                if (!out.containsKey(name)) {
+                    out.put(name, c.getLong(0));
+                    if (colors != null) colors.put(name, c.isNull(2) ? "" : c.getString(2));
+                } else {
+                    cr.delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, c.getLong(0))), null, null);
+                }
             }
         } catch (Exception ignored) {
         }
@@ -149,8 +158,9 @@ public class TtCalendar extends Plugin {
     }
 
     /**
-     * 找到或创建一组日历（上课 / 作业 / 考试各一本），显示名与颜色对齐到当前主题；
-     * 账户下多出来的旧日历删掉。本地日历必须以 sync adapter 身份插入，否则 Provider 拒绝。
+     * 找到或创建一组日历（每门课 / 作业 / 考试 / 周次各一本）；账户下多出来的旧日历删掉。
+     * 颜色只在应用要的颜色变了时才写（上次写的值记在 CAL_SYNC1）：用户在系统日历里自己改的颜色不会被同步覆回去。
+     * 本地日历必须以 sync adapter 身份插入，否则 Provider 拒绝。
      */
     @PluginMethod
     public void ensureCalendars(PluginCall call) {
@@ -160,7 +170,8 @@ public class TtCalendar extends Plugin {
         }
         JSArray wanted = call.getArray("calendars", new JSArray());
         ContentResolver cr = getContext().getContentResolver();
-        HashMap<String, Long> have = findCalendars();
+        HashMap<String, String> written = new HashMap<>();
+        HashMap<String, Long> have = findCalendars(written);
         JSObject ids = new JSObject();
         try {
             HashSet<String> keep = new HashSet<>();
@@ -168,13 +179,17 @@ public class TtCalendar extends Plugin {
                 JSONObject w = wanted.getJSONObject(i);
                 String slug = w.getString("slug");
                 String name = w.optString("name", ACCOUNT_NAME);
-                int color = parseColor(w.optString("color", ""), 0xFF4F5BD5);
+                String hex = w.optString("color", "");
+                int color = parseColor(hex, 0xFF4F5BD5);
                 keep.add(slug);
                 Long id = have.get(slug);
                 if (id != null) {
                     ContentValues v = new ContentValues();
                     v.put(Calendars.CALENDAR_DISPLAY_NAME, name);
-                    v.put(Calendars.CALENDAR_COLOR, color);
+                    if (!hex.equalsIgnoreCase(written.get(slug))) {
+                        v.put(Calendars.CALENDAR_COLOR, color);
+                        v.put(Calendars.CAL_SYNC1, hex);
+                    }
                     v.put(Calendars.VISIBLE, 1);
                     v.put(Calendars.SYNC_EVENTS, 1);
                     cr.update(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, id)), v, null, null);
@@ -185,6 +200,7 @@ public class TtCalendar extends Plugin {
                     v.put(Calendars.NAME, slug);
                     v.put(Calendars.CALENDAR_DISPLAY_NAME, name);
                     v.put(Calendars.CALENDAR_COLOR, color);
+                    v.put(Calendars.CAL_SYNC1, hex);
                     v.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_OWNER);
                     v.put(Calendars.OWNER_ACCOUNT, ACCOUNT_NAME);
                     v.put(Calendars.VISIBLE, 1);
@@ -282,8 +298,8 @@ public class TtCalendar extends Plugin {
             v.putNull(Events.DURATION);
             v.put(Events.DTEND, ev.getLong("end"));
         }
-        if (!ev.isNull("color")) v.put(Events.EVENT_COLOR, parseColor(ev.optString("color"), 0));
-        else v.putNull(Events.EVENT_COLOR);
+        // 颜色属于日历：事件不单独着色，用户在系统日历里改日历颜色就整本一起变
+        v.putNull(Events.EVENT_COLOR);
         v.put(Events.HAS_ALARM, hasAlarm ? 1 : 0);
         v.put(Events.AVAILABILITY, ev.optBoolean("busy", true) ? Events.AVAILABILITY_BUSY : Events.AVAILABILITY_FREE);
         v.put(Events.ACCESS_LEVEL, Events.ACCESS_PRIVATE);

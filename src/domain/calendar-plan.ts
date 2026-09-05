@@ -19,7 +19,6 @@ export interface CalendarEventBody {
   exdate?: string
   allDay: boolean
   tz: string
-  color?: string
   busy: boolean
   /** 系统日历事件详情里「在应用中打开」的目标 */
   link?: string
@@ -38,7 +37,7 @@ export const OTHER_CALENDAR: CalendarSlug = 'tt.course'
 export interface CalendarSpec {
   slug: CalendarSlug
   name: string
-  /** 课程自己的颜色；作业 / 考试 / 周次由调用方按主题填 */
+  /** 课程自己的颜色；作业 / 考试 / 周次由调用方填固定值。事件不单独着色，颜色属于日历 */
   color?: string
 }
 
@@ -126,7 +125,6 @@ interface SeriesItem {
   name: string
   location?: string
   teacher?: string
-  color?: string
   startPeriod: number
   endPeriod: number
   link?: string
@@ -155,7 +153,6 @@ function single(key: string, it: SeriesItem, tz: string, suffix = ''): DesiredEv
       end: atMinutes(it.date, it.end),
       allDay: false,
       tz,
-      color: it.color,
       busy: true,
       link: it.link,
     },
@@ -200,7 +197,6 @@ function series(keyBase: string, items: SeriesItem[], tz: string): DesiredEvent[
       exdate: exdate.length > 0 ? exdate : undefined,
       allDay: false,
       tz,
-      color: first.color,
       busy: true,
       link: first.link,
     },
@@ -225,7 +221,7 @@ function planCourses(snap: Snapshot, prefs: Prefs, tz: string): DesiredEvent[] {
       const link = o.courseId ? `timetable://open/course/${o.courseId}` : `timetable://open/day/${date}`
       const item: SeriesItem = {
         date, start: o.start, end: o.end, name: o.name,
-        location: o.location, teacher: o.teacher, color: o.color,
+        location: o.location, teacher: o.teacher,
         startPeriod: o.startPeriod, endPeriod: o.endPeriod, link, courseId: o.courseId,
         reminders: o.muted ? [] : classReminders(prefs, o.start),
       }
@@ -276,13 +272,12 @@ function planWeeks(snap: Snapshot, tz: string): DesiredEvent[] {
   return out
 }
 
-function planTasks(tasks: Task[], courseName: Map<string, string>, courseColor: Map<string, string>, prefs: Prefs, today: LocalDate, tz: string): DesiredEvent[] {
+function planTasks(tasks: Task[], courseName: Map<string, string>, prefs: Prefs, today: LocalDate, tz: string): DesiredEvent[] {
   const out: DesiredEvent[] = []
   for (const t of tasks) {
     if (t.done || !t.due || t.inbox || t.title.trim().length === 0) continue
     if (diffDays(today, t.due) > TASK_KEEP_DAYS) continue
     const course = t.courseId ? courseName.get(t.courseId) : undefined
-    const color = t.courseId ? courseColor.get(t.courseId) : undefined
     const isExam = t.kind === 'exam'
     const name = t.title.trim()
     const title = `${isExam && !name.includes('考') ? `${name}考试` : name}${course ? `（${course}）` : ''}`
@@ -294,13 +289,13 @@ function planTasks(tasks: Task[], courseName: Map<string, string>, courseColor: 
     if (isExam && t.dueMinutes == null) {
       // 只知道哪天考：全天事件，提前 N 天的早上提醒
       const start = utcMidnight(t.due)
-      body = { title, location, description, start, end: start + DAY_MIN * 60000, allDay: true, tz, color, busy: false, link }
+      body = { title, location, description, start, end: start + DAY_MIN * 60000, allDay: true, tz, busy: false, link }
       reminders = examLeadsAllDay(prefs.examDays)
     } else {
       const startMin = t.dueMinutes ?? UNTIMED_DUE
       const start = atMinutes(t.due, startMin)
       const endMin = isExam ? (t.endMinutes != null && t.endMinutes > startMin ? t.endMinutes : startMin + 120) : startMin + 30
-      body = { title, location, description, start, end: atMinutes(t.due, endMin), allDay: false, tz, color, busy: isExam, link }
+      body = { title, location, description, start, end: atMinutes(t.due, endMin), allDay: false, tz, busy: isExam, link }
       reminders = isExam ? examLeadsTimed(prefs.examDays, startMin) : timedLeads(prefs.taskLeads)
     }
     out.push({ key: `t:${t.id}`, kind: isExam ? 'exam' : 'task', calendar: isExam ? EXAM_CALENDAR : TASK_CALENDAR, event: body, reminders })
@@ -313,10 +308,9 @@ export function planCalendar(snap: Snapshot | null, tasks: Task[], prefs: Prefs,
   const tz = localTz()
   const today = fromDate(now)
   const courseName = new Map(snap?.courses.map((c) => [c.id, c.name]) ?? [])
-  const courseColor = new Map(snap?.courses.map((c) => [c.id, c.color]) ?? [])
   const out: DesiredEvent[] = []
   if (snap) out.push(...planCourses(snap, prefs, tz), ...planWeeks(snap, tz))
-  out.push(...planTasks(tasks, courseName, courseColor, prefs, today, tz))
+  out.push(...planTasks(tasks, courseName, prefs, today, tz))
   return out
 }
 

@@ -101,25 +101,17 @@ export async function requestCalendarPermission(): Promise<CalendarPermission> {
 
 /* ---------------- 同步 ---------------- */
 
-function cssColor(name: string, fallback: string): string {
-  try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    if (/^#[0-9a-f]{6}$/i.test(v)) return v
-  } catch {
-    /* 非浏览器环境 */
-  }
-  return fallback
+/* 日历颜色是日历自己的属性，不随应用深浅色 / 系统配色变：固定一套，写进去后就不再动 */
+const FIXED_COLORS: Record<string, string> = {
+  [TASK_CALENDAR]: '#B98A2F',
+  [EXAM_CALENDAR]: '#DE5B78',
+  [WEEK_CALENDAR]: '#8A8E97',
 }
+const DEFAULT_COLOR = '#4F5BD5'
 
-/** 每门课一本（课程颜色），作业 / 考试 / 周次各一本，颜色跟应用里一致 */
+/** 每门课一本（课程颜色），作业 / 考试 / 周次各一本 */
 function withColors(specs: CalendarSpec[]): (CalendarSpec & { color: string })[] {
-  const fixed: Record<string, string> = {
-    [TASK_CALENDAR]: cssColor('--c-amber', '#B98A2F'),
-    [EXAM_CALENDAR]: cssColor('--c-rose', '#DE5B78'),
-    [WEEK_CALENDAR]: cssColor('--c-ink4', '#8A8E97'),
-  }
-  const accent = cssColor('--c-accent', '#4F5BD5')
-  return specs.map((c) => ({ ...c, color: c.color ?? fixed[c.slug] ?? accent }))
+  return specs.map((c) => ({ ...c, color: c.color ?? FIXED_COLORS[c.slug] ?? DEFAULT_COLOR }))
 }
 
 function toWrite(e: DesiredEvent, ids: Record<string, number>): WriteItem {
