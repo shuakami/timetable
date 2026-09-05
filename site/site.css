@@ -814,6 +814,10 @@ section {
   flex-direction: column;
   align-items: center;
 }
+.w picture {
+  display: block;
+  width: 100%;
+}
 .w img {
   width: 100%;
   height: auto;
