@@ -38,7 +38,6 @@ function hydratePrefs(raw: unknown): Prefs {
   const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const nums = (v: unknown, fallback: number[]) => (Array.isArray(v) && v.every((x) => typeof x === 'number') ? (v as number[]) : fallback)
   return {
-    calendar: typeof p.calendar === 'boolean' ? p.calendar : d.calendar,
     classLead: typeof p.classLead === 'number' && p.classLead > 0 ? p.classLead : d.classLead,
     earlyLead: typeof p.earlyLead === 'number' ? p.earlyLead : d.earlyLead,
     taskLeads: nums(p.taskLeads, d.taskLeads),

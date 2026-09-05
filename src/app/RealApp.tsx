@@ -1738,7 +1738,6 @@ function CoursesPage({ onBack, onDetail, onManual }: { onBack: () => void; onDet
 /* ---------------- 根 ---------------- */
 
 const ONBOARD_KEY = 'tt.onboarded.v1'
-const CAL_ASK_KEY = 'tt.calendarAsked.v1'
 
 type Route =
   | { k: 'course'; course: Course }
@@ -1905,22 +1904,20 @@ export default function RealApp() {
     setOnboarded(true)
   }, [onboardUnder, stack.length])
 
-  /* 有课表、还没加进手机日历：推一次「加进手机日历」，之后全自动 */
+  /* 有课表、还没拿到日历权限：每次启动推一次「加进手机日历」，拿到后全自动 */
+  const calAsked = useRef(false)
   useEffect(() => {
-    if (!onboarded || onboardUnder || stack.length > 0 || !calendarSupported() || !state.prefs.calendar) return
+    if (!onboarded || onboardUnder || stack.length > 0 || !calendarSupported() || calAsked.current) return
     if (state.courses.length === 0) return
-    try {
-      if (localStorage.getItem(CAL_ASK_KEY) === '1') return
-    } catch { return }
     let alive = true
     void calendarPermission().then((p) => {
       if (!alive) return
-      try { localStorage.setItem(CAL_ASK_KEY, '1') } catch { /* 忽略 */ }
+      calAsked.current = true
       if (p === 'granted') void syncCalendar()
-      else if (p === 'prompt') setStack((s) => (s.length === 0 ? [{ k: 'calendarIntro' }] : s))
+      else setStack((s) => (s.length === 0 ? [{ k: 'calendarIntro' }] : s))
     })
     return () => { alive = false }
-  }, [onboarded, onboardUnder, stack.length, state.courses.length, state.prefs.calendar])
+  }, [onboarded, onboardUnder, stack.length, state.courses.length])
 
   /* 系统返回：先关浮层，再退内页，再回今天；引导期间退上一步 */
   const backRef = useRef<() => boolean>(() => false)

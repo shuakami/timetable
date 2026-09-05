@@ -120,11 +120,9 @@ export type WidgetStyle = (typeof WIDGET_STYLES)[number]
 
 /** 提醒与小组件偏好。提醒全部由系统日历发出，这里只是写进日历的提醒模板 */
 export interface Prefs {
-  /** 写进手机日历（默认开；关掉即从手机日历移除全部内容） */
-  calendar: boolean
   classLead: Minutes // 课前多久提醒
   earlyLead: Minutes // 早课（08:30 前开始）再加一条更早的提醒，0 = 不加
-  taskLeads: Minutes[] // 作业截止前多久（可多个）；没写时间的作业按「提前 N 天的晚上 8 点」
+  taskLeads: Minutes[] // 作业截止前多久（可多个）；没写时刻的作业按当天 23:00 截止
   examDays: number[] // 考试提前几天（0 = 当天早上 8 点）
   widgetStyle: WidgetStyle
 }
@@ -140,7 +138,6 @@ export const EXAM_DAYS: number[] = [7, 3, 1, 0]
 
 export function defaultPrefs(): Prefs {
   return {
-    calendar: true,
     classLead: 15,
     earlyLead: 30,
     taskLeads: [24 * 60, 2 * 60],

@@ -25,7 +25,13 @@ export interface CalendarEventBody {
   link?: string
 }
 
-export type DesiredKind = 'course' | 'task' | 'exam'
+export type DesiredKind = 'course' | 'task' | 'exam' | 'week'
+
+/** 每种内容各写一本日历，在系统日历里分开显示、各有颜色 */
+export type CalendarSlug = 'tt.course' | 'tt.task' | 'tt.exam'
+
+export const calendarOf = (kind: DesiredKind): CalendarSlug =>
+  kind === 'task' ? 'tt.task' : kind === 'exam' ? 'tt.exam' : 'tt.course'
 
 export interface DesiredEvent {
   key: string
@@ -41,6 +47,8 @@ const BYDAY = ['', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']
 const EARLY_BEFORE: Minutes = 8 * 60 + 30
 /** 待办已过期超过这么多天就不再占日历 */
 const TASK_KEEP_DAYS = 30
+/** 没写时刻的作业按当天这个时间截止 */
+const UNTIMED_DUE: Minutes = 23 * 60
 /** 一个课程系列只有这么少次时，直接写单次事件 */
 const MIN_SERIES = 3
 
@@ -69,14 +77,6 @@ function uniqSorted(list: Minutes[]): Minutes[] {
 /** 有具体时刻的事件：截止前多久 */
 function timedLeads(leads: Minutes[]): Minutes[] {
   return uniqSorted(leads.filter((m) => m > 0))
-}
-
-/** 全天事件：把「提前 N 天」落到前 N 天的晚上 8 点；不满一天的都归到前一晚 8 点 */
-function allDayLeads(leads: Minutes[]): Minutes[] {
-  return uniqSorted(leads.map((m) => {
-    const days = Math.max(1, Math.ceil(m / DAY_MIN))
-    return days * DAY_MIN - 20 * 60
-  }))
 }
 
 /** 考试：提前 d 天的早 8 点；d=0 且当天开考晚于 8 点就是当天 8 点，否则退到考前 1 小时 */
@@ -116,18 +116,14 @@ function classReminders(prefs: Prefs, start: Minutes): Minutes[] {
   return uniqSorted(out)
 }
 
-function periodText(sp: number, ep: number): string {
-  return sp === ep ? `第 ${sp} 节` : `第 ${sp}–${ep} 节`
-}
-
-function single(key: string, it: SeriesItem, tz: string): DesiredEvent {
+function single(key: string, it: SeriesItem, tz: string, suffix = ''): DesiredEvent {
   return {
     key,
     kind: 'course',
     event: {
-      title: it.name,
+      title: `${it.name}${suffix}`,
       location: it.location,
-      description: joinLocation([periodText(it.startPeriod, it.endPeriod), it.teacher]),
+      description: it.teacher?.trim() || undefined,
       start: atMinutes(it.date, it.start),
       end: atMinutes(it.date, it.end),
       allDay: false,
@@ -169,7 +165,7 @@ function series(keyBase: string, items: SeriesItem[], tz: string): DesiredEvent[
     event: {
       title: first.name,
       location: first.location,
-      description: joinLocation([periodText(first.startPeriod, first.endPeriod), first.teacher]),
+      description: first.teacher?.trim() || undefined,
       start: atMinutes(first.date, first.start),
       duration: `PT${Math.max(1, first.end - first.start)}M`,
       rrule,
@@ -206,7 +202,7 @@ function planCourses(snap: Snapshot, prefs: Prefs, tz: string): DesiredEvent[] {
         reminders: o.muted ? [] : classReminders(prefs, o.start),
       }
       if (o.status === 'moved') {
-        out.push(single(`mv:${o.key}`, item, tz))
+        out.push(single(`mv:${o.key}`, item, tz, '（调课）'))
       } else if (o.muted) {
         // 这一次不提醒：从系列里挖出来，单独写一条没有提醒的
         out.push(single(`mu:${o.key}`, item, tz))
@@ -234,6 +230,23 @@ function planCourses(snap: Snapshot, prefs: Prefs, tz: string): DesiredEvent[] {
   return out
 }
 
+/** 每周一一条全天的「第 N 周」，打开日历就知道这是第几周 */
+function planWeeks(snap: Snapshot, tz: string): DesiredEvent[] {
+  const sem = snap.semester
+  const out: DesiredEvent[] = []
+  for (let w = 1; w <= sem.totalWeeks; w++) {
+    const monday = dateOf(sem, w, 1)
+    const start = utcMidnight(monday)
+    out.push({
+      key: `w:${w}`,
+      kind: 'week',
+      event: { title: `第 ${w} 周`, start, end: start + DAY_MIN * 60000, allDay: true, tz, busy: false, link: `timetable://open/day/${monday}` },
+      reminders: [],
+    })
+  }
+  return out
+}
+
 function planTasks(tasks: Task[], courseName: Map<string, string>, courseColor: Map<string, string>, prefs: Prefs, today: LocalDate, tz: string): DesiredEvent[] {
   const out: DesiredEvent[] = []
   for (const t of tasks) {
@@ -242,22 +255,24 @@ function planTasks(tasks: Task[], courseName: Map<string, string>, courseColor: 
     const course = t.courseId ? courseName.get(t.courseId) : undefined
     const color = t.courseId ? courseColor.get(t.courseId) : undefined
     const isExam = t.kind === 'exam'
-    const title = `${isExam ? '考试：' : ''}${t.title.trim()}${course ? ` — ${course}` : ''}`
+    const name = t.title.trim()
+    const title = `${isExam && !name.includes('考') ? `${name}考试` : name}${course ? ` · ${course}` : ''}`
     const location = isExam ? joinLocation([t.location, t.seat ? `座位 ${t.seat}` : undefined]) : joinLocation([t.location])
     const link = `timetable://open/task/${t.id}`
-    const timed = t.dueMinutes != null
+    const description = t.note?.trim() || undefined
     let body: CalendarEventBody
     let reminders: Minutes[]
-    if (timed) {
-      const startMin = t.dueMinutes as Minutes
+    if (isExam && t.dueMinutes == null) {
+      // 只知道哪天考：全天事件，提前 N 天的早上提醒
+      const start = utcMidnight(t.due)
+      body = { title, location, description, start, end: start + DAY_MIN * 60000, allDay: true, tz, color, busy: false, link }
+      reminders = examLeadsAllDay(prefs.examDays)
+    } else {
+      const startMin = t.dueMinutes ?? UNTIMED_DUE
       const start = atMinutes(t.due, startMin)
       const endMin = isExam ? (t.endMinutes != null && t.endMinutes > startMin ? t.endMinutes : startMin + 120) : startMin + 30
-      body = { title, location, description: t.note?.trim() || undefined, start, end: atMinutes(t.due, endMin), allDay: false, tz, color, busy: isExam, link }
+      body = { title, location, description, start, end: atMinutes(t.due, endMin), allDay: false, tz, color, busy: isExam, link }
       reminders = isExam ? examLeadsTimed(prefs.examDays, startMin) : timedLeads(prefs.taskLeads)
-    } else {
-      const start = utcMidnight(t.due)
-      body = { title, location, description: t.note?.trim() || undefined, start, end: start + DAY_MIN * 60000, allDay: true, tz, color, busy: false, link }
-      reminders = isExam ? examLeadsAllDay(prefs.examDays) : allDayLeads(prefs.taskLeads)
     }
     out.push({ key: `t:${t.id}`, kind: isExam ? 'exam' : 'task', event: body, reminders })
   }
@@ -271,7 +286,7 @@ export function planCalendar(snap: Snapshot | null, tasks: Task[], prefs: Prefs,
   const courseName = new Map(snap?.courses.map((c) => [c.id, c.name]) ?? [])
   const courseColor = new Map(snap?.courses.map((c) => [c.id, c.color]) ?? [])
   const out: DesiredEvent[] = []
-  if (snap) out.push(...planCourses(snap, prefs, tz))
+  if (snap) out.push(...planCourses(snap, prefs, tz), ...planWeeks(snap, tz))
   out.push(...planTasks(tasks, courseName, courseColor, prefs, today, tz))
   return out
 }
@@ -289,7 +304,7 @@ export function summarize(events: DesiredEvent[]): CalendarSummary {
   for (const e of events) {
     if (e.kind === 'exam') exams++
     else if (e.kind === 'task') tasks++
-    else courses.add(e.event.title)
+    else if (e.kind === 'course') courses.add(e.event.title.replace(/（调课）$/, ''))
   }
   return { courses: courses.size, tasks, exams }
 }

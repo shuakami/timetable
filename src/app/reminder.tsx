@@ -8,13 +8,13 @@ import { CLASS_LEADS, EARLY_LEADS, TASK_LEADS, type Minutes, type Prefs, type Wi
 import type { CalendarSummary } from '../domain/calendar-plan'
 import {
   calendarPreview, calendarSupported, openCalendarSettings, openSystemCalendar,
-  requestCalendarPermission, scheduleCalendarSync, setCalendarEnabled, useCalendarStatus,
+  requestCalendarPermission, scheduleCalendarSync, useCalendarStatus,
 } from './calendar'
 import { addWidgetToHome, nativeToast, syncWidgets, widgetPinSupported } from './widgets'
 
 /* ---------------- 提醒（全部由手机日历发出） ---------------- */
 
-type PrefKey = 'classLead' | 'earlyLead' | 'taskLeads' | 'examDays' | 'calendar'
+type PrefKey = 'classLead' | 'earlyLead' | 'taskLeads' | 'examDays'
 
 interface Option {
   label: string
@@ -59,7 +59,7 @@ const OPTIONS: Record<PrefKey, { title: string; sub?: string; multi?: boolean; o
   },
   taskLeads: {
     title: '作业截止前',
-    sub: '可选多个。没写具体时刻的作业，按截止那天早上算。',
+    sub: '可选多个。没写时刻的作业按当天 23:00 截止。',
     multi: true,
     options: TASK_LEADS.map((m) => ({
       label: `前 ${leadLabel(m)}`,
@@ -75,14 +75,6 @@ const OPTIONS: Record<PrefKey, { title: string; sub?: string; multi?: boolean; o
       { label: '1 天、当天早上', patch: { examDays: [1, 0] }, match: (p) => p.examDays.join() === '1,0' },
       { label: '当天早上', patch: { examDays: [0] }, match: (p) => p.examDays.join() === '0' },
       { label: '不提醒', patch: { examDays: [] }, match: (p) => p.examDays.length === 0 },
-    ],
-  },
-  calendar: {
-    title: '写进手机日历',
-    sub: '关掉即从手机日历整本移除；卸载前也需要先关掉。',
-    options: [
-      { label: '开', patch: { calendar: true }, match: (p) => p.calendar },
-      { label: '关', patch: { calendar: false }, match: (p) => !p.calendar },
     ],
   },
 }
@@ -110,7 +102,7 @@ function CalendarCard({ onOpen }: { onOpen: () => void }) {
   const state = useStore()
   const cal = useCalendarStatus()
   const preview = useMemo(() => calendarPreview(), [state.courses, state.tasks, state.overrides, state.prefs, state.semester])
-  if (!calendarSupported() || !state.prefs.calendar) return null
+  if (!calendarSupported()) return null
 
   if (cal.permission === 'granted') {
     const s = cal.summary ?? preview
@@ -133,7 +125,7 @@ function CalendarCard({ onOpen }: { onOpen: () => void }) {
     >
       <div className="min-w-0 flex-1">
         <div className="text-[14px] font-semibold text-(--c-ink)">还没加进手机日历</div>
-        <div className="mt-0.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{denied ? '需要在系统设置里允许日历权限' : `${summaryText(preview)}，到点由日历提醒`}</div>
+        <div className="mt-0.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{denied ? '日历权限已关闭，提醒发不出去' : `${summaryText(preview)}，到点由日历提醒`}</div>
       </div>
       <span className="text-[12.5px] font-bold text-(--c-accent)">{denied ? '去设置' : '加入'}</span>
     </button>
@@ -142,7 +134,6 @@ function CalendarCard({ onOpen }: { onOpen: () => void }) {
 
 export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: (k: PrefKey) => void }) {
   const state = useStore()
-  const cal = useCalendarStatus()
   const open = async () => {
     if (!(await openSystemCalendar())) nativeToast('没有找到日历应用')
   }
@@ -166,25 +157,7 @@ export function NotifPrefPage({ onBack, onPick }: { onBack: () => void; onPick: 
               </div>
             </div>
           ))}
-          {calendarSupported() && (
-            <div className="mt-5">
-              <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">手机日历</div>
-              <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
-                <button onClick={() => onPick('calendar')} className={rowCls(0)}>
-                  <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{OPTIONS.calendar.title}</span>
-                  <span className="text-[12.5px] font-medium text-(--c-ink4)">{valueOf('calendar', state.prefs)}</span>
-                  <Chevron />
-                </button>
-                {state.prefs.calendar && cal.permission === 'granted' && (
-                  <button onClick={() => void open()} className={rowCls(1)}>
-                    <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">在日历中查看</span>
-                    <Chevron />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+         </div>
       </div>
     </Page>
   )
@@ -204,12 +177,8 @@ export function PrefPickPage({ pref, onBack }: { pref: PrefKey; onBack: () => vo
               <button
                 key={o.label}
                 onClick={() => {
-                  const patch = typeof o.patch === 'function' ? o.patch(state.prefs) : o.patch
-                  if (pref === 'calendar') void setCalendarEnabled(!!patch.calendar)
-                  else {
-                    store.setPrefs(patch)
-                    scheduleCalendarSync()
-                  }
+                  store.setPrefs(typeof o.patch === 'function' ? o.patch(state.prefs) : o.patch)
+                  scheduleCalendarSync()
                   if (!multi) onBack()
                 }}
                 className={rowCls(i)}
@@ -227,42 +196,53 @@ export function PrefPickPage({ pref, onBack }: { pref: PrefKey; onBack: () => vo
 
 /* ---------------- 首次：加进手机日历（全屏内页） ---------------- */
 
+const KINDS: { color: string; label: string; count: (s: CalendarSummary) => string; lead: (p: Prefs) => string }[] = [
+  { color: 'var(--c-accent)', label: '上课', count: (s) => (s.courses > 0 ? `${s.courses} 门课` : ''), lead: (p) => `前 ${p.classLead} 分钟` },
+  { color: 'var(--c-amber)', label: '作业', count: (s) => (s.tasks > 0 ? `${s.tasks} 项` : ''), lead: (p) => (p.taskLeads.length > 0 ? `截止前 ${[...p.taskLeads].sort((a, b) => b - a).map(leadLabel).join('、')}` : '不提醒') },
+  { color: 'var(--c-rose)', label: '考试', count: (s) => (s.exams > 0 ? `${s.exams} 场` : ''), lead: (p) => examDaysLabel(p.examDays) },
+]
+
 export function CalendarIntroPage({ onDone }: { onDone: () => void }) {
   const state = useStore()
+  const cal = useCalendarStatus()
   const [busy, setBusy] = useState(false)
   const preview = useMemo(() => calendarPreview(), [state.courses, state.tasks, state.overrides, state.prefs, state.semester])
+  const denied = cal.permission === 'denied'
 
-  const lines: [string, string][] = [
-    ['上课前', `${state.prefs.classLead} 分钟`],
-    ['作业截止前', taskLeadsText(state.prefs.taskLeads).replace('截止前 ', '')],
-    ['考试前', examDaysLabel(state.prefs.examDays)],
-  ]
+  useEffect(() => {
+    if (cal.permission === 'granted') onDone()
+  }, [cal.permission])
 
   const go = async () => {
+    if (denied) {
+      await openCalendarSettings()
+      return
+    }
     setBusy(true)
-    const r = await requestCalendarPermission()
+    await requestCalendarPermission()
     setBusy(false)
-    if (r === 'denied') nativeToast('可以稍后在「提醒」里加入')
-    onDone()
   }
 
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-6 [scrollbar-width:none]">
-        <TopBar title="加进手机日历" sub={`${summaryText(preview)}，到点由手机日历提醒。`} />
+        <TopBar title="加进手机日历" sub="到点由手机日历提醒；课表、作业变了，日历跟着变。" />
         <div className="mt-6 rounded-[18px] bg-(--c-surface) px-4">
-          {lines.map(([k, v], i) => (
-            <div key={k} className={`flex items-center py-3.5 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
-              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}</span>
-              <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{v}</span>
-            </div>
-          ))}
+          {KINDS.map((k, i) => {
+            const n = k.count(preview)
+            return (
+              <div key={k.label} className={`flex items-center py-3.5 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
+                <i className="mr-3 h-[9px] w-[9px] flex-none rounded-full" style={{ background: k.color }} />
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k.label}{n && <span className="ml-1.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{n}</span>}</span>
+                <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{k.lead(state.prefs)}</span>
+              </div>
+            )
+          })}
         </div>
-        <div className="mt-3 px-1 text-[12px] leading-[1.5] font-medium text-(--c-ink5)">课表、作业变了，日历跟着变。</div>
+        {denied && <div className="mt-3 px-1 text-[12px] leading-[1.5] font-medium text-(--c-rose)">日历权限已关闭，提醒发不出去。</div>}
       </div>
       <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">
-        <PrimaryButton disabled={busy} onClick={() => void go()}>加入</PrimaryButton>
-        <button onClick={onDone} className="mt-3 w-full py-2 text-[13px] font-bold text-(--c-ink4) transition-opacity active:opacity-60">以后再说</button>
+        <PrimaryButton disabled={busy} onClick={() => void go()}>{denied ? '去系统设置允许' : '加入'}</PrimaryButton>
       </div>
     </Page>
   )

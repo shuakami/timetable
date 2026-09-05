@@ -33,10 +33,13 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 
 /**
- * 系统日历：应用自己的一本本地日历（ACCOUNT_TYPE_LOCAL），以 sync adapter 身份读写。
- * 课、作业、考试都是这本日历里的事件，提醒由系统日历发出；页面只算差异，这里只做落地。
+ * 系统日历：应用自己的几本本地日历（ACCOUNT_TYPE_LOCAL，上课 / 作业 / 考试），以 sync adapter 身份读写。
+ * 提醒由系统日历发出；页面只算差异，这里只做落地。
  * key/hash 存在事件的 SYNC_DATA1/2 上：映射就在日历里，不另存一份状态。
  */
 @CapacitorPlugin(
@@ -103,100 +106,125 @@ public class TtCalendar extends Plugin {
         }
     }
 
-    /** 我们那本日历的 _ID；没有返回 -1 */
-    private long findCalendar() {
+    /** 账户下现有的日历：NAME -> _ID */
+    private HashMap<String, Long> findCalendars() {
+        HashMap<String, Long> out = new HashMap<>();
         ContentResolver cr = getContext().getContentResolver();
         try (Cursor c = cr.query(
                 Calendars.CONTENT_URI,
-                new String[]{ Calendars._ID },
+                new String[]{ Calendars._ID, Calendars.NAME },
                 Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=?",
                 new String[]{ ACCOUNT_NAME, ACCOUNT_TYPE },
                 null)) {
-            if (c != null && c.moveToFirst()) return c.getLong(0);
+            while (c != null && c.moveToNext()) {
+                String name = c.isNull(1) ? "" : c.getString(1);
+                if (!out.containsKey(name)) out.put(name, c.getLong(0));
+                else cr.delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, c.getLong(0))), null, null);
+            }
         } catch (Exception ignored) {
         }
-        return -1;
+        return out;
     }
 
     /**
-     * 找到或创建日历；顺带把显示名与颜色对齐到当前主题。
-     * 本地日历必须以 sync adapter 身份插入，否则 Provider 拒绝。
+     * 找到或创建一组日历（上课 / 作业 / 考试各一本），显示名与颜色对齐到当前主题；
+     * 账户下多出来的旧日历删掉。本地日历必须以 sync adapter 身份插入，否则 Provider 拒绝。
      */
     @PluginMethod
-    public void ensureCalendar(PluginCall call) {
+    public void ensureCalendars(PluginCall call) {
         if (!has()) {
             call.reject("denied");
             return;
         }
-        String name = call.getString("name", ACCOUNT_NAME);
-        int color = parseColor(call.getString("color"), 0xFF3B6FE0);
+        JSArray wanted = call.getArray("calendars", new JSArray());
         ContentResolver cr = getContext().getContentResolver();
-        long id = findCalendar();
+        HashMap<String, Long> have = findCalendars();
+        JSObject ids = new JSObject();
         try {
-            if (id >= 0) {
-                ContentValues v = new ContentValues();
-                v.put(Calendars.CALENDAR_DISPLAY_NAME, name);
-                v.put(Calendars.CALENDAR_COLOR, color);
-                v.put(Calendars.VISIBLE, 1);
-                v.put(Calendars.SYNC_EVENTS, 1);
-                cr.update(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, id)), v, null, null);
-            } else {
-                ContentValues v = new ContentValues();
-                v.put(Calendars.ACCOUNT_NAME, ACCOUNT_NAME);
-                v.put(Calendars.ACCOUNT_TYPE, ACCOUNT_TYPE);
-                v.put(Calendars.NAME, "timetable");
-                v.put(Calendars.CALENDAR_DISPLAY_NAME, name);
-                v.put(Calendars.CALENDAR_COLOR, color);
-                v.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_OWNER);
-                v.put(Calendars.OWNER_ACCOUNT, ACCOUNT_NAME);
-                v.put(Calendars.VISIBLE, 1);
-                v.put(Calendars.SYNC_EVENTS, 1);
-                v.put(Calendars.MAX_REMINDERS, 5);
-                v.put(Calendars.ALLOWED_REMINDERS, Reminders.METHOD_DEFAULT + "," + Reminders.METHOD_ALERT);
-                v.put(Calendars.ALLOWED_AVAILABILITY, Events.AVAILABILITY_BUSY + "," + Events.AVAILABILITY_FREE);
-                v.put(Calendars.ALLOWED_ATTENDEE_TYPES, String.valueOf(CalendarContract.Attendees.TYPE_NONE));
-                v.put(Calendars.CAN_ORGANIZER_RESPOND, 0);
-                v.put(Calendars.CAN_MODIFY_TIME_ZONE, 1);
-                v.put(Calendars.CALENDAR_TIME_ZONE, java.util.TimeZone.getDefault().getID());
-                Uri u = cr.insert(asSync(Calendars.CONTENT_URI), v);
-                if (u == null) {
-                    call.reject("insert failed");
-                    return;
+            HashSet<String> keep = new HashSet<>();
+            for (int i = 0; i < wanted.length(); i++) {
+                JSONObject w = wanted.getJSONObject(i);
+                String slug = w.getString("slug");
+                String name = w.optString("name", ACCOUNT_NAME);
+                int color = parseColor(w.optString("color", ""), 0xFF4F5BD5);
+                keep.add(slug);
+                Long id = have.get(slug);
+                if (id != null) {
+                    ContentValues v = new ContentValues();
+                    v.put(Calendars.CALENDAR_DISPLAY_NAME, name);
+                    v.put(Calendars.CALENDAR_COLOR, color);
+                    v.put(Calendars.VISIBLE, 1);
+                    v.put(Calendars.SYNC_EVENTS, 1);
+                    cr.update(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, id)), v, null, null);
+                } else {
+                    ContentValues v = new ContentValues();
+                    v.put(Calendars.ACCOUNT_NAME, ACCOUNT_NAME);
+                    v.put(Calendars.ACCOUNT_TYPE, ACCOUNT_TYPE);
+                    v.put(Calendars.NAME, slug);
+                    v.put(Calendars.CALENDAR_DISPLAY_NAME, name);
+                    v.put(Calendars.CALENDAR_COLOR, color);
+                    v.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_OWNER);
+                    v.put(Calendars.OWNER_ACCOUNT, ACCOUNT_NAME);
+                    v.put(Calendars.VISIBLE, 1);
+                    v.put(Calendars.SYNC_EVENTS, 1);
+                    v.put(Calendars.MAX_REMINDERS, 5);
+                    v.put(Calendars.ALLOWED_REMINDERS, Reminders.METHOD_DEFAULT + "," + Reminders.METHOD_ALERT);
+                    v.put(Calendars.ALLOWED_AVAILABILITY, Events.AVAILABILITY_BUSY + "," + Events.AVAILABILITY_FREE);
+                    v.put(Calendars.ALLOWED_ATTENDEE_TYPES, String.valueOf(CalendarContract.Attendees.TYPE_NONE));
+                    v.put(Calendars.CAN_ORGANIZER_RESPOND, 0);
+                    v.put(Calendars.CAN_MODIFY_TIME_ZONE, 1);
+                    v.put(Calendars.CALENDAR_TIME_ZONE, java.util.TimeZone.getDefault().getID());
+                    Uri u = cr.insert(asSync(Calendars.CONTENT_URI), v);
+                    if (u == null) {
+                        call.reject("insert failed");
+                        return;
+                    }
+                    id = ContentUris.parseId(u);
                 }
-                id = ContentUris.parseId(u);
+                ids.put(slug, (long) id);
+            }
+            for (Map.Entry<String, Long> e : have.entrySet()) {
+                if (!keep.contains(e.getKey())) {
+                    cr.delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, e.getValue())), null, null);
+                }
             }
         } catch (Exception e) {
             call.reject(String.valueOf(e.getMessage()));
             return;
         }
         JSObject o = new JSObject();
-        o.put("id", id);
+        o.put("ids", ids);
         call.resolve(o);
     }
 
-    /** 日历里现有的全部事件：id + key + hash，页面拿去和期望集合比 */
+    /** 账户下全部事件：id + calendarId + key + hash，页面拿去和期望集合比 */
     @PluginMethod
     public void readAll(PluginCall call) {
         if (!has()) {
             call.reject("denied");
             return;
         }
-        long cal = call.getLong("calendarId", -1L);
-        if (cal < 0) cal = findCalendar();
+        HashMap<String, Long> cals = findCalendars();
         JSArray out = new JSArray();
-        if (cal >= 0) {
+        if (!cals.isEmpty()) {
+            StringBuilder in = new StringBuilder();
+            for (Long id : cals.values()) {
+                if (in.length() > 0) in.append(',');
+                in.append(id);
+            }
             ContentResolver cr = getContext().getContentResolver();
             try (Cursor c = cr.query(
                     asSync(Events.CONTENT_URI),
-                    new String[]{ Events._ID, Events.SYNC_DATA1, Events.SYNC_DATA2 },
-                    Events.CALENDAR_ID + "=? AND " + Events.DELETED + "=0",
-                    new String[]{ String.valueOf(cal) },
+                    new String[]{ Events._ID, Events.CALENDAR_ID, Events.SYNC_DATA1, Events.SYNC_DATA2 },
+                    Events.CALENDAR_ID + " IN (" + in + ") AND " + Events.DELETED + "=0",
+                    null,
                     null)) {
                 while (c != null && c.moveToNext()) {
                     JSObject e = new JSObject();
                     e.put("id", c.getLong(0));
-                    e.put("key", c.isNull(1) ? "" : c.getString(1));
-                    e.put("hash", c.isNull(2) ? "" : c.getString(2));
+                    e.put("calendarId", c.getLong(1));
+                    e.put("key", c.isNull(2) ? "" : c.getString(2));
+                    e.put("hash", c.isNull(3) ? "" : c.getString(3));
                     out.put(e);
                 }
             } catch (Exception e) {
@@ -280,12 +308,6 @@ public class TtCalendar extends Plugin {
             call.reject("denied");
             return;
         }
-        long cal = call.getLong("calendarId", -1L);
-        if (cal < 0) cal = findCalendar();
-        if (cal < 0) {
-            call.reject("no calendar");
-            return;
-        }
         JSArray inserts = call.getArray("inserts", new JSArray());
         JSArray updates = call.getArray("updates", new JSArray());
         JSArray deletes = call.getArray("deletes", new JSArray());
@@ -306,7 +328,7 @@ public class TtCalendar extends Plugin {
                 long id = it.getLong("id");
                 int[] mins = minutes(it);
                 ops.add(ContentProviderOperation.newUpdate(ContentUris.withAppendedId(evUri, id))
-                        .withValues(eventValues(cal, it.getJSONObject("event"), it.getString("key"), it.getString("hash"), mins.length > 0))
+                        .withValues(eventValues(it.getLong("calendarId"), it.getJSONObject("event"), it.getString("key"), it.getString("hash"), mins.length > 0))
                         .build());
                 ops.add(ContentProviderOperation.newDelete(remUri)
                         .withSelection(Reminders.EVENT_ID + "=?", new String[]{ String.valueOf(id) })
@@ -328,7 +350,7 @@ public class TtCalendar extends Plugin {
                 if (ops.size() + 1 + mins.length > BATCH) flush(cr, ops);
                 int ref = ops.size();
                 ops.add(ContentProviderOperation.newInsert(evUri)
-                        .withValues(eventValues(cal, it.getJSONObject("event"), it.getString("key"), it.getString("hash"), mins.length > 0))
+                        .withValues(eventValues(it.getLong("calendarId"), it.getJSONObject("event"), it.getString("key"), it.getString("hash"), mins.length > 0))
                         .build());
                 for (int m : mins) {
                     ops.add(ContentProviderOperation.newInsert(remUri)
@@ -351,17 +373,17 @@ public class TtCalendar extends Plugin {
         call.resolve(o);
     }
 
-    /** 整本日历删掉（Provider 级联删事件与提醒） */
+    /** 账户下的日历全部删掉（Provider 级联删事件与提醒） */
     @PluginMethod
     public void removeAll(PluginCall call) {
         if (!has()) {
             call.resolve();
             return;
         }
-        long id = findCalendar();
-        if (id >= 0) {
+        ContentResolver cr = getContext().getContentResolver();
+        for (Long id : findCalendars().values()) {
             try {
-                getContext().getContentResolver().delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, id)), null, null);
+                cr.delete(asSync(ContentUris.withAppendedId(Calendars.CONTENT_URI, id)), null, null);
             } catch (Exception ignored) {
             }
         }

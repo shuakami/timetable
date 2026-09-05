@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { eventHash, planCalendar, summarize, type CalendarEventBody, type CalendarSummary, type DesiredEvent } from '../domain/calendar-plan'
+import { calendarOf, eventHash, planCalendar, summarize, type CalendarEventBody, type CalendarSlug, type CalendarSummary, type DesiredEvent } from '../domain/calendar-plan'
 import { store } from './store'
 
-/* 系统日历：课、作业、考试都写进应用自己的一本本地日历，提醒由系统日历发出。
+/* 系统日历：课、作业、考试各写进应用自己的一本本地日历，提醒由系统日历发出。
    这里只做两件事：把 Store 投影成期望事件集合，和日历里现有的比出差异后一次写入。
    映射关系（key / hash）就存在日历事件上，没有第二份状态。 */
 
@@ -11,24 +11,31 @@ export type CalendarPermission = 'granted' | 'prompt' | 'denied' | 'unsupported'
 
 interface RemoteEvent {
   id: number
+  calendarId: number
   key: string
   hash: string
 }
 
 interface WriteItem {
+  calendarId: number
   key: string
   hash: string
   event: CalendarEventBody
   reminders: number[]
 }
 
+interface CalendarSpec {
+  slug: CalendarSlug
+  name: string
+  color: string
+}
+
 interface TtCalendarPlugin {
   checkPermission(): Promise<{ status: CalendarPermission }>
   requestPermission(): Promise<{ status: CalendarPermission }>
-  ensureCalendar(o: { name: string; color: string }): Promise<{ id: number }>
-  readAll(o: { calendarId: number }): Promise<{ events: RemoteEvent[] }>
-  apply(o: { calendarId: number; inserts: WriteItem[]; updates: (WriteItem & { id: number })[]; deletes: number[] }): Promise<{ inserted: number; updated: number; deleted: number }>
-  removeAll(): Promise<void>
+  ensureCalendars(o: { calendars: CalendarSpec[] }): Promise<{ ids: Record<string, number> }>
+  readAll(): Promise<{ events: RemoteEvent[] }>
+  apply(o: { inserts: WriteItem[]; updates: (WriteItem & { id: number })[]; deletes: number[] }): Promise<{ inserted: number; updated: number; deleted: number }>
   hasCalendarApp(): Promise<{ available: boolean }>
   openCalendar(o: { at: number }): Promise<void>
   openAppSettings(): Promise<void>
@@ -36,7 +43,6 @@ interface TtCalendarPlugin {
 
 const TtCalendar = registerPlugin<TtCalendarPlugin>('TtCalendar')
 
-const CALENDAR_NAME = '课程表'
 const DEBOUNCE_MS = 800
 const CHUNK = 50
 
@@ -105,18 +111,27 @@ export async function requestCalendarPermission(): Promise<CalendarPermission> {
 
 /* ---------------- 同步 ---------------- */
 
-function accentColor(): string {
+function cssColor(name: string, fallback: string): string {
   try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim()
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
     if (/^#[0-9a-f]{6}$/i.test(v)) return v
   } catch {
     /* 非浏览器环境 */
   }
-  return '#3B6FE0'
+  return fallback
 }
 
-function toWrite(e: DesiredEvent): WriteItem {
-  return { key: e.key, hash: eventHash(e), event: e.event, reminders: e.reminders }
+/** 三本日历：在系统日历的列表里挨着排，颜色跟应用里一致 */
+function calendarSpecs(): CalendarSpec[] {
+  return [
+    { slug: 'tt.course', name: '课程表 · 上课', color: cssColor('--c-accent', '#4F5BD5') },
+    { slug: 'tt.task', name: '课程表 · 作业', color: cssColor('--c-amber', '#B98A2F') },
+    { slug: 'tt.exam', name: '课程表 · 考试', color: cssColor('--c-rose', '#DE5B78') },
+  ]
+}
+
+function toWrite(e: DesiredEvent, ids: Record<string, number>): WriteItem {
+  return { calendarId: ids[calendarOf(e.kind)], key: e.key, hash: eventHash(e), event: e.event, reminders: e.reminders }
 }
 
 function chunks<T>(list: T[], n: number): T[][] {
@@ -129,14 +144,13 @@ let running: Promise<void> | null = null
 let again = false
 
 async function doSync(): Promise<void> {
-  if (!store.state.prefs.calendar) return
   const perm = await calendarPermission()
   if (perm !== 'granted') return
   setStatus({ syncing: true })
   try {
-    const { id: calendarId } = await TtCalendar.ensureCalendar({ name: CALENDAR_NAME, color: accentColor() })
+    const { ids } = await TtCalendar.ensureCalendars({ calendars: calendarSpecs() })
     const desired = planCalendar(store.snapshot(), store.state.tasks, store.state.prefs, new Date())
-    const { events: remote } = await TtCalendar.readAll({ calendarId })
+    const { events: remote } = await TtCalendar.readAll()
 
     const byKey = new Map<string, RemoteEvent>()
     const deletes: number[] = []
@@ -148,24 +162,28 @@ async function doSync(): Promise<void> {
     const inserts: WriteItem[] = []
     const updates: (WriteItem & { id: number })[] = []
     for (const e of desired) {
-      const w = toWrite(e)
+      const w = toWrite(e, ids)
       const r = byKey.get(e.key)
       if (!r) inserts.push(w)
       else {
         byKey.delete(e.key)
-        if (r.hash !== w.hash) updates.push({ ...w, id: r.id })
+        // 换了本日历（作业改成考试）就删掉重建，其余内容变了原地改
+        if (r.calendarId !== w.calendarId) {
+          deletes.push(r.id)
+          inserts.push(w)
+        } else if (r.hash !== w.hash) updates.push({ ...w, id: r.id })
       }
     }
     for (const r of byKey.values()) deletes.push(r.id)
 
     if (inserts.length + updates.length + deletes.length > 0) {
       try {
-        await TtCalendar.apply({ calendarId, inserts, updates, deletes })
+        await TtCalendar.apply({ inserts, updates, deletes })
       } catch {
         // 整批失败就拆小批重试，让一条坏数据只影响它自己
-        for (const d of chunks(deletes, CHUNK)) await TtCalendar.apply({ calendarId, inserts: [], updates: [], deletes: d }).catch(() => undefined)
-        for (const u of chunks(updates, CHUNK)) await TtCalendar.apply({ calendarId, inserts: [], updates: u, deletes: [] }).catch(() => undefined)
-        for (const i of chunks(inserts, CHUNK)) await TtCalendar.apply({ calendarId, inserts: i, updates: [], deletes: [] }).catch(() => undefined)
+        for (const d of chunks(deletes, CHUNK)) await TtCalendar.apply({ inserts: [], updates: [], deletes: d }).catch(() => undefined)
+        for (const u of chunks(updates, CHUNK)) await TtCalendar.apply({ inserts: [], updates: u, deletes: [] }).catch(() => undefined)
+        for (const i of chunks(inserts, CHUNK)) await TtCalendar.apply({ inserts: i, updates: [], deletes: [] }).catch(() => undefined)
       }
     }
     setStatus({ summary: summarize(desired), lastSyncAt: Date.now(), failed: false })
@@ -202,29 +220,6 @@ export function scheduleCalendarSync(): void {
     timer = null
     void syncCalendar()
   }, DEBOUNCE_MS)
-}
-
-/** 把整本「课程表」日历从手机里删掉 */
-export async function removeCalendar(): Promise<void> {
-  if (!calendarSupported()) return
-  if (timer != null) {
-    window.clearTimeout(timer)
-    timer = null
-  }
-  if (running) await running.catch(() => undefined)
-  try {
-    await TtCalendar.removeAll()
-  } catch {
-    /* 没权限时本来就没有 */
-  }
-  setStatus({ summary: null, lastSyncAt: null })
-}
-
-/** 开/关「写进手机日历」：关掉即移除，打开即写入 */
-export async function setCalendarEnabled(on: boolean): Promise<void> {
-  store.setPrefs({ calendar: on })
-  if (on) await syncCalendar()
-  else await removeCalendar()
 }
 
 export async function openCalendarSettings(): Promise<void> {

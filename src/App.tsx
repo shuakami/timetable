@@ -1540,10 +1540,6 @@ const notifPrefs: [string, [string, string][]][] = [
     ['作业截止前', '1 天、2 小时'],
     ['考试前', '前 7 天、前 3 天、前 1 天、当天早上'],
   ]],
-  ['手机日历', [
-    ['写进手机日历', '开'],
-    ['在日历中查看', ''],
-  ]],
 ]
 
 function NotifPrefScreen() {
@@ -1591,10 +1587,10 @@ function NotifPrefScreen() {
 
 /* ---------------- 首次：加进手机日历 ---------------- */
 
-const calendarIntroRows: [string, string][] = [
-  ['上课前', '15 分钟'],
-  ['作业截止前', '1 天、2 小时'],
-  ['考试前', '前 7 天、前 3 天、前 1 天、当天早上'],
+const calendarIntroRows: [string, string, string, string][] = [
+  ['var(--c-accent)', '上课', '8 门课', '前 15 分钟'],
+  ['var(--c-amber)', '作业', '3 项', '截止前 1 天、2 小时'],
+  ['var(--c-rose)', '考试', '1 场', '前 7 天、前 3 天、前 1 天、当天早上'],
 ]
 
 function CalendarIntroScreen() {
@@ -1603,24 +1599,23 @@ function CalendarIntroScreen() {
       <div className="flex flex-1 flex-col pt-12">
         <div className="px-5">
           <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">加进手机日历</h1>
-          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">8 门课、3 项作业、1 场考试，到点由手机日历提醒。</div>
+          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">到点由手机日历提醒；课表、作业变了，日历跟着变。</div>
         </div>
         <div className="mt-6 px-5">
           <div className="rounded-[18px] bg-(--c-surface) px-4">
-            {calendarIntroRows.map(([k, v], i) => (
+            {calendarIntroRows.map(([c, k, n, v], i) => (
               <div key={k} className={`flex items-center py-3.5 ${i ? 'border-t border-(--c-line2)' : ''}`}>
-                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}</span>
+                <i className="mr-3 h-[9px] w-[9px] flex-none rounded-full" style={{ background: c }} />
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}<span className="ml-1.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{n}</span></span>
                 <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{v}</span>
               </div>
             ))}
           </div>
-          <div className="mt-3 px-1 text-[12px] leading-[1.5] font-medium text-(--c-ink5)">课表、作业变了，日历跟着变。</div>
         </div>
         <div className="mt-auto" />
       </div>
       <div className="px-5 pb-6">
         <button className="w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white">加入</button>
-        <button className="mt-3 w-full py-2 text-[13px] font-bold text-(--c-ink4)">以后再说</button>
       </div>
     </Phone>
   )
