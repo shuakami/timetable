@@ -154,7 +154,7 @@ public final class WidgetRender {
         v.setTextViewText(R.id.w_sub, sub == null ? "" : sub);
     }
 
-    /** 一行课：底色是课程色 8% 铺在卡片底上；正在上的那节底色加深到 30%、课名用课程色，时间位换成剩余时长 */
+    /** 一行课：底色是课程色 8% 铺在卡片底上；正在上的那节描一圈课程色边框、课名用课程色，时间位换成剩余时长 */
     private static void row(Context ctx, RemoteViews v, Palette p, String prefix, int idx, Item it, boolean now, String time) {
         int rowId = id(ctx, prefix + idx);
         if (it == null) {
@@ -162,7 +162,9 @@ public final class WidgetRender {
             return;
         }
         v.setViewVisibility(rowId, View.VISIBLE);
-        v.setInt(id(ctx, prefix + idx + "_bg"), "setColorFilter", p.tint(it.color, now ? 30 : 8));
+        v.setInt(id(ctx, prefix + idx + "_bg"), "setColorFilter", p.tint(it.color, 8));
+        v.setViewVisibility(id(ctx, prefix + idx + "_ring"), now ? View.VISIBLE : View.GONE);
+        v.setInt(id(ctx, prefix + idx + "_ring"), "setColorFilter", it.color);
         v.setInt(id(ctx, prefix + idx + "_bar"), "setColorFilter", it.color);
         v.setTextViewText(id(ctx, prefix + idx + "_name"), it.name);
         v.setTextColor(id(ctx, prefix + idx + "_name"), now ? p.deepen(it.color, 72) : p.ink);
@@ -382,9 +384,11 @@ public final class WidgetRender {
                 }
                 boolean nowCell = it.startAt <= now && now < it.endAt;
                 v.setViewVisibility(id(ctx, cid), View.VISIBLE);
-                v.setInt(id(ctx, cid + "_bg"), "setColorFilter", p.tint(it.color, nowCell ? 38 : 8));
+                v.setInt(id(ctx, cid + "_bg"), "setColorFilter", p.tint(it.color, 8));
+                v.setViewVisibility(id(ctx, cid + "_ring"), nowCell ? View.VISIBLE : View.GONE);
+                v.setInt(id(ctx, cid + "_ring"), "setColorFilter", it.color);
                 v.setTextViewText(id(ctx, cid + "_name"), it.name);
-                v.setTextColor(id(ctx, cid + "_name"), p.deepen(it.color, nowCell ? 70 : 88));
+                v.setTextColor(id(ctx, cid + "_name"), p.deepen(it.color, 88));
                 v.setTextViewText(id(ctx, cid + "_time"), it.start);
                 v.setTextColor(id(ctx, cid + "_time"), p.ink3);
                 v.setTextViewText(id(ctx, cid + "_loc"), it.loc);

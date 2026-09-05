@@ -13,6 +13,7 @@
     <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical" android:gravity="bottom">
     <FrameLayout android:id="@+id/row0" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
         <ImageView android:id="@+id/row0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_row_bg" android:contentDescription="@null" />
+        <ImageView android:id="@+id/row0_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingLeft="6dp" android:paddingRight="8dp">
             <ImageView android:id="@+id/row0_bar" android:layout_width="3dp" android:layout_height="20dp" android:scaleType="fitXY" android:src="@drawable/widget_bar" android:contentDescription="@null" />
             <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginLeft="7dp">

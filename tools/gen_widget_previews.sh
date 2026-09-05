@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 把 widget_previews.html 截成小组件选择器用的预览图（drawable-nodpi，3x）。
+# 中文字体：本机需装 Noto Sans SC（fc-list | grep 'Noto Sans SC'），否则数字 / 汉字会落到替补字体。
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/../android/app/src/main/res/drawable-nodpi"

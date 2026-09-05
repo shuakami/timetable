@@ -15,6 +15,7 @@
             <TextView android:id="@+id/wd0" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" />
             <FrameLayout android:id="@+id/c0_0" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c0_0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c0_0_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c0_0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c0_0_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -23,6 +24,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c0_1" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c0_1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c0_1_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c0_1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c0_1_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -31,6 +33,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c0_2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c0_2_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c0_2_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c0_2_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c0_2_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -42,6 +45,7 @@
             <TextView android:id="@+id/wd1" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" />
             <FrameLayout android:id="@+id/c1_0" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c1_0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c1_0_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c1_0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c1_0_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -50,6 +54,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c1_1" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c1_1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c1_1_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c1_1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c1_1_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -58,6 +63,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c1_2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c1_2_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c1_2_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c1_2_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c1_2_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -69,6 +75,7 @@
             <TextView android:id="@+id/wd2" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" />
             <FrameLayout android:id="@+id/c2_0" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c2_0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c2_0_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c2_0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c2_0_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -77,6 +84,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c2_1" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c2_1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c2_1_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c2_1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c2_1_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -85,6 +93,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c2_2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c2_2_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c2_2_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c2_2_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c2_2_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -96,6 +105,7 @@
             <TextView android:id="@+id/wd3" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" />
             <FrameLayout android:id="@+id/c3_0" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c3_0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c3_0_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c3_0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c3_0_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -104,6 +114,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c3_1" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c3_1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c3_1_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c3_1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c3_1_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -112,6 +123,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c3_2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c3_2_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c3_2_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c3_2_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c3_2_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -123,6 +135,7 @@
             <TextView android:id="@+id/wd4" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textSize="10.5sp" android:textStyle="bold" android:textColor="@color/widgetInk3" />
             <FrameLayout android:id="@+id/c4_0" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c4_0_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c4_0_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c4_0_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c4_0_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -131,6 +144,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c4_1" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c4_1_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c4_1_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c4_1_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c4_1_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />
@@ -139,6 +153,7 @@
             </FrameLayout>
             <FrameLayout android:id="@+id/c4_2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/c4_2_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/c4_2_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/c4_2_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="@color/widgetInk" />
                     <TextView android:id="@+id/c4_2_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/widgetInk3" android:layout_marginTop="3dp" />

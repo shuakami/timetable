@@ -19,6 +19,7 @@ def row(i, name_sp='13sp', loc=True, time=True, prefix='row'):
     parts = [
         f'    <FrameLayout android:id="@+id/{rid}" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">',
         f'        <ImageView android:id="@+id/{rid}_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_row_bg" android:contentDescription="@null" />',
+        f'        <ImageView android:id="@+id/{rid}_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />',
         '        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingLeft="6dp" android:paddingRight="8dp">',
         f'            <ImageView android:id="@+id/{rid}_bar" android:layout_width="3dp" android:layout_height="20dp" android:scaleType="fitXY" android:src="@drawable/widget_bar" android:contentDescription="@null" />',
         '            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginLeft="7dp">',
@@ -104,6 +105,7 @@ for c in range(5):
         cid = f'c{c}_{r}'
         cells.append(f'''            <FrameLayout android:id="@+id/{cid}" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp">
                 <ImageView android:id="@+id/{cid}_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_cell_bg" android:contentDescription="@null" />
+                <ImageView android:id="@+id/{cid}_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_focus" android:visibility="gone" android:contentDescription="@null" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="5dp">
                     <TextView android:id="@+id/{cid}_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textSize="10sp" android:textStyle="bold" android:textColor="#16171A" />
                     <TextView android:id="@+id/{cid}_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:textSize="9sp" android:textStyle="bold" android:textColor="#8A8E97" android:layout_marginTop="3dp" />
