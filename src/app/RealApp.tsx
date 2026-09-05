@@ -1436,11 +1436,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
   const trashCount = state.courses.filter((c) => c.removedByImport).length
   const live = state.courses.filter((c) => !c.removedByImport)
   const week = sem ? weekOf(sem, todayStr()) : 0
-  /* 每周节数：按学期总节数平均到每周 */
-  const liveIds = new Set(live.map((c) => c.id))
-  const weekly = sem && sem.totalWeeks > 0
-    ? state.rules.filter((r) => liveIds.has(r.courseId)).reduce((a, r) => a + maskToWeeks(r.weeksMask).length * (r.endPeriod - r.startPeriod + 1), 0) / sem.totalWeeks
-    : 0
+  const homework = state.tasks.filter((t) => t.kind === 'homework')
 
   const groups: [string, [string, string, MePage][]][] = [
     ['课表', [
@@ -1506,7 +1502,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
 
         <div className="px-5">
           <button onClick={() => onPage('stats')} className="flex w-full rounded-[18px] bg-(--c-surface) px-4 py-3.5 transition-opacity active:opacity-60">
-            {[[String(live.length), '门课'], [weekly > 0 ? fmtNum(weekly) : '—', '节 / 周'], [String(state.overrides.length), '次调整']].map(([n, l], i) => (
+            {[[String(live.length), '门课'], [String(state.overrides.length), '次调整'], [String(homework.length), '项作业']].map(([n, l], i) => (
               <div key={l} className={`flex-1 ${i ? 'border-l border-(--c-surface2)' : ''}`}>
                 <div className="text-center text-[17px] font-extrabold tabular-nums text-(--c-ink)">{n}</div>
                 <div className="mt-0.5 text-center text-[11px] font-semibold text-(--c-ink4)">{l}</div>
@@ -1639,10 +1635,10 @@ function StatsPage({ onBack, onCourse, onChanges, onTodo }: { onBack: () => void
       }
     }
     const leave = state.overrides.filter((o) => o.kind === 'leave' && ruleCourse.get(o.ruleId) === c.id).length
-    return { c, total, done, weekly: weeks.size ? total / weeks.size : 0, leave }
+    return { c, total, done, weekly: weeks.size ? Math.round(total / weeks.size) : 0, leave }
   })
   const totalPeriods = rows.reduce((a, r) => a + r.total, 0)
-  const weekly = sem && sem.totalWeeks > 0 ? totalPeriods / sem.totalWeeks : 0
+  const weekly = sem && sem.totalWeeks > 0 ? Math.round(totalPeriods / sem.totalWeeks) : 0
   const week = sem ? Math.min(Math.max(weekOf(sem, today), 0), sem.totalWeeks) : 0
 
   const byCategory = new Map<string, typeof rows>()
@@ -1651,7 +1647,12 @@ function StatsPage({ onBack, onCourse, onChanges, onTodo }: { onBack: () => void
     byCategory.set(k, [...(byCategory.get(k) ?? []), r])
   }
   const cats = [...byCategory.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'zh-CN')))
-  const facts = [live.length > 0 ? `${live.length} 门课` : '', weekly > 0 ? `每周 ${fmtNum(weekly)} 节` : ''].filter(Boolean)
+  const donePeriods = rows.reduce((a, r) => a + r.done, 0)
+  const facts = [
+    live.length > 0 ? `${live.length} 门课` : '',
+    weekly > 0 ? `每周 ${weekly} 节` : '',
+    donePeriods > 0 ? `已上 ${donePeriods} 节` : '',
+  ].filter(Boolean)
 
   const liveIds = new Set(live.map((c) => c.id))
   const ovs = state.overrides.filter((o) => liveIds.has(ruleCourse.get(o.ruleId) ?? ''))
@@ -1695,7 +1696,7 @@ function StatsPage({ onBack, onCourse, onChanges, onTodo }: { onBack: () => void
           <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">{cat || (cats.length > 1 ? '其他' : '课程')}</div>
           <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
             {(byCategory.get(cat) ?? []).map(({ c, total, done, weekly: w, leave }, i) => {
-              const meta = [c.teacher ?? '', w > 0 ? `每周 ${fmtNum(w)} 节` : ''].filter(Boolean)
+              const meta = [c.teacher ?? '', w > 0 ? `每周 ${w} 节` : ''].filter(Boolean)
               return (
                 <button key={c.id} onClick={() => onCourse(c)} className={`block w-full py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
                   <div className="flex items-baseline">
