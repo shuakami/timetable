@@ -43,6 +43,9 @@ function hydratePrefs(raw: unknown): Prefs {
     taskLeads: nums(p.taskLeads, d.taskLeads),
     examDays: nums(p.examDays, d.examDays),
     widgetStyle: (WIDGET_STYLES as readonly string[]).includes(p.widgetStyle as string) ? (p.widgetStyle as WidgetStyle) : d.widgetStyle,
+    name: typeof p.name === 'string' ? p.name : d.name,
+    avatar: typeof p.avatar === 'string' ? p.avatar : d.avatar,
+    wall: typeof p.wall === 'string' ? p.wall : d.wall,
   }
 }
 
@@ -119,6 +122,12 @@ export class Store {
     const s = this.state
     if (!s.semester) return null
     return { semester: s.semester, courses: s.courses, rules: s.rules, overrides: s.overrides, entries: s.entries }
+  }
+
+  /** 整份数据清空，回到刚安装的状态 */
+  reset() {
+    this.state = emptyState()
+    this.commit()
   }
 
   setSemester(sem: Semester) {

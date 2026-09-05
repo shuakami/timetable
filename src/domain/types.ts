@@ -125,6 +125,11 @@ export interface Prefs {
   taskLeads: Minutes[] // 作业截止前多久（可多个）；没写时刻的作业按当天 23:00 截止
   examDays: number[] // 考试提前几天（0 = 当天早上 8 点）
   widgetStyle: WidgetStyle
+  /** 「我」页显示的名字；空则用学期名 */
+  name: string
+  /** 头像、背景文件路径（同作业照片）；空则用内置图 */
+  avatar: string
+  wall: string
 }
 
 /** 课前提醒可选的提前量 */
@@ -143,6 +148,9 @@ export function defaultPrefs(): Prefs {
     taskLeads: [24 * 60, 2 * 60],
     examDays: [7, 3, 1, 0],
     widgetStyle: 'today',
+    name: '',
+    avatar: '',
+    wall: '',
   }
 }
 

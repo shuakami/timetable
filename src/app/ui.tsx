@@ -919,12 +919,13 @@ export function Loader({ size = 16, className = '' }: { size?: number; className
   )
 }
 
-export function PrimaryButton({ children, onClick, disabled, busy, onDark }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; busy?: boolean; onDark?: boolean }) {
+export function PrimaryButton({ children, onClick, disabled, busy, onDark, tone = 'brand' }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; busy?: boolean; onDark?: boolean; tone?: 'brand' | 'danger' }) {
+  const bg = tone === 'danger' ? 'bg-(--c-danger) disabled:bg-(--c-danger)' : 'bg-(--c-accent) disabled:bg-(--c-accent)'
   return (
     <button
       onClick={onClick}
       disabled={disabled || busy}
-      className={`grid w-full place-items-center rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] ${busy ? 'disabled:bg-(--c-accent) disabled:text-white' : onDark ? 'disabled:bg-white/12 disabled:text-white/35' : 'disabled:bg-(--c-line) disabled:text-(--c-ink5)'}`}
+      className={`grid w-full place-items-center rounded-[18px] ${busy ? bg : tone === 'danger' ? 'bg-(--c-danger)' : 'bg-(--c-accent)'} py-[15px] text-[15px] font-bold text-white transition-transform duration-150 active:scale-[.985] ${busy ? 'disabled:text-white' : onDark ? 'disabled:bg-white/12 disabled:text-white/35' : 'disabled:bg-(--c-line) disabled:text-(--c-ink5)'}`}
     >
       <span className={`[grid-area:1/1] transition-opacity duration-200 ${busy ? 'opacity-0' : ''}`} style={{ transitionTimingFunction: EASE_CSS }}>{children}</span>
       <span className={`flex [grid-area:1/1] transition-opacity duration-200 ${busy ? '' : 'opacity-0'}`} style={{ transitionTimingFunction: EASE_CSS }}>
@@ -1279,6 +1280,7 @@ export const ICON = {
   info: <g><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></g>,
   trash: <g><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13" /></g>,
   download: <g><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 17.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-1.5" /></g>,
+  image: <g><rect x="3.5" y="4.5" width="17" height="15" rx="3" /><circle cx="9" cy="10" r="1.6" /><path d="m4 17 5-5 4 4 3-3 4.5 4.5" /></g>,
   camera: <g><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.2-2h5.6L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" /><circle cx="12" cy="12.5" r="3.2" /></g>,
   calendar: <g><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /></g>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,

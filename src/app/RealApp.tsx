@@ -2,7 +2,7 @@ import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } fro
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react'
 import { flushSync } from 'react-dom'
 import { App as CapApp } from '@capacitor/app'
-import type { Course, Occurrence, Semester, Task, OverrideKind, WidgetStyle } from '../domain/types'
+import type { Course, Occurrence, Semester, SessionRule, Task, OverrideKind, WidgetStyle } from '../domain/types'
 import { addDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
 import { maskHasWeek, maskToWeeks } from '../domain/weeks'
 import { occurrencesOn, occurrencesInWeek, type Snapshot } from '../domain/engine'
@@ -20,15 +20,15 @@ import {
   ManualAddPage,
 } from './pages'
 import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave } from './todo'
-import type { CapturedPhoto } from './camera'
+import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
-import { calendarPermission, calendarSupported, scheduleCalendarSync, syncCalendar } from './calendar'
+import { calendarPermission, calendarSupported, clearCalendar, scheduleCalendarSync, syncCalendar } from './calendar'
 import { nativeToast, syncWidgets } from './widgets'
 import { onIncomingIcs, shareIcs } from './files'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
-  BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
+  ActionSheet, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
   TextAction, TextInput, TopBar, WD, WD_SHORT, dockStyle, md, tint, type Ghost, type Rect,
   DateInput, TimeInput,
 } from './ui'
@@ -1417,7 +1417,7 @@ function RuleEditorPage({ rule, onBack }: { rule: RuleManifest | null; onBack: (
 
 /* ---------------- 我的 ---------------- */
 
-type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'share' | 'changes' | 'notif' | 'widget' | 'theme'
+type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'share' | 'changes' | 'notif' | 'widget' | 'theme' | 'profile' | 'stats' | 'erase'
 
 const WIDGET_LABEL: Record<WidgetStyle, string> = {
   today: '今日课程',
@@ -1454,7 +1454,12 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
       ['导入历史', `${state.batches.length} 次`, 'history'],
       ['回收站', trashCount > 0 ? `${trashCount} 门` : '空', 'trash'],
     ]],
+    ['数据', [
+      ['清除数据', '', 'erase'],
+    ]],
   ]
+  const avatar = usePhotoSrc(state.prefs.avatar, '/avatar.jpg')
+  const wall = usePhotoSrc(state.prefs.wall, '/wall.jpg')
 
   const meHero = useRef<HTMLDivElement>(null)
   const meHead = useRef<HTMLDivElement>(null)
@@ -1475,34 +1480,30 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
       </div>
       <div className="relative flex-1 overflow-y-auto pb-[130px] [scrollbar-width:none]">
         <div ref={meHero} className="relative h-[258px] overflow-hidden bg-[#5d6d55]">
-          <img
-            src="/wall.jpg"
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover object-[50%_32%]"
-          />
+          <img src={wall} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_32%]" />
           <div className="absolute inset-x-0 bottom-0 h-[150px] bg-gradient-to-t from-(--c-bg) via-(--c-bg)/70 to-transparent" />
           <div className="absolute inset-x-0 top-0 h-[92px] bg-gradient-to-b from-black/25 to-transparent" />
-          <div className="absolute inset-x-5 bottom-3 flex items-end">
-            <img src="/avatar.jpg" alt="" className="h-[62px] w-[62px] flex-none rounded-full border-[1.5px] border-(--c-bg) bg-(--c-accent) object-cover" />
+          <button onClick={() => onPage('profile')} className="absolute inset-x-5 bottom-3 flex items-end text-left transition-opacity active:opacity-70">
+            <img src={avatar} alt="" className="h-[62px] w-[62px] flex-none rounded-full border-[1.5px] border-(--c-bg) bg-(--c-accent) object-cover" />
             <div className="mb-1 ml-3.5 flex-1">
-              <div className="text-[19px] font-extrabold tracking-[-.02em] text-(--c-ink)">{sem?.name ?? '我的课表'}</div>
+              <div className="text-[19px] font-extrabold tracking-[-.02em] text-(--c-ink)">{state.prefs.name || sem?.name || '我的课表'}</div>
               <div className="mt-[3px] flex items-center gap-2.5 text-[12px] font-semibold text-(--c-ink3)">
                 <span>{sem ? `第 ${Math.max(0, Math.min(sem.totalWeeks, week))} / ${sem.totalWeeks} 周` : '未设置学期'}</span>
                 {sem && <span className="tabular-nums text-(--c-ink5)">{md(sem.startDate)} 起</span>}
               </div>
             </div>
-          </div>
+          </button>
         </div>
 
         <div className="px-5">
-          <div className="flex rounded-[18px] bg-(--c-surface) px-4 py-3.5">
+          <button onClick={() => onPage('stats')} className="flex w-full rounded-[18px] bg-(--c-surface) px-4 py-3.5 transition-opacity active:opacity-60">
             {[[String(live.length), '门课'], [credits > 0 ? String(Math.round(credits * 10) / 10) : '—', '学分'], [String(state.overrides.length), '次调整']].map(([n, l], i) => (
               <div key={l} className={`flex-1 ${i ? 'border-l border-(--c-surface2)' : ''}`}>
                 <div className="text-center text-[17px] font-extrabold tabular-nums text-(--c-ink)">{n}</div>
                 <div className="mt-0.5 text-center text-[11px] font-semibold text-(--c-ink4)">{l}</div>
               </div>
             ))}
-          </div>
+          </button>
 
           {groups.map(([g, rows]) => (
             <div key={g} className="mt-5">
@@ -1525,6 +1526,238 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
         </div>
       </div>
     </>
+  )
+}
+
+/* 头像 / 背景：自选照片先用直接路径再换成可显示的，没选则用内置图 */
+function usePhotoSrc(path: string, fallback: string): string {
+  const [src, setSrc] = useState(() => (path ? photoSrc(path) : ''))
+  useEffect(() => {
+    if (!path) {
+      setSrc('')
+      return
+    }
+    let alive = true
+    setSrc(photoSrc(path))
+    void loadPhotoSrc(path).then((s) => alive && setSrc(s))
+    return () => {
+      alive = false
+    }
+  }, [path])
+  return src || fallback
+}
+
+const periodsOf = (r: SessionRule) => r.endPeriod - r.startPeriod + 1
+const fmtNum = (n: number) => String(Math.round(n * 10) / 10)
+
+type PhotoTarget = 'avatar' | 'wall'
+
+function CameraBadge({ className }: { className: string }) {
+  return (
+    <span className={`grid place-items-center rounded-full ${className}`}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">{ICON.camera}</svg>
+    </span>
+  )
+}
+
+/* 个人资料：顶部就是「我」页头图的缩影，点背景换背景、点头像换头像；已自定义时弹出「从相册选择 / 恢复默认」 */
+function ProfilePage({ onBack, onPick }: { onBack: () => void; onPick: (t: PhotoTarget) => void }) {
+  const state = useStore()
+  const avatar = usePhotoSrc(state.prefs.avatar, '/avatar.jpg')
+  const wall = usePhotoSrc(state.prefs.wall, '/wall.jpg')
+  const [menu, setMenu] = useState<PhotoTarget | null>(null)
+  const tap = (t: PhotoTarget) => (state.prefs[t] ? setMenu(t) : onPick(t))
+  const reset = (t: PhotoTarget) => {
+    void camera.remove([state.prefs[t]])
+    store.setPrefs(t === 'avatar' ? { avatar: '' } : { wall: '' })
+  }
+  return (
+    <SubPage title="个人资料" onBack={onBack}>
+      <div className="relative h-[172px] overflow-hidden rounded-[18px] bg-[#5d6d55]">
+        <button onClick={() => tap('wall')} className="absolute inset-0 transition-opacity active:opacity-80">
+          <img src={wall} alt="" className="h-full w-full object-cover object-[50%_32%]" />
+          <div className="absolute inset-x-0 bottom-0 h-[96px] bg-gradient-to-t from-black/50 to-transparent" />
+          <CameraBadge className="absolute top-3 right-3 h-[28px] w-[28px] bg-black/35 text-white backdrop-blur-md" />
+        </button>
+        <button onClick={() => tap('avatar')} className="absolute bottom-4 left-4 h-[64px] w-[64px] transition-transform duration-150 active:scale-[.95]">
+          <img src={avatar} alt="" className="h-full w-full rounded-full border-2 border-white/90 object-cover" />
+          <CameraBadge className="absolute -right-0.5 -bottom-0.5 h-[24px] w-[24px] bg-(--c-ink) text-(--c-bg) ring-2 ring-white" />
+        </button>
+      </div>
+      {menu && (
+        <ActionSheet
+          title={menu === 'avatar' ? '头像' : '背景'}
+          groups={[[
+            { title: '从相册选择', icon: ICON.image, onClick: () => onPick(menu) },
+            { title: '恢复默认', icon: ICON.undo, onClick: () => reset(menu) },
+          ]]}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+        <Field k="名称">
+          <TextInput
+            value={state.prefs.name}
+            maxLength={20}
+            placeholder={state.semester?.name ?? '我的课表'}
+            onChange={(e) => store.setPrefs({ name: e.target.value })}
+            onBlur={(e) => store.setPrefs({ name: e.target.value.trim() })}
+          />
+        </Field>
+      </div>
+    </SubPage>
+  )
+}
+
+/* 统计：学期走到哪、每门课上到哪，请过假的课单独标出来；可直接给导师或老师看 */
+function StatsPage({ onBack, onCourse, onChanges, onTodo }: { onBack: () => void; onCourse: (c: Course) => void; onChanges: () => void; onTodo: () => void }) {
+  const state = useStore()
+  const sem = state.semester
+  const live = state.courses.filter((c) => !c.removedByImport)
+  const today = todayStr()
+  const ruleCourse = new Map(state.rules.map((r) => [r.id, r.courseId]))
+
+  const rows = live.map((c) => {
+    const rs = state.rules.filter((r) => r.courseId === c.id)
+    const weeks = new Set<number>()
+    let total = 0
+    let done = 0
+    for (const r of rs) {
+      for (const w of maskToWeeks(r.weeksMask)) {
+        weeks.add(w)
+        total += periodsOf(r)
+        if (sem && dateOf(sem, w, r.weekday) < today) done += periodsOf(r)
+      }
+    }
+    const leave = state.overrides.filter((o) => o.kind === 'leave' && ruleCourse.get(o.ruleId) === c.id).length
+    return { c, total, done, weekly: weeks.size ? total / weeks.size : 0, leave }
+  })
+  const credits = live.reduce((a, c) => a + (c.credit ?? 0), 0)
+  const totalPeriods = rows.reduce((a, r) => a + r.total, 0)
+  const weekly = sem && sem.totalWeeks > 0 ? totalPeriods / sem.totalWeeks : 0
+  const week = sem ? Math.min(Math.max(weekOf(sem, today), 0), sem.totalWeeks) : 0
+
+  const byCategory = new Map<string, typeof rows>()
+  for (const r of rows) {
+    const k = r.c.category?.trim() || ''
+    byCategory.set(k, [...(byCategory.get(k) ?? []), r])
+  }
+  const cats = [...byCategory.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'zh-CN')))
+  const facts = [live.length > 0 ? `${live.length} 门课` : '', credits > 0 ? `${fmtNum(credits)} 学分` : '', weekly > 0 ? `每周 ${fmtNum(weekly)} 节` : ''].filter(Boolean)
+
+  const liveIds = new Set(live.map((c) => c.id))
+  const ovs = state.overrides.filter((o) => liveIds.has(ruleCourse.get(o.ruleId) ?? ''))
+  const nOv = (k: OverrideKind) => ovs.filter((o) => o.kind === k).length
+  const homework = state.tasks.filter((t) => t.kind === 'homework')
+  const exams = state.tasks.filter((t) => t.kind === 'exam')
+  const firstDays = new Set(state.rules.filter((r) => liveIds.has(r.courseId) && r.startPeriod === 1).map((r) => r.weekday)).size
+  type More = [string, string, (() => void) | null]
+  const more = (
+    [
+      ['第一节有课', firstDays > 0 ? `每周 ${firstDays} 天` : '', null],
+      ['作业', homework.length > 0 ? `${homework.filter((t) => t.done).length} / ${homework.length} 已完成` : '', onTodo],
+      ['考试', exams.length > 0 ? `${exams.length} 场` : '', onTodo],
+      ['请假', nOv('leave') > 0 ? `${nOv('leave')} 次` : '', onChanges],
+      ['停课', nOv('cancelled') > 0 ? `${nOv('cancelled')} 次` : '', onChanges],
+      ['调课', nOv('moved') > 0 ? `${nOv('moved')} 次` : '', onChanges],
+    ] as More[]
+  ).filter((m) => m[1])
+
+  return (
+    <SubPage title="统计" onBack={onBack}>
+      {sem && (
+        <div className="rounded-[18px] bg-(--c-surface) px-4 pt-4 pb-4">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[22px] font-extrabold tracking-[-.02em] text-(--c-ink)">第 {week} 周</span>
+            <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">共 {sem.totalWeeks} 周</span>
+          </div>
+          <div className="mt-3 h-[5px] overflow-hidden rounded-full bg-(--c-surface2)">
+            <div className="h-full rounded-full bg-(--c-ink)" style={{ width: `${sem.totalWeeks > 0 ? Math.min(100, (week / sem.totalWeeks) * 100) : 0}%` }} />
+          </div>
+          {facts.length > 0 && (
+            <div className="mt-3.5 flex gap-3 text-[12.5px] font-medium tabular-nums text-(--c-ink3)">
+              {facts.map((f) => <span key={f}>{f}</span>)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {cats.map((cat) => (
+        <div key={cat || '_'} className="mt-5">
+          <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">{cat || (cats.length > 1 ? '其他' : '课程')}</div>
+          <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+            {(byCategory.get(cat) ?? []).map(({ c, total, done, weekly: w, leave }, i) => {
+              const meta = [c.teacher ?? '', c.credit != null ? `${fmtNum(c.credit)} 学分` : '', w > 0 ? `每周 ${fmtNum(w)} 节` : ''].filter(Boolean)
+              return (
+                <button key={c.id} onClick={() => onCourse(c)} className={`block w-full py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
+                  <div className="flex items-baseline">
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-(--c-ink)">{c.name}</span>
+                    {total > 0 && <span className="ml-3 flex-none text-[12.5px] font-semibold tabular-nums text-(--c-ink3)">{done} / {total} 节</span>}
+                  </div>
+                  {total > 0 && (
+                    <div className="mt-2 h-[4px] overflow-hidden rounded-full bg-(--c-surface2)">
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, (done / total) * 100)}%`, background: c.color }} />
+                    </div>
+                  )}
+                  {(meta.length > 0 || leave > 0) && (
+                    <div className="mt-1.5 flex items-baseline text-[12px] font-medium tabular-nums text-(--c-ink4)">
+                      <span className="flex min-w-0 flex-1 gap-2.5 truncate">{meta.map((m) => <span key={m}>{m}</span>)}</span>
+                      {leave > 0 && <span className="ml-3 flex-none text-(--c-danger)">请假 {leave} 次</span>}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {more.length > 0 && (
+        <div className="mt-5">
+          <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">本学期</div>
+          <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+            {more.map(([k, v, go], i) => (
+              <button key={k} onClick={go ?? undefined} disabled={!go} className={`flex w-full items-center py-3.5 text-left transition-opacity active:opacity-60 disabled:active:opacity-100 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}</span>
+                <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{v}</span>
+                {go && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink5)' }} strokeWidth="2.2" className="ml-2"><path d="m9 5 7 7-7 7" /></svg>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </SubPage>
+  )
+}
+
+/* 清除数据：本机课表、作业和系统日历里应用建的日历一并删掉，回到初始状态 */
+function ErasePage({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (busy) return
+    setBusy(true)
+    const s = store.state
+    const paths = [...s.tasks.flatMap((t) => t.photos?.map((p) => p.path) ?? []), s.prefs.avatar, s.prefs.wall].filter(Boolean)
+    await clearCalendar()
+    await camera.remove(paths)
+    store.reset()
+    await syncWidgets()
+    onDone()
+  }
+  return (
+    <Page>
+      <div className="flex-1 overflow-y-auto px-5 [scrollbar-width:none]">
+        <TopBar title="清除数据" sub="卸载应用不会移除系统日历中的内容。" onBack={onBack} />
+        <div className="mt-6 rounded-[18px] bg-(--c-surface) px-4">
+          {['课表、课程和调整', '作业和照片', '系统日历中由本应用创建的日历'].map((t, i) => (
+            <div key={t} className={`py-3.5 text-[14px] font-semibold text-(--c-ink) ${i ? 'border-t border-(--c-surface2)' : ''}`}>{t}</div>
+          ))}
+        </div>
+      </div>
+      <div className="flex-none px-5 pt-3 pb-[max(28px,env(safe-area-inset-bottom))]">
+        <PrimaryButton tone="danger" busy={busy} onClick={() => void run()}>清除全部数据</PrimaryButton>
+      </div>
+    </Page>
   )
 }
 
@@ -1774,6 +2007,10 @@ type Route =
   | { k: 'notifPick'; pref: PrefKey }
   | { k: 'widget' }
   | { k: 'theme' }
+  | { k: 'profile' }
+  | { k: 'photoPick'; target: PhotoTarget }
+  | { k: 'stats' }
+  | { k: 'erase' }
 
 /* 课程详情里点某条每周安排：找到这条规则在本周（或第一周）的那次课 */
 function occurrenceOfRule(snap: Snapshot, ruleId: string): Occurrence | null {
@@ -1893,6 +2130,31 @@ export default function RealApp() {
   }
   const pop = () => setStack((s) => s.slice(0, -1))
   const backToTimetable = () => { setStack([]); setTab(0) }
+  /* 头像 / 背景：原生走相册页（单选），浏览器直接选文件；换掉的文件随手删 */
+  const applyPhoto = (target: PhotoTarget, ps: CapturedPhoto[]) => {
+    const p = ps[0]
+    if (!p) return
+    const old = store.state.prefs[target]
+    const path = rememberPhoto(p).path
+    store.setPrefs(target === 'avatar' ? { avatar: path } : { wall: path })
+    if (old) void camera.remove([old])
+  }
+  const pickPhoto = async (target: PhotoTarget) => {
+    if (nativeCamera()) push({ k: 'photoPick', target })
+    else applyPhoto(target, await camera.pick())
+  }
+  /* 清除完：回到刚安装的样子，重新走引导 */
+  const eraseDone = () => {
+    try {
+      localStorage.removeItem(ONBOARD_KEY)
+    } catch {
+      /* 忽略 */
+    }
+    setOnboardUnder(false)
+    setOnboarded(false)
+    setStack([])
+    setTab(0)
+  }
   const openCourseById = (id: string) => {
     const c = store.state.courses.find((x) => x.id === id)
     if (c) push({ k: 'course', course: c })
@@ -2077,6 +2339,14 @@ export default function RealApp() {
         return <WidgetPage key={key} snap={snap} onBack={pop} />
       case 'theme':
         return <ThemePage key={key} onBack={pop} />
+      case 'profile':
+        return <ProfilePage key={key} onBack={pop} onPick={(t) => void pickPhoto(t)} />
+      case 'photoPick':
+        return <PickerPage key={key} single onBack={pop} onDone={(ps) => { applyPhoto(r.target, ps); pop() }} />
+      case 'stats':
+        return <StatsPage key={key} onBack={pop} onCourse={(c) => push({ k: 'course', course: c })} onChanges={() => push({ k: 'changes' })} onTodo={() => { setStack([]); setTab(2) }} />
+      case 'erase':
+        return <ErasePage key={key} onBack={pop} onDone={eraseDone} />
       case 'courses':
         return (
           <CoursesPage

@@ -33,6 +33,7 @@ interface TtCalendarPlugin {
   ensureCalendars(o: { calendars: (CalendarSpec & { color: string; visible: boolean })[] }): Promise<{ ids: Record<string, number>; archived?: number[] }>
   readAll(): Promise<{ events: RemoteEvent[] }>
   apply(o: { inserts: WriteItem[]; updates: (WriteItem & { id: number })[]; deletes: number[] }): Promise<{ inserted: number; updated: number; deleted: number }>
+  removeAll(): Promise<void>
   hasCalendarApp(): Promise<{ available: boolean }>
   openCalendar(o: { at: number }): Promise<void>
   openAppSettings(): Promise<void>
@@ -213,6 +214,22 @@ export function scheduleCalendarSync(): void {
     timer = null
     void syncCalendar()
   }, DEBOUNCE_MS)
+}
+
+/** 删掉应用在系统日历里建的全部日历（含已归档的） */
+export async function clearCalendar(): Promise<void> {
+  if (!calendarSupported()) return
+  if (timer != null) {
+    window.clearTimeout(timer)
+    timer = null
+  }
+  if (running) await running.catch(() => undefined)
+  try {
+    await TtCalendar.removeAll()
+  } catch {
+    /* 忽略 */
+  }
+  setStatus({ summary: null, lastSyncAt: null, failed: false })
 }
 
 export async function openCalendarSettings(): Promise<void> {

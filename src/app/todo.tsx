@@ -644,7 +644,7 @@ export function CameraPage({
 
 /* ---------------- 相册 ---------------- */
 
-export function PickerPage({ onBack, onDone }: { onBack: () => void; onDone: (photos: CapturedPhoto[]) => void }) {
+export function PickerPage({ onBack, onDone, single }: { onBack: () => void; onDone: (photos: CapturedPhoto[]) => void; single?: boolean }) {
   const [items, setItems] = useState<GalleryItem[]>([])
   const [page, setPage] = useState(0)
   const [more, setMore] = useState(true)
@@ -721,14 +721,16 @@ export function PickerPage({ onBack, onDone }: { onBack: () => void; onDone: (ph
               return (
                 <button
                   key={it.id}
-                  onClick={() => setPicked((cur) => (n >= 0 ? cur.filter((x) => x !== it.id) : [...cur, it.id]))}
+                  onClick={() => setPicked((cur) => (n >= 0 ? cur.filter((x) => x !== it.id) : single ? [it.id] : [...cur, it.id]))}
                   className="relative aspect-square overflow-hidden rounded-[6px]"
                 >
                   <img src={it.thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
                   {n >= 0 ? (
                     <>
                       <span className="absolute inset-0 rounded-[6px] ring-[2.5px] ring-inset ring-(--c-accent)" style={{ background: 'color-mix(in srgb, var(--c-accent) 18%, transparent)' }} />
-                      <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-(--c-accent) text-[11px] font-extrabold text-white">{n + 1}</span>
+                      <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-(--c-accent) text-[11px] font-extrabold text-white">
+                        {single ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg> : n + 1}
+                      </span>
                     </>
                   ) : (
                     <span className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full border-[1.5px] border-white/80" style={{ background: 'rgba(0,0,0,.25)' }} />
@@ -741,7 +743,7 @@ export function PickerPage({ onBack, onDone }: { onBack: () => void; onDone: (ph
       </div>
 
       <div className="flex-none px-5 pt-3 pb-8">
-        <PrimaryButton onDark disabled={picked.length === 0} busy={busy} onClick={() => void add()}>添加 {picked.length} 张</PrimaryButton>
+        <PrimaryButton onDark disabled={picked.length === 0} busy={busy} onClick={() => void add()}>{single ? '使用这张' : `添加 ${picked.length} 张`}</PrimaryButton>
       </div>
     </Page>
   )

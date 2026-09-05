@@ -1389,7 +1389,144 @@ const meGroups: [string, [string, string][]][] = [
     ['外观', '跟随系统'],
     ['分享课表', ''],
   ]],
+  ['数据', [
+    ['清除数据', ''],
+  ]],
 ]
+
+/* ---------------- 个人资料 / 统计 / 清除数据 ---------------- */
+
+function SubHead({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="px-5">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19 8 12l7-7" /></svg>
+      </div>
+      <h1 className="mt-4 text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">{title}</h1>
+      {sub && <div className="mt-1.5 text-[13px] leading-[1.5] font-medium text-(--c-ink4)">{sub}</div>}
+    </div>
+  )
+}
+
+const CAM = <g><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.2-2h5.6L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" /><circle cx="12" cy="12.5" r="3.2" /></g>
+
+function CamBadge({ className }: { className: string }) {
+  return (
+    <span className={`grid place-items-center rounded-full ${className}`}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">{CAM}</svg>
+    </span>
+  )
+}
+
+function ProfileScreen() {
+  return (
+    <Phone>
+      <div className="flex-1 overflow-hidden pt-12">
+        <SubHead title="个人资料" />
+        <div className="mt-6 px-5">
+          <div className="relative h-[172px] overflow-hidden rounded-[18px] bg-[#5d6d55]">
+            <img src="/wall.jpg" alt="" className="h-full w-full object-cover object-[50%_32%]" />
+            <div className="absolute inset-x-0 bottom-0 h-[96px] bg-gradient-to-t from-black/50 to-transparent" />
+            <CamBadge className="absolute top-3 right-3 h-[28px] w-[28px] bg-black/35 text-white backdrop-blur-md" />
+            <div className="absolute bottom-4 left-4 h-[64px] w-[64px]">
+              <img src="/avatar.jpg" alt="" className="h-full w-full rounded-full border-2 border-white/90 object-cover" />
+              <CamBadge className="absolute -right-0.5 -bottom-0.5 h-[24px] w-[24px] bg-(--c-ink) text-(--c-bg) ring-2 ring-white" />
+            </div>
+          </div>
+          <div className="mt-5 flex items-baseline rounded-[16px] bg-(--c-surface) px-4 py-3">
+            <span className="w-[62px] flex-none text-[12.5px] font-medium text-(--c-ink4)">名称</span>
+            <span className="text-[14px] font-semibold text-(--c-ink)">李思远</span>
+          </div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+/* [颜色, 课名, 已上, 全部, 老师, 学分, 每周节数, 请假次数] */
+const statsCourses: [string, string, number, number, string, number, number, number][] = [
+  ['var(--c-accent)', '高等数学', 36, 96, '王建国', 4, 6, 2],
+  ['var(--c-rose)', '线性代数', 24, 64, '刘娜', 3, 4, 0],
+  ['var(--c-amber)', '大学英语', 24, 64, '周敏', 2, 4, 0],
+  ['#4F8A6B', '数据结构', 20, 64, '张伟', 3, 4, 1],
+]
+
+function StatsScreen() {
+  return (
+    <Phone>
+      <div className="flex-1 overflow-hidden pt-12">
+        <SubHead title="统计" />
+        <div className="mt-6 px-5">
+          <div className="rounded-[18px] bg-(--c-surface) px-4 pt-4 pb-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[22px] font-extrabold tracking-[-.02em] text-(--c-ink)">第 6 周</span>
+              <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">共 18 周</span>
+            </div>
+            <div className="mt-3 h-[5px] overflow-hidden rounded-full bg-(--c-surface2)">
+              <div className="h-full w-1/3 rounded-full bg-(--c-ink)" />
+            </div>
+            <div className="mt-3.5 flex gap-3 text-[12.5px] font-medium tabular-nums text-(--c-ink3)">
+              <span>12 门课</span><span>24 学分</span><span>每周 22 节</span>
+            </div>
+          </div>
+          <div className="mt-5">
+            <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">必修</div>
+            <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+              {statsCourses.map(([c, n, done, total, t, cr, w, leave], i) => (
+                <div key={n} className={`py-3.5 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
+                  <div className="flex items-baseline">
+                    <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{n}</span>
+                    <span className="ml-3 text-[12.5px] font-semibold tabular-nums text-(--c-ink3)">{done} / {total} 节</span>
+                  </div>
+                  <div className="mt-2 h-[4px] overflow-hidden rounded-full bg-(--c-surface2)">
+                    <div className="h-full rounded-full" style={{ width: `${(done / total) * 100}%`, background: c }} />
+                  </div>
+                  <div className="mt-1.5 flex items-baseline text-[12px] font-medium tabular-nums text-(--c-ink4)">
+                    <span className="flex flex-1 gap-2.5"><span>{t}</span><span>{cr} 学分</span><span>每周 {w} 节</span></span>
+                    {leave > 0 && <span className="ml-3 text-(--c-danger)">请假 {leave} 次</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-5">
+            <div className="px-0.5 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">本学期</div>
+            <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+              {([['第一节有课', '每周 3 天', false], ['作业', '5 / 7 已完成', true], ['考试', '2 场', true], ['请假', '3 次', true], ['调课', '1 次', true]] as [string, string, boolean][]).map(([k, v, go], i) => (
+                <div key={k} className={`flex items-center py-3.5 ${i ? 'border-t border-(--c-surface2)' : ''}`}>
+                  <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}</span>
+                  <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{v}</span>
+                  {go && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.2" className="ml-2"><path d="m9 5 7 7-7 7" /></svg>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+function EraseScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col pt-12">
+        <SubHead title="清除数据" sub="卸载应用不会移除系统日历中的内容。" />
+        <div className="mt-6 px-5">
+          <div className="rounded-[18px] bg-(--c-surface) px-4">
+            {['课表、课程和调整', '作业和照片', '系统日历中由本应用创建的日历'].map((t, i) => (
+              <div key={t} className={`py-3.5 text-[14px] font-semibold text-(--c-ink) ${i ? 'border-t border-(--c-line2)' : ''}`}>{t}</div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-auto" />
+      </div>
+      <div className="px-5 pb-6">
+        <button className="w-full rounded-[18px] bg-(--c-danger) py-[15px] text-[15px] font-bold text-white">清除全部数据</button>
+      </div>
+    </Phone>
+  )
+}
 
 function MeScreen() {
   return (
@@ -2790,6 +2927,9 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['detail-todo', '课程详情 · 作业与备忘', () => <DetailScreen tall />],
   ['todo2-classend', '今天 · 刚下课', () => <Todo2ClassEndScreen />],
   ['me', '我的', () => <MeScreen />],
+  ['profile', '个人资料', () => <ProfileScreen />],
+  ['stats', '统计', () => <StatsScreen />],
+  ['erase', '清除数据', () => <EraseScreen />],
   ['lock', '锁屏', () => <LockScreen />],
   ['notif', '提醒', () => <NotifPrefScreen />],
   ['calendar-intro', '同步至系统日历', () => <CalendarIntroScreen />],
