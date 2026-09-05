@@ -1480,9 +1480,11 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
       </div>
       <div className="relative flex-1 overflow-y-auto pb-[130px] [scrollbar-width:none]">
         <div ref={meHero} className="relative h-[258px] overflow-hidden bg-[#5d6d55]">
-          <img src={wall} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_32%]" />
-          <div className="absolute inset-x-0 bottom-0 h-[150px] bg-gradient-to-t from-(--c-bg) via-(--c-bg)/70 to-transparent" />
-          <div className="absolute inset-x-0 top-0 h-[92px] bg-gradient-to-b from-black/25 to-transparent" />
+          <button onClick={() => onPage('profile')} className="absolute inset-0 transition-opacity active:opacity-85">
+            <img src={wall} alt="" className="h-full w-full object-cover object-[50%_32%]" />
+          </button>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[150px] bg-gradient-to-t from-(--c-bg) via-(--c-bg)/70 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[92px] bg-gradient-to-b from-black/25 to-transparent" />
           <button onClick={() => onPage('profile')} className="absolute inset-x-5 bottom-3 flex items-end text-left transition-opacity active:opacity-70">
             <img src={avatar} alt="" className="h-[62px] w-[62px] flex-none rounded-full border-[1.5px] border-(--c-bg) bg-(--c-accent) object-cover" />
             <div className="mb-1 ml-3.5 flex-1">
