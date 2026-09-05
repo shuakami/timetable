@@ -1534,11 +1534,11 @@ function LockScreen() {
 const notifPrefs: [string, [string, string][]][] = [
   ['上课', [
     ['上课前提醒', '15 分钟'],
-    ['早课再提前', '提前 30 分钟'],
+    ['首节课额外提醒', '30 分钟'],
   ]],
   ['作业与考试', [
     ['作业截止前', '1 天、2 小时'],
-    ['考试前', '前 7 天、前 3 天、前 1 天、当天早上'],
+    ['考试前', '7 天、3 天、1 天及当天'],
   ]],
 ]
 
@@ -1548,14 +1548,10 @@ function NotifPrefScreen() {
       <div className="flex-1 overflow-hidden pt-12">
         <div className="px-5">
           <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">提醒</h1>
-          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">上课前、作业截止前、考试前，由手机日历提醒。</div>
         </div>
         <div className="mt-6 px-5">
           <div className="flex items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5">
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-semibold text-(--c-ink)">已在手机日历里</div>
-              <div className="mt-0.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">8 门课、3 项作业、1 场考试</div>
-            </div>
+            <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">已同步至系统日历</span>
             <span className="text-[12.5px] font-bold text-(--c-accent)">打开日历</span>
           </div>
         </div>
@@ -1587,10 +1583,10 @@ function NotifPrefScreen() {
 
 /* ---------------- 首次：加进手机日历 ---------------- */
 
-const calendarIntroRows: [string, string, string, string][] = [
-  ['var(--c-accent)', '上课', '8 门课', '前 15 分钟'],
-  ['var(--c-amber)', '作业', '3 项', '截止前 1 天、2 小时'],
-  ['var(--c-rose)', '考试', '1 场', '前 7 天、前 3 天、前 1 天、当天早上'],
+const calendarIntroRows: [string, string, string][] = [
+  ['var(--c-accent)', '上课', '提前 15 分钟'],
+  ['var(--c-amber)', '作业', '提前 1 天、2 小时'],
+  ['var(--c-rose)', '考试', '提前 7 天、3 天、1 天及当天'],
 ]
 
 function CalendarIntroScreen() {
@@ -1598,15 +1594,14 @@ function CalendarIntroScreen() {
     <Phone>
       <div className="flex flex-1 flex-col pt-12">
         <div className="px-5">
-          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">加进手机日历</h1>
-          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">到点由手机日历提醒；课表、作业变了，日历跟着变。</div>
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">同步至系统日历</h1>
         </div>
         <div className="mt-6 px-5">
           <div className="rounded-[18px] bg-(--c-surface) px-4">
-            {calendarIntroRows.map(([c, k, n, v], i) => (
+            {calendarIntroRows.map(([c, k, v], i) => (
               <div key={k} className={`flex items-center py-3.5 ${i ? 'border-t border-(--c-line2)' : ''}`}>
                 <i className="mr-3 h-[9px] w-[9px] flex-none rounded-full" style={{ background: c }} />
-                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}<span className="ml-1.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{n}</span></span>
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}</span>
                 <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{v}</span>
               </div>
             ))}
@@ -1615,7 +1610,7 @@ function CalendarIntroScreen() {
         <div className="mt-auto" />
       </div>
       <div className="px-5 pb-6">
-        <button className="w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white">加入</button>
+        <button className="w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white">开启同步</button>
       </div>
     </Phone>
   )
@@ -2802,7 +2797,7 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['me', '我的', () => <MeScreen />],
   ['lock', '锁屏', () => <LockScreen />],
   ['notif', '提醒', () => <NotifPrefScreen />],
-  ['calendar-intro', '加进手机日历', () => <CalendarIntroScreen />],
+  ['calendar-intro', '同步至系统日历', () => <CalendarIntroScreen />],
   ['widget', '桌面小组件', () => <WidgetScreen />],
   ['widget2', '小组件样式', () => <WidgetScreen2 />],
   ['freeday', '今天没有课', () => <FreeDayScreen />],

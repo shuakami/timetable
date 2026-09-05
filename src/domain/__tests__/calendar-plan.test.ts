@@ -3,7 +3,7 @@ import type { Semester, Task } from '../types'
 import { defaultPrefs } from '../types'
 import type { Snapshot } from '../engine'
 import { weeksToMask } from '../weeks'
-import { calendarOf, eventHash, planCalendar, summarize, type DesiredEvent } from '../calendar-plan'
+import { EXAM_CALENDAR, TASK_CALENDAR, WEEK_CALENDAR, calendarsFor, courseCalendar, eventHash, planCalendar, summarize, type DesiredEvent } from '../calendar-plan'
 
 /** 课程/作业/考试事件（不含每周一的「第 N 周」） */
 const noWeeks = (ev: DesiredEvent[]) => ev.filter((e) => e.kind !== 'week')
@@ -41,6 +41,7 @@ describe('课程', () => {
     expect(e.event.title).toBe('高等数学')
     expect(e.event.location).toBe('教三 302')
     expect(e.event.description).toBe('王立群')
+    expect(e.calendar).toBe(courseCalendar('c1'))
     expect(e.event.rrule).toBe('FREQ=WEEKLY;INTERVAL=1;BYDAY=MO;COUNT=8')
     expect(e.event.duration).toBe('PT100M')
     expect(e.event.exdate).toBeUndefined()
@@ -97,7 +98,21 @@ describe('课程', () => {
     expect(weeks).toHaveLength(8)
     expect(weeks[0].event).toMatchObject({ title: '第 1 周', allDay: true, start: Date.UTC(2026, 7, 31) })
     expect(weeks[0].reminders).toEqual([])
-    expect(calendarOf('week')).toBe('tt.course')
+    expect(weeks[0].calendar).toBe(WEEK_CALENDAR)
+  })
+
+  it('每门课一本日历、用课程颜色；作业、考试、周次各一本', () => {
+    const c2 = { ...course, id: 'c2', name: '线性代数', color: '#B98A2F' }
+    const r2 = { ...weekly, id: 'r2', courseId: 'c2', weekday: 3 as const }
+    const ev = planCalendar(snap({ courses: [course, c2], rules: [weekly, r2] }), [{ ...base, due: '2026-09-10' }, { ...base, id: 'x', kind: 'exam', due: '2026-09-11' }], prefs, now)
+    const cals = calendarsFor(ev, snap({ courses: [course, c2] }))
+    expect(cals.map((c) => [c.slug, c.name, c.color])).toEqual([
+      [courseCalendar('c1'), '课程表 高等数学', '#4F5BD5'],
+      [courseCalendar('c2'), '课程表 线性代数', '#B98A2F'],
+      [WEEK_CALENDAR, '课程表 周次', undefined],
+      [TASK_CALENDAR, '课程表 作业', undefined],
+      [EXAM_CALENDAR, '课程表 考试', undefined],
+    ])
   })
 })
 
@@ -108,8 +123,8 @@ describe('作业与考试', () => {
     const s = snap({ courses: [course] })
     const [timed] = noWeeks(planCalendar(s, [{ ...base, due: '2026-09-10', dueMinutes: 21 * 60 }], prefs, now))
     expect(timed.kind).toBe('task')
-    expect(calendarOf(timed.kind)).toBe('tt.task')
-    expect(timed.event.title).toBe('第三章习题 · 高等数学')
+    expect(timed.calendar).toBe(TASK_CALENDAR)
+    expect(timed.event.title).toBe('第三章习题（高等数学）')
     expect(timed.event.allDay).toBe(false)
     expect(timed.event.start).toBe(new Date('2026-09-10T21:00:00').getTime())
     expect(timed.reminders).toEqual([120, 1440])
@@ -135,11 +150,11 @@ describe('作业与考试', () => {
     const exam: Task = { ...base, id: 'e', kind: 'exam', title: '期中', due: '2026-10-20', dueMinutes: 14 * 60, endMinutes: 16 * 60, location: '教一 101', seat: '23' }
     const [e] = noWeeks(planCalendar(snap({ courses: [course] }), [exam], prefs, now))
     expect(e.kind).toBe('exam')
-    expect(calendarOf(e.kind)).toBe('tt.exam')
-    expect(e.event.title).toBe('期中考试 · 高等数学')
+    expect(e.calendar).toBe(EXAM_CALENDAR)
+    expect(e.event.title).toBe('期中考试（高等数学）')
     const [named] = noWeeks(planCalendar(snap({ courses: [course] }), [{ ...exam, title: '期末考' }], prefs, now))
-    expect(named.event.title).toBe('期末考 · 高等数学')
-    expect(e.event.location).toBe('教一 101 · 座位 23')
+    expect(named.event.title).toBe('期末考（高等数学）')
+    expect(e.event.location).toBe('教一 101 座位 23')
     expect(e.event.end! - e.event.start).toBe(2 * 60 * 60000)
     // 7/3/1 天前早 8 点 + 当天早 8 点
     expect(e.reminders).toEqual([360, 1800, 4680, 10440])

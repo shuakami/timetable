@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { calendarOf, eventHash, planCalendar, summarize, type CalendarEventBody, type CalendarSlug, type CalendarSummary, type DesiredEvent } from '../domain/calendar-plan'
+import { EXAM_CALENDAR, TASK_CALENDAR, WEEK_CALENDAR, calendarsFor, eventHash, planCalendar, summarize, type CalendarEventBody, type CalendarSpec, type CalendarSummary, type DesiredEvent } from '../domain/calendar-plan'
 import { store } from './store'
 
 /* 系统日历：课、作业、考试各写进应用自己的一本本地日历，提醒由系统日历发出。
@@ -24,16 +24,10 @@ interface WriteItem {
   reminders: number[]
 }
 
-interface CalendarSpec {
-  slug: CalendarSlug
-  name: string
-  color: string
-}
-
 interface TtCalendarPlugin {
   checkPermission(): Promise<{ status: CalendarPermission }>
   requestPermission(): Promise<{ status: CalendarPermission }>
-  ensureCalendars(o: { calendars: CalendarSpec[] }): Promise<{ ids: Record<string, number> }>
+  ensureCalendars(o: { calendars: (CalendarSpec & { color: string })[] }): Promise<{ ids: Record<string, number> }>
   readAll(): Promise<{ events: RemoteEvent[] }>
   apply(o: { inserts: WriteItem[]; updates: (WriteItem & { id: number })[]; deletes: number[] }): Promise<{ inserted: number; updated: number; deleted: number }>
   hasCalendarApp(): Promise<{ available: boolean }>
@@ -77,11 +71,6 @@ export function useCalendarStatus(): CalendarStatus {
   )
 }
 
-/** 现在会写进日历的内容（不需要权限，直接从 Store 算） */
-export function calendarPreview(): CalendarSummary {
-  return summarize(planCalendar(store.snapshot(), store.state.tasks, store.state.prefs, new Date()))
-}
-
 /* ---------------- 权限 ---------------- */
 
 export async function calendarPermission(): Promise<CalendarPermission> {
@@ -121,17 +110,19 @@ function cssColor(name: string, fallback: string): string {
   return fallback
 }
 
-/** 三本日历：在系统日历的列表里挨着排，颜色跟应用里一致 */
-function calendarSpecs(): CalendarSpec[] {
-  return [
-    { slug: 'tt.course', name: '课程表 · 上课', color: cssColor('--c-accent', '#4F5BD5') },
-    { slug: 'tt.task', name: '课程表 · 作业', color: cssColor('--c-amber', '#B98A2F') },
-    { slug: 'tt.exam', name: '课程表 · 考试', color: cssColor('--c-rose', '#DE5B78') },
-  ]
+/** 每门课一本（课程颜色），作业 / 考试 / 周次各一本，颜色跟应用里一致 */
+function withColors(specs: CalendarSpec[]): (CalendarSpec & { color: string })[] {
+  const fixed: Record<string, string> = {
+    [TASK_CALENDAR]: cssColor('--c-amber', '#B98A2F'),
+    [EXAM_CALENDAR]: cssColor('--c-rose', '#DE5B78'),
+    [WEEK_CALENDAR]: cssColor('--c-ink4', '#8A8E97'),
+  }
+  const accent = cssColor('--c-accent', '#4F5BD5')
+  return specs.map((c) => ({ ...c, color: c.color ?? fixed[c.slug] ?? accent }))
 }
 
 function toWrite(e: DesiredEvent, ids: Record<string, number>): WriteItem {
-  return { calendarId: ids[calendarOf(e.kind)], key: e.key, hash: eventHash(e), event: e.event, reminders: e.reminders }
+  return { calendarId: ids[e.calendar], key: e.key, hash: eventHash(e), event: e.event, reminders: e.reminders }
 }
 
 function chunks<T>(list: T[], n: number): T[][] {
@@ -148,8 +139,9 @@ async function doSync(): Promise<void> {
   if (perm !== 'granted') return
   setStatus({ syncing: true })
   try {
-    const { ids } = await TtCalendar.ensureCalendars({ calendars: calendarSpecs() })
-    const desired = planCalendar(store.snapshot(), store.state.tasks, store.state.prefs, new Date())
+    const snap = store.snapshot()
+    const desired = planCalendar(snap, store.state.tasks, store.state.prefs, new Date())
+    const { ids } = await TtCalendar.ensureCalendars({ calendars: withColors(calendarsFor(desired, snap)) })
     const { events: remote } = await TtCalendar.readAll()
 
     const byKey = new Map<string, RemoteEvent>()

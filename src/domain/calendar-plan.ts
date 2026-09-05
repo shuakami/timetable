@@ -27,15 +27,38 @@ export interface CalendarEventBody {
 
 export type DesiredKind = 'course' | 'task' | 'exam' | 'week'
 
-/** 每种内容各写一本日历，在系统日历里分开显示、各有颜色 */
-export type CalendarSlug = 'tt.course' | 'tt.task' | 'tt.exam'
+/** 每门课一本日历（用课程自己的颜色），作业、考试、周次各一本 */
+export type CalendarSlug = string
+export const courseCalendar = (courseId: string): CalendarSlug => `tt.c.${courseId}`
+export const TASK_CALENDAR: CalendarSlug = 'tt.task'
+export const EXAM_CALENDAR: CalendarSlug = 'tt.exam'
+export const WEEK_CALENDAR: CalendarSlug = 'tt.week'
+export const OTHER_CALENDAR: CalendarSlug = 'tt.course'
 
-export const calendarOf = (kind: DesiredKind): CalendarSlug =>
-  kind === 'task' ? 'tt.task' : kind === 'exam' ? 'tt.exam' : 'tt.course'
+export interface CalendarSpec {
+  slug: CalendarSlug
+  name: string
+  /** 课程自己的颜色；作业 / 考试 / 周次由调用方按主题填 */
+  color?: string
+}
+
+/** 期望事件用到的全部日历 */
+export function calendarsFor(events: DesiredEvent[], snap: Snapshot | null): CalendarSpec[] {
+  const byId = new Map((snap?.courses ?? []).map((c) => [courseCalendar(c.id), c]))
+  const out = new Map<CalendarSlug, CalendarSpec>()
+  for (const e of events) {
+    if (out.has(e.calendar)) continue
+    const c = byId.get(e.calendar)
+    const name = c ? c.name : e.calendar === TASK_CALENDAR ? '作业' : e.calendar === EXAM_CALENDAR ? '考试' : e.calendar === WEEK_CALENDAR ? '周次' : '上课'
+    out.set(e.calendar, { slug: e.calendar, name: `课程表 ${name}`, color: c?.color })
+  }
+  return [...out.values()]
+}
 
 export interface DesiredEvent {
   key: string
   kind: DesiredKind
+  calendar: CalendarSlug
   event: CalendarEventBody
   /** 提前多少分钟提醒（去重、升序） */
   reminders: Minutes[]
@@ -92,7 +115,7 @@ function examLeadsAllDay(days: number[]): Minutes[] {
 }
 
 function joinLocation(parts: (string | undefined)[]): string | undefined {
-  const s = parts.filter((x): x is string => !!x && x.trim().length > 0).map((x) => x.trim()).join(' · ')
+  const s = parts.filter((x): x is string => !!x && x.trim().length > 0).map((x) => x.trim()).join(' ')
   return s.length > 0 ? s : undefined
 }
 
@@ -107,8 +130,11 @@ interface SeriesItem {
   startPeriod: number
   endPeriod: number
   link?: string
+  courseId?: string
   reminders: Minutes[]
 }
+
+const courseSlug = (courseId?: string): CalendarSlug => (courseId ? courseCalendar(courseId) : OTHER_CALENDAR)
 
 function classReminders(prefs: Prefs, start: Minutes): Minutes[] {
   const out = [prefs.classLead]
@@ -120,6 +146,7 @@ function single(key: string, it: SeriesItem, tz: string, suffix = ''): DesiredEv
   return {
     key,
     kind: 'course',
+    calendar: courseSlug(it.courseId),
     event: {
       title: `${it.name}${suffix}`,
       location: it.location,
@@ -162,6 +189,7 @@ function series(keyBase: string, items: SeriesItem[], tz: string): DesiredEvent[
   return [{
     key: keyBase,
     kind: 'course',
+    calendar: courseSlug(first.courseId),
     event: {
       title: first.name,
       location: first.location,
@@ -198,7 +226,7 @@ function planCourses(snap: Snapshot, prefs: Prefs, tz: string): DesiredEvent[] {
       const item: SeriesItem = {
         date, start: o.start, end: o.end, name: o.name,
         location: o.location, teacher: o.teacher, color: o.color,
-        startPeriod: o.startPeriod, endPeriod: o.endPeriod, link,
+        startPeriod: o.startPeriod, endPeriod: o.endPeriod, link, courseId: o.courseId,
         reminders: o.muted ? [] : classReminders(prefs, o.start),
       }
       if (o.status === 'moved') {
@@ -240,6 +268,7 @@ function planWeeks(snap: Snapshot, tz: string): DesiredEvent[] {
     out.push({
       key: `w:${w}`,
       kind: 'week',
+      calendar: WEEK_CALENDAR,
       event: { title: `第 ${w} 周`, start, end: start + DAY_MIN * 60000, allDay: true, tz, busy: false, link: `timetable://open/day/${monday}` },
       reminders: [],
     })
@@ -256,7 +285,7 @@ function planTasks(tasks: Task[], courseName: Map<string, string>, courseColor: 
     const color = t.courseId ? courseColor.get(t.courseId) : undefined
     const isExam = t.kind === 'exam'
     const name = t.title.trim()
-    const title = `${isExam && !name.includes('考') ? `${name}考试` : name}${course ? ` · ${course}` : ''}`
+    const title = `${isExam && !name.includes('考') ? `${name}考试` : name}${course ? `（${course}）` : ''}`
     const location = isExam ? joinLocation([t.location, t.seat ? `座位 ${t.seat}` : undefined]) : joinLocation([t.location])
     const link = `timetable://open/task/${t.id}`
     const description = t.note?.trim() || undefined
@@ -274,7 +303,7 @@ function planTasks(tasks: Task[], courseName: Map<string, string>, courseColor: 
       body = { title, location, description, start, end: atMinutes(t.due, endMin), allDay: false, tz, color, busy: isExam, link }
       reminders = isExam ? examLeadsTimed(prefs.examDays, startMin) : timedLeads(prefs.taskLeads)
     }
-    out.push({ key: `t:${t.id}`, kind: isExam ? 'exam' : 'task', event: body, reminders })
+    out.push({ key: `t:${t.id}`, kind: isExam ? 'exam' : 'task', calendar: isExam ? EXAM_CALENDAR : TASK_CALENDAR, event: body, reminders })
   }
   return out
 }
