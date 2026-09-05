@@ -226,6 +226,10 @@ public class TtCamera extends Plugin {
             try {
                 provider = future.get();
                 provider.unbindAll();
+                if (previewView == null || frame == null) {
+                    if (call != null) call.reject("stopped");
+                    return;
+                }
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
                 capture = new ImageCapture.Builder()
@@ -298,8 +302,9 @@ public class TtCamera extends Plugin {
     public void stop(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             if (provider != null) provider.unbindAll();
-            if (frame != null && frame.getParent() != null) {
-                ((ViewGroup) frame.getParent()).removeView(frame);
+            if (frame != null) {
+                frame.animate().cancel();
+                if (frame.getParent() != null) ((ViewGroup) frame.getParent()).removeView(frame);
             }
             frame = null;
             previewView = null;

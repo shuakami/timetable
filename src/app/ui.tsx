@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { AnimatePresence, animate, motion, useMotionValue, type MotionValue } from 'motion/react'
 import { weekdayOf } from '../domain/dates'
+import { useImeShrink } from './ime'
 
 /* 动画参数：与 lexicon 一致 */
 export const SPRING = { type: 'spring', bounce: 0.2, duration: 0.6 } as const
@@ -35,11 +36,13 @@ export const NAV_ITEMS: [React.ReactNode, string][] = [
 ]
 
 export function Nav({ active, onTab, hidden }: { active: number; onTab: (i: number) => void; hidden?: boolean }) {
+  const shrink = useImeShrink()
   return (
+    <motion.div className="pointer-events-none absolute inset-x-0 bottom-0 z-[8]" style={{ y: shrink }}>
     <motion.div
       animate={{ y: hidden ? 130 : 0, opacity: hidden ? 0 : 1 }}
       transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-      className="pointer-events-none absolute inset-x-0 bottom-[max(24px,env(safe-area-inset-bottom))] z-[8] flex justify-center px-4"
+      className="pointer-events-none absolute inset-x-0 bottom-[max(24px,env(safe-area-inset-bottom))] flex justify-center px-4"
     >
       <div className="pointer-events-auto flex w-[92%] items-center justify-between rounded-full p-[5px]" style={dockStyle}>
         {NAV_ITEMS.map(([ic, label], i) => {
@@ -63,6 +66,7 @@ export function Nav({ active, onTab, hidden }: { active: number; onTab: (i: numb
           )
         })}
       </div>
+    </motion.div>
     </motion.div>
   )
 }
@@ -188,8 +192,9 @@ const BOTTOM_BANDS: [number, number, number][] = [
 const BOTTOM_VEIL = 'linear-gradient(to top, var(--c-bg) 0%, var(--c-bg) 42%, rgb(var(--c-bg-rgb) / .85) 66%, rgb(var(--c-bg-rgb) / 0) 100%)'
 
 export function BottomVeil({ height }: { height: number }) {
+  const shrink = useImeShrink()
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[7]" style={{ height }}>
+    <motion.div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[7]" style={{ height, y: shrink }}>
       {BOTTOM_BANDS.map(([r, a, b]) => {
         const mask = `linear-gradient(to top, #000 0%, #000 ${a}%, rgba(0,0,0,0) ${b}%)`
         return (
@@ -201,7 +206,7 @@ export function BottomVeil({ height }: { height: number }) {
         )
       })}
       <div className="absolute inset-0" style={{ background: BOTTOM_VEIL }} />
-    </div>
+    </motion.div>
   )
 }
 

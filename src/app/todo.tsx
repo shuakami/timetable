@@ -429,10 +429,17 @@ export function CameraPage({
   const video = useRef<HTMLDivElement>(null)
   const course = state.courses.find((c) => c.id === cid)
 
+  /** 每次开预览递增；start 返回时若已被 leave 抢先，立刻撤掉这次开出来的原生层 */
+  const previewGen = useRef(0)
   const startPreview = async () => {
     if (!frame.current) return
     zoom.current = 1
+    const gen = ++previewGen.current
     await camera.start('back', layoutRect(frame.current), SLIDE.duration * 1000)
+    if (gen !== previewGen.current || !previewOn.current) {
+      await camera.stop()
+      return
+    }
     const el = camera.webPreview()
     if (el && video.current) {
       el.className = 'h-full w-full object-cover'
@@ -475,6 +482,7 @@ export function CameraPage({
   const leave = async () => {
     if (!previewOn.current) return
     previewOn.current = false
+    previewGen.current++
     const f = await camera.freeze()
     if (f && mounted.current) {
       await new Promise<void>((ok) => {
@@ -489,12 +497,13 @@ export function CameraPage({
   useEffect(() => {
     if (!live) {
       if (previewOn.current) void leave()
+      else void camera.stop()
       return
     }
     let alive = true
     previewOn.current = true
     setBusy(false)
-    void startPreview().catch(() => { if (alive) setDenied(true) })
+    void startPreview().catch(() => { if (alive && previewOn.current) setDenied(true) })
     return () => {
       alive = false
       if (previewOn.current) void leave()

@@ -15,6 +15,8 @@ let fullH = typeof window === 'undefined' ? 0 : window.innerHeight
 const listeners = new Set<Listener>()
 
 const offset = () => Math.max(0, kb - Math.max(0, fullH - window.innerHeight))
+/** WebView 已经被键盘压短的那部分：贴底的底栏/遮罩往下补这么多，屏幕上位置不动、不会在压短那一帧跳上来 */
+const shrink = () => (kb > 0 ? Math.min(kb, Math.max(0, fullH - window.innerHeight)) : 0)
 const emit = () => { const o = offset(); listeners.forEach((l) => l(o)) }
 
 if (typeof window !== 'undefined') {
@@ -28,6 +30,18 @@ if (typeof window !== 'undefined') {
 
 /** 当前键盘相对 WebView 底边露出的高度（CSS px） */
 export const imeHeight = () => kb
+
+/** 贴底元素的 y（正值，往下）：键盘打开期间留在原屏幕位置，藏在键盘后面 */
+export function useImeShrink(): MotionValue<number> {
+  const y = useMotionValue(shrink())
+  useEffect(() => {
+    const l: Listener = () => y.set(shrink())
+    listeners.add(l)
+    l(0)
+    return () => { listeners.delete(l) }
+  }, [y])
+  return y
+}
 
 /** 返回跟随键盘的 y（负值，往上），挂到要贴着键盘的元素 style.y 上 */
 export function useImeY(): MotionValue<number> {

@@ -783,7 +783,7 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
     if (drag.current?.state === 'drag') return
     const pane = box.current
     if (!pane) return
-    drag.current = { x0: e.clientX, y0: e.clientY, w: pane.clientWidth - 20, state: 'pending', last: 0, t: e.timeStamp, v: 0 }
+    drag.current = { x0: e.clientX, y0: e.clientY, w: pane.clientWidth - 12, state: 'pending', last: 0, t: e.timeStamp, v: 0 }
   }
   const onMove = (e: React.PointerEvent) => {
     const d = drag.current
@@ -847,17 +847,19 @@ function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }
             onPointerMove={onMove}
             onPointerUp={onUp}
             onPointerCancel={onUp}
-            className="overflow-hidden rounded-[22px] bg-(--c-surface) p-2.5 pb-4 [touch-action:pan-y]"
+            className="overflow-hidden rounded-[22px] bg-(--c-surface) px-1.5 pt-2.5 pb-4 [touch-action:pan-y]"
           >
+            {/* 相邻周在这层裁掉：每周自带 4px 内边，选中标记外扩的 4px 不被切 */}
             <motion.div
               key={week}
               initial={swiped.current ? false : { opacity: 0, transform: `translateX(${dir * 28}px)` }}
               animate={{ opacity: 1, transform: 'translateX(0px)' }}
               transition={{ type: 'tween', ease: SWIPE_EASE, duration: 0.22 }}
+              className="-mx-1 overflow-hidden px-1"
             >
               <motion.div className="flex w-[300%] -ml-[100%] items-start" style={{ x }}>
                 {panes.map((w) => (
-                  <div key={w} className="w-1/3 flex-none">
+                  <div key={w} className="w-1/3 flex-none px-1">
                     {w >= 1 && w <= sem.totalWeeks && (
                       <WeekGrid
                         snap={snap}
