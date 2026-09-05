@@ -477,6 +477,14 @@ section {
   transform: rotate(-12deg);
   filter: var(--mascot-shadow);
 }
+/* 首屏要画出来的东西，脚本接手前先不显示，免得先闪一下再消失 */
+.pen .ld,
+.pen .note {
+  opacity: 0;
+}
+.pen .mascot-peek {
+  transform: translateY(44px) rotate(-2deg);
+}
 
 /* ============ 一天 ============ */
 .stops {

@@ -7,6 +7,10 @@
   "use strict";
 
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* index.html 里先给 <html> 加了 .pen，把首屏引线、批注、探头藏住；这里接手后再摘掉 */
+  function handoff() {
+    document.documentElement.classList.remove("pen");
+  }
 
   /* ---------- Lenis ---------- */
   var lenis = new Lenis({ duration: 1.1, smoothWheel: true });
@@ -22,6 +26,7 @@
   });
 
   if (reduce || typeof gsap === "undefined") {
+    handoff();
     (function raf(t) {
       lenis.raf(t);
       requestAnimationFrame(raf);
@@ -130,6 +135,8 @@
     var notesShown = notes.some(visible);
     if (notesShown) gsap.set(notes, { opacity: 0 });
     if (mascot) gsap.set(mascot, { y: 44, rotation: -2 });
+    /* 引线已被蒙版盖住、批注已是 opacity 0、探头已在下方：可以交还给行内样式 */
+    handoff();
 
     var tl = gsap.timeline({ paused: true });
     if (notesShown) {
