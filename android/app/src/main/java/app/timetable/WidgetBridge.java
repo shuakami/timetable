@@ -9,8 +9,6 @@ import android.graphics.Color;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.PowerManager;
-import android.provider.Settings;
 import android.os.Build;
 import android.widget.Toast;
 
@@ -189,104 +187,6 @@ public class WidgetBridge extends Plugin {
         String text = call.getString("text");
         Activity act = getActivity();
         if (text != null && act != null) act.runOnUiThread(() -> Toast.makeText(act, text, Toast.LENGTH_SHORT).show());
-        call.resolve();
-    }
-
-    /** 电池优化白名单：已在名单返回 ignoring=true，否则弹系统请求，失败退到应用详情页 */
-    @PluginMethod
-    public void requestIgnoreBatteryOptimizations(PluginCall call) {
-        Activity act = getActivity();
-        if (act == null) { call.reject("no activity"); return; }
-        PowerManager pm = (PowerManager) act.getSystemService(Activity.POWER_SERVICE);
-        boolean ignoring = pm != null && pm.isIgnoringBatteryOptimizations(act.getPackageName());
-        JSObject r = new JSObject();
-        r.put("ignoring", ignoring);
-        if (!ignoring) {
-            try {
-                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + act.getPackageName()));
-                act.startActivity(i);
-            } catch (Exception e) {
-                try {
-                    act.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + act.getPackageName())));
-                } catch (Exception ignored) { }
-            }
-        }
-        call.resolve(r);
-    }
-
-    /** 各家 ROM 的自启动管理页；按顺序试，都不在就退到应用详情页 */
-    private static final String[][] AUTOSTART = {
-        // ColorOS（OPPO / OnePlus / realme）
-        { "com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity" },
-        { "com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity" },
-        { "com.coloros.safecenter", "com.coloros.privacypermissionsentry.PermissionTopActivity" },
-        { "com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity" },
-        { "com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity" },
-        { "com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity" },
-        { "com.oplus.battery", "com.oplus.battery.ui.activity.PowerUsageModelActivity" },
-        // MIUI / HyperOS
-        { "com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity" },
-        // EMUI / HarmonyOS
-        { "com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity" },
-        { "com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity" },
-        // vivo
-        { "com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity" },
-        { "com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager" },
-        // Flyme
-        { "com.meizu.safe", "com.meizu.safe.permission.SmartBGActivity" },
-        // Samsung
-        { "com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity" },
-    };
-
-    @PluginMethod
-    public void openAutostartSettings(PluginCall call) {
-        Activity act = getActivity();
-        if (act == null) { call.reject("no activity"); return; }
-        String pkg = act.getPackageName();
-        for (String[] c : AUTOSTART) {
-            Intent i = new Intent().setComponent(new ComponentName(c[0], c[1]))
-                .putExtra("packageName", pkg)
-                .putExtra("package_name", pkg)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (i.resolveActivity(act.getPackageManager()) == null) continue;
-            try {
-                act.startActivity(i);
-                JSObject r = new JSObject();
-                r.put("vendor", true);
-                call.resolve(r);
-                return;
-            } catch (Exception ignored) { }
-        }
-        try {
-            act.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg)));
-        } catch (Exception ignored) { }
-        JSObject r = new JSObject();
-        r.put("vendor", false);
-        call.resolve(r);
-    }
-
-    /** 打开某通知渠道的系统设置页（横幅/悬浮/锁屏在这里开），Android 8 以下退到应用通知页 */
-    @PluginMethod
-    public void openChannelSettings(PluginCall call) {
-        Activity act = getActivity();
-        if (act == null) { call.reject("no activity"); return; }
-        String channelId = call.getString("channelId", "");
-        Intent i;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            i = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-                .putExtra(Settings.EXTRA_APP_PACKAGE, act.getPackageName())
-                .putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
-        } else {
-            i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + act.getPackageName()));
-        }
-        try {
-            act.startActivity(i);
-        } catch (Exception e) {
-            try {
-                act.startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, act.getPackageName()));
-            } catch (Exception ignored) { }
-        }
         call.resolve();
     }
 

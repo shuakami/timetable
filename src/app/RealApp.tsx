@@ -22,9 +22,8 @@ import {
 import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave } from './todo'
 import type { CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
-import { NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
-import { PermsPage } from './permissions'
-import { attachNotificationActions, notificationsAllowed, pushChange, requestNotifications, setNotificationRouter, syncNotifications } from './notify'
+import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
+import { calendarPermission, calendarSupported, scheduleCalendarSync, syncCalendar } from './calendar'
 import { nativeToast, syncWidgets } from './widgets'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
@@ -1202,18 +1201,12 @@ function ImportRunPage({ rule, initialText, onBack, onDone }: { rule: RuleManife
     const t0 = performance.now()
     const failed = pending.diagnostics.filter((d) => d.level === 'error').length
     const hadCourses = store.state.courses.length > 0
-    const diff = store.applyImport(pending.courses, {
+    store.applyImport(pending.courses, {
       id: uid(), semesterId: store.state.semester!.id,
       ruleId: rule.id, ruleName: rule.name, ruleVersion: rule.version,
       at: Date.now(), durationMs: Math.max(1, Math.round(performance.now() - t0)),
       failed, diagnostics: pending.diagnostics,
     })
-    if (hadCourses && store.state.prefs.importSummary && (diff.added.length > 0 || diff.removed.length > 0)) {
-      void pushChange(
-        '课表已更新',
-        [diff.added.length > 0 && `新增 ${diff.added.length} 门`, diff.removed.length > 0 && `移除 ${diff.removed.length} 门`].filter(Boolean).join('，'),
-      )
-    }
     onDone()
   }
 
@@ -1413,7 +1406,7 @@ function RuleEditorPage({ rule, onBack }: { rule: RuleManifest | null; onBack: (
 
 /* ---------------- 我的 ---------------- */
 
-type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'changes' | 'notif' | 'perms' | 'widget' | 'theme'
+type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'changes' | 'notif' | 'widget' | 'theme'
 
 const WIDGET_LABEL: Record<WidgetStyle, string> = {
   today: '今日课程',
@@ -1439,7 +1432,6 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
     ]],
     ['提醒', [
       ['上课提醒', `课前 ${state.prefs.classLead} 分钟`, 'notif'],
-      ['提醒与权限', '', 'perms'],
       ['作业提醒', taskLeadsText(state.prefs.taskLeads), 'notif'],
     ]],
     ['外观', [
@@ -1746,8 +1738,7 @@ function CoursesPage({ onBack, onDetail, onManual }: { onBack: () => void; onDet
 /* ---------------- 根 ---------------- */
 
 const ONBOARD_KEY = 'tt.onboarded.v1'
-const NOTIF_ASK_KEY = 'tt.notifAsked.v1'
-const PERMS_DONE_KEY = 'tt.perms.done.v1'
+const CAL_ASK_KEY = 'tt.calendarAsked.v1'
 
 type Route =
   | { k: 'course'; course: Course }
@@ -1769,7 +1760,7 @@ type Route =
   | { k: 'trash' }
   | { k: 'courses' }
   | { k: 'notif' }
-  | { k: 'perms' }
+  | { k: 'calendarIntro' }
   | { k: 'notifPick'; pref: PrefKey }
   | { k: 'widget' }
   | { k: 'theme' }
@@ -1812,41 +1803,44 @@ export default function RealApp() {
     return () => clearInterval(t)
   }, [])
 
-  /* 通知与小组件跟着数据走：Store 一变就重排、重画 */
+  /* 手机日历与小组件跟着数据走：Store 一变就重写、重画；回到前台再对一遍 */
   useEffect(() => {
-    attachNotificationActions()
-    setNotificationRouter((to) => {
-      setStack([])
-      setTab(to === 'changes' ? 3 : to === 'todo' ? 2 : 0)
-      if (to === 'changes') setStack([{ k: 'changes' }])
-    })
     let timer: number | null = null
     const run = () => {
+      scheduleCalendarSync()
       if (timer != null) window.clearTimeout(timer)
-      timer = window.setTimeout(() => {
-        void syncNotifications()
-        void syncWidgets()
-      }, 400)
+      timer = window.setTimeout(() => void syncWidgets(), 400)
     }
-    void (async () => {
-      if (!(await notificationsAllowed())) {
-        try {
-          if (localStorage.getItem(NOTIF_ASK_KEY) !== '1') {
-            localStorage.setItem(NOTIF_ASK_KEY, '1')
-            await requestNotifications()
-          }
-        } catch {
-          /* 忽略 */
-        }
-      }
-      run()
-    })()
+    run()
     const off = store.subscribe(run)
-    const onResume = CapApp.addListener('resume', run)
+    const onResume = CapApp.addListener('resume', () => {
+      void syncCalendar()
+      void syncWidgets()
+    })
+    /* 日历事件里的「在应用中打开」 */
+    const onUrl = CapApp.addListener('appUrlOpen', ({ url }) => {
+      const m = /^timetable:\/\/open\/(course|task|day)\/([^/?#]+)/.exec(url)
+      if (!m) return
+      const [, kind, id] = m
+      setMenu(null)
+      if (kind === 'course') {
+        const c = store.state.courses.find((x) => x.id === id)
+        setTab(0)
+        setStack(c ? [{ k: 'course', course: c }] : [])
+      } else if (kind === 'task') {
+        const t = store.state.tasks.find((x) => x.id === id)
+        setTab(2)
+        setStack(t ? [{ k: 'todoDetail', task: t }] : [])
+      } else {
+        setTab(0)
+        setStack([])
+      }
+    })
     return () => {
       off()
       if (timer != null) window.clearTimeout(timer)
       void onResume.then((h) => h.remove())
+      void onUrl.then((h) => h.remove())
     }
   }, [])
 
@@ -1909,13 +1903,24 @@ export default function RealApp() {
       /* 忽略 */
     }
     setOnboarded(true)
-    /* 首次完成引导时：自动推一次「开启提醒」 */
-    try {
-      if (localStorage.getItem(PERMS_DONE_KEY) !== '1') {
-        setStack((s) => [...s, { k: 'perms' }])
-      }
-    } catch { /* 忽略 */ }
   }, [onboardUnder, stack.length])
+
+  /* 有课表、还没加进手机日历：推一次「加进手机日历」，之后全自动 */
+  useEffect(() => {
+    if (!onboarded || onboardUnder || stack.length > 0 || !calendarSupported() || !state.prefs.calendar) return
+    if (state.courses.length === 0) return
+    try {
+      if (localStorage.getItem(CAL_ASK_KEY) === '1') return
+    } catch { return }
+    let alive = true
+    void calendarPermission().then((p) => {
+      if (!alive) return
+      try { localStorage.setItem(CAL_ASK_KEY, '1') } catch { /* 忽略 */ }
+      if (p === 'granted') void syncCalendar()
+      else if (p === 'prompt') setStack((s) => (s.length === 0 ? [{ k: 'calendarIntro' }] : s))
+    })
+    return () => { alive = false }
+  }, [onboarded, onboardUnder, stack.length, state.courses.length, state.prefs.calendar])
 
   /* 系统返回：先关浮层，再退内页，再回今天；引导期间退上一步 */
   const backRef = useRef<() => boolean>(() => false)
@@ -2049,8 +2054,8 @@ export default function RealApp() {
         return <TrashPage key={key} onBack={pop} />
       case 'notif':
         return <NotifPrefPage key={key} onBack={pop} onPick={(pref) => push({ k: 'notifPick', pref })} />
-      case 'perms':
-        return <PermsPage key={key} isFirstTime={false} onBack={pop} onFinish={pop} />
+      case 'calendarIntro':
+        return <CalendarIntroPage key={key} onDone={pop} />
       case 'notifPick':
         return <PrefPickPage key={key} pref={r.pref} onBack={pop} />
       case 'widget':
@@ -2073,7 +2078,6 @@ export default function RealApp() {
   const ovr = (kind: OverrideKind) => {
     if (!mo?.ruleId) return
     store.addOverride({ id: uid(), kind, date: mo.date, ruleId: mo.ruleId, createdAt: Date.now() })
-    if (kind === 'cancelled') void pushChange(`${md(mo.date)} ${mo.name} 停课`, [fmtMinutes(mo.start), mo.location].filter(Boolean).join('，'))
     setMenu(null)
   }
   const restore = () => {

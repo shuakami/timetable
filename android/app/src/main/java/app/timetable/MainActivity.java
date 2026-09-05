@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
         splash.setKeepOnScreenCondition(() -> !WidgetBridge.webReady && SystemClock.uptimeMillis() - start < SPLASH_MAX_MS);
         registerPlugin(WidgetBridge.class);
         registerPlugin(TtCamera.class);
+        registerPlugin(TtCalendar.class);
         super.onCreate(savedInstanceState);
         ThemeApply.applySaved(this, getBridge().getWebView());
         ImeFollow.install(this, getBridge().getWebView());

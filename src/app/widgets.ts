@@ -12,9 +12,6 @@ interface WidgetBridgePlugin {
   systemDark(): Promise<{ dark: boolean }>
   dynamicColors(): Promise<DynamicColors>
   toast(o: { text: string }): Promise<void>
-  requestIgnoreBatteryOptimizations(): Promise<{ ignoring: boolean }>
-  openChannelSettings(o: { channelId: string }): Promise<void>
-  openAutostartSettings(): Promise<{ vendor: boolean }>
   addListener(event: 'systemDark', cb: (o: { dark: boolean }) => void): Promise<PluginListenerHandle>
   addListener(event: 'dynamicColors', cb: (o: DynamicColors) => void): Promise<PluginListenerHandle>
 }
@@ -39,42 +36,6 @@ export function notifyWebReady(): void {
 export function syncNativeTheme(bg: string, light: boolean): void {
   if (!native()) return
   WidgetBridge.setTheme({ bg, light }).catch(() => undefined)
-}
-
-/** 请求加入电池优化白名单；已在名单返回 true */
-export async function requestIgnoreBattery(): Promise<boolean> {
-  if (!native()) return true
-  try {
-    return (await WidgetBridge.requestIgnoreBatteryOptimizations()).ignoring
-  } catch {
-    return false
-  }
-}
-
-/** 查询电池优化状态 */
-export async function batteryOptimizationsIgnored(): Promise<boolean> {
-  if (!native()) return true
-  try {
-    return (await WidgetBridge.requestIgnoreBatteryOptimizations()).ignoring
-  } catch {
-    return true
-  }
-}
-
-/** 打开自启动设置页（ColorOS / MIUI / Flyme 各有专属页）；没有专属页时打开应用详情，返回 false */
-export async function openAutostartSettings(): Promise<boolean> {
-  if (!native()) return false
-  try {
-    return (await WidgetBridge.openAutostartSettings()).vendor
-  } catch {
-    return false
-  }
-}
-
-/** 打开通知渠道的系统设置页 */
-export function openChannelSettings(channelId: string): void {
-  if (!native()) return
-  WidgetBridge.openChannelSettings({ channelId }).catch(() => undefined)
 }
 
 export function nativeToast(text: string): void {

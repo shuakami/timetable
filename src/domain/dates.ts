@@ -1,4 +1,4 @@
-import type { LocalDate, Semester } from './types'
+import type { LocalDate, Minutes, Semester } from './types'
 
 /* 本地日期工具：全部基于 'YYYY-MM-DD' 字符串与本地历法，不引入时区。 */
 
@@ -56,4 +56,11 @@ export function fmtDuration(min: number): string {
 export function fmtMinutes(min: number): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${p(Math.floor(min / 60))}:${p(min % 60)}`
+}
+
+/** 某一天某时刻（从 00:00 起的分钟数）的 epoch ms */
+export function atMinutes(date: LocalDate, min: Minutes): number {
+  const d = toDate(date)
+  d.setMinutes(min)
+  return d.getTime()
 }

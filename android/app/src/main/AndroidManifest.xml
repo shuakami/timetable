@@ -22,6 +22,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 系统日历事件详情里的「在 课程表 中打开」 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="timetable" android:host="open" />
+            </intent-filter>
 
         </activity>
 
@@ -63,13 +70,19 @@
         </provider>
     </application>
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="content" android:host="com.android.calendar" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -82,19 +95,5 @@
         android:maxSdkVersion="28" />
 
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
-    <!-- Android 11+ 包可见性：自启动管理页所在的系统应用 -->
-    <queries>
-        <package android:name="com.coloros.safecenter" />
-        <package android:name="com.oplus.safecenter" />
-        <package android:name="com.oppo.safe" />
-        <package android:name="com.coloros.oppoguardelf" />
-        <package android:name="com.oplus.battery" />
-        <package android:name="com.miui.securitycenter" />
-        <package android:name="com.huawei.systemmanager" />
-        <package android:name="com.vivo.permissionmanager" />
-        <package android:name="com.iqoo.secure" />
-        <package android:name="com.meizu.safe" />
-        <package android:name="com.samsung.android.lool" />
-    </queries>
 
 </manifest>

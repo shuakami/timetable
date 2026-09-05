@@ -118,40 +118,33 @@ export interface Task {
 export const WIDGET_STYLES = ['today', 'next', 'twoDays', 'week'] as const
 export type WidgetStyle = (typeof WIDGET_STYLES)[number]
 
-/** 通知与小组件偏好（对应原型 09/10 屏） */
+/** 提醒与小组件偏好。提醒全部由系统日历发出，这里只是写进日历的提醒模板 */
 export interface Prefs {
-  classLead: Minutes // 开课前提醒
-  firstClassLead: Minutes // 第一节课加早提醒
-  onlyChanged: boolean // 只提醒有变化的课
-  taskLeads: Minutes[] // 作业截止前多久提醒（分钟，可多个）
-  examDays: number[] // 考试倒数：提前几天
-  changePush: boolean // 调课与停课立刻推送
-  importSummary: boolean // 导入差异汇总一条
-  muteInClass: boolean // 上课中静音
-  quietStart: Minutes
-  quietEnd: Minutes
-  silentFreeDay: boolean // 没有课的一天不发通知
-  dailySummaryAt: Minutes | null // 每日摘要时间，null = 关
+  /** 写进手机日历（默认开；关掉即从手机日历移除全部内容） */
+  calendar: boolean
+  classLead: Minutes // 课前多久提醒
+  earlyLead: Minutes // 早课（08:30 前开始）再加一条更早的提醒，0 = 不加
+  taskLeads: Minutes[] // 作业截止前多久（可多个）；没写时间的作业按「提前 N 天的晚上 8 点」
+  examDays: number[] // 考试提前几天（0 = 当天早上 8 点）
   widgetStyle: WidgetStyle
 }
 
+/** 课前提醒可选的提前量 */
+export const CLASS_LEADS: Minutes[] = [5, 10, 15, 20, 30, 45]
+/** 早课加提醒可选的提前量（0 = 关） */
+export const EARLY_LEADS: Minutes[] = [0, 30, 45, 60]
 /** 作业提醒可选的提前量 */
 export const TASK_LEADS: Minutes[] = [3 * 24 * 60, 24 * 60, 8 * 60, 2 * 60, 60, 15]
+/** 考试提醒可选的提前天数 */
+export const EXAM_DAYS: number[] = [7, 3, 1, 0]
 
 export function defaultPrefs(): Prefs {
   return {
+    calendar: true,
     classLead: 15,
-    firstClassLead: 40,
-    onlyChanged: false,
+    earlyLead: 30,
     taskLeads: [24 * 60, 2 * 60],
-    examDays: [3, 0],
-    changePush: true,
-    importSummary: true,
-    muteInClass: true,
-    quietStart: 23 * 60,
-    quietEnd: 7 * 60,
-    silentFreeDay: true,
-    dailySummaryAt: 7 * 60 + 20,
+    examDays: [7, 3, 1, 0],
     widgetStyle: 'today',
   }
 }

@@ -1,5 +1,5 @@
 import type {
-  Course, ImportBatch, Override, Semester, SessionRule, UserEntry, ChangeEntry, Task, TaskPhoto, Prefs,
+  Course, ImportBatch, Override, Semester, SessionRule, UserEntry, ChangeEntry, Task, TaskPhoto, Prefs, WidgetStyle,
 } from './types'
 import { WIDGET_STYLES, defaultPrefs } from './types'
 import type { Snapshot } from './engine'
@@ -32,16 +32,28 @@ export function emptyState(): State {
   }
 }
 
+/** 只保留当前 Prefs 有的字段；旧版本的本地通知偏好（静音时段、每日摘要等）在这里丢掉 */
+function hydratePrefs(raw: unknown): Prefs {
+  const d = defaultPrefs()
+  const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const nums = (v: unknown, fallback: number[]) => (Array.isArray(v) && v.every((x) => typeof x === 'number') ? (v as number[]) : fallback)
+  return {
+    calendar: typeof p.calendar === 'boolean' ? p.calendar : d.calendar,
+    classLead: typeof p.classLead === 'number' && p.classLead > 0 ? p.classLead : d.classLead,
+    earlyLead: typeof p.earlyLead === 'number' ? p.earlyLead : d.earlyLead,
+    taskLeads: nums(p.taskLeads, d.taskLeads),
+    examDays: nums(p.examDays, d.examDays),
+    widgetStyle: (WIDGET_STYLES as readonly string[]).includes(p.widgetStyle as string) ? (p.widgetStyle as WidgetStyle) : d.widgetStyle,
+  }
+}
+
 /** 从持久化读回的原始对象补齐类型：周次位掩码转 bigint，新字段补默认值 */
 export function hydrate(s: State): State {
   for (const r of s.rules) r.weeksMask = BigInt(r.weeksMask as unknown as string)
   if (!s.savedRules || s.savedRules.length === 0) s.savedRules = [...BUILTIN_RULES]
   if (!s.tasks) s.tasks = []
   for (const t of s.tasks) if (!t.photos) t.photos = []
-  s.prefs = { ...defaultPrefs(), ...(s.prefs ?? {}) }
-  delete (s.prefs as Partial<Prefs> & { taskEveningAt?: number }).taskEveningAt
-  if (!Array.isArray(s.prefs.taskLeads)) s.prefs.taskLeads = defaultPrefs().taskLeads
-  if (!(WIDGET_STYLES as readonly string[]).includes(s.prefs.widgetStyle)) s.prefs.widgetStyle = defaultPrefs().widgetStyle
+  s.prefs = hydratePrefs(s.prefs)
   return s
 }
 

@@ -1384,7 +1384,6 @@ const meGroups: [string, [string, string][]][] = [
   ['提醒', [
     ['上课提醒', '课前 15 分钟'],
     ['作业提醒', '截止前 1 天、2 小时'],
-    ['桌面小组件', '今日时间线'],
   ]],
   ['其他', [
     ['外观', '跟随系统'],
@@ -1534,22 +1533,16 @@ function LockScreen() {
 
 const notifPrefs: [string, [string, string][]][] = [
   ['上课', [
-    ['开课前提醒', '15 分钟'],
-    ['第一节课加早提醒', '提前 40 分钟'],
-    ['只提醒有变化的课', '开'],
+    ['上课前提醒', '15 分钟'],
+    ['早课再提前', '提前 30 分钟'],
   ]],
   ['作业与考试', [
-    ['作业截止', '1 天、2 小时'],
-    ['考试倒数', '3 天、当天早上'],
+    ['作业截止前', '1 天、2 小时'],
+    ['考试前', '前 7 天、前 3 天、前 1 天、当天早上'],
   ]],
-  ['变更', [
-    ['调课与停课', '立刻推送'],
-    ['规则重新导入后差异', '汇总一条'],
-  ]],
-  ['安静', [
-    ['上课中静音', '开'],
-    ['夜间不打扰', '23:00 – 07:00'],
-    ['没有课的一天', '不发任何通知'],
+  ['手机日历', [
+    ['写进手机日历', '开'],
+    ['在日历中查看', ''],
   ]],
 ]
 
@@ -1558,8 +1551,17 @@ function NotifPrefScreen() {
     <Phone>
       <div className="flex-1 overflow-hidden pt-12">
         <div className="px-5">
-          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">通知</h1>
-          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">上课前、作业截止前、课表变更时提醒。</div>
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">提醒</h1>
+          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">上课前、作业截止前、考试前，由手机日历提醒。</div>
+        </div>
+        <div className="mt-6 px-5">
+          <div className="flex items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5">
+            <div className="min-w-0 flex-1">
+              <div className="text-[14px] font-semibold text-(--c-ink)">已在手机日历里</div>
+              <div className="mt-0.5 text-[12.5px] font-medium tabular-nums text-(--c-ink4)">8 门课、3 项作业、1 场考试</div>
+            </div>
+            <span className="text-[12.5px] font-bold text-(--c-accent)">打开日历</span>
+          </div>
         </div>
         <div className="mt-5 px-5">
           {notifPrefs.map(([g, rows]) => (
@@ -1587,100 +1589,40 @@ function NotifPrefScreen() {
   )
 }
 
-/* ---------------- 系统权限（屏 1） ---------------- */
+/* ---------------- 首次：加进手机日历 ---------------- */
 
-function PermsScreen() {
+const calendarIntroRows: [string, string][] = [
+  ['上课前', '15 分钟'],
+  ['作业截止前', '1 天、2 小时'],
+  ['考试前', '前 7 天、前 3 天、前 1 天、当天早上'],
+]
+
+function CalendarIntroScreen() {
   return (
     <Phone>
       <div className="flex flex-1 flex-col pt-12">
         <div className="px-5">
-          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">开启提醒</h1>
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">加进手机日历</h1>
+          <div className="mt-2 text-[12.5px] leading-[1.5] font-medium text-(--c-ink3)">8 门课、3 项作业、1 场考试，到点由手机日历提醒。</div>
         </div>
-
         <div className="mt-6 px-5">
-          <div className="overflow-hidden rounded-[18px] bg-(--c-surface)">
-            <PermRow label="通知" action="开启" />
-            <PermRow label="锁屏与横幅" action="去设置" sep />
-            <PermRow label="准点提醒" action="允许" sep />
-            <PermRow label="保持后台运行" action="设置" sep />
-            <PermRow label="开机自启" action="去设置" sep />
+          <div className="rounded-[18px] bg-(--c-surface) px-4">
+            {calendarIntroRows.map(([k, v], i) => (
+              <div key={k} className={`flex items-center py-3.5 ${i ? 'border-t border-(--c-line2)' : ''}`}>
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{k}</span>
+                <span className="text-[12.5px] font-medium tabular-nums text-(--c-ink4)">{v}</span>
+              </div>
+            ))}
           </div>
+          <div className="mt-3 px-1 text-[12px] leading-[1.5] font-medium text-(--c-ink5)">课表、作业变了，日历跟着变。</div>
         </div>
-
         <div className="mt-auto" />
       </div>
       <div className="px-5 pb-6">
-        <button className="w-full rounded-[16px] bg-(--c-accent) py-4 text-[15.5px] font-bold text-white">好了</button>
+        <button className="w-full rounded-[18px] bg-(--c-accent) py-[15px] text-[15px] font-bold text-white">加入</button>
+        <button className="mt-3 w-full py-2 text-[13px] font-bold text-(--c-ink4)">以后再说</button>
       </div>
     </Phone>
-  )
-}
-
-function PermRow({ label, action, sep }: { label: string; action: string; sep?: boolean }) {
-  return (
-    <div className={`flex h-[52px] items-center px-4 ${sep ? 'border-t border-(--c-line2)' : ''}`}>
-      <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">{label}</span>
-      <span className="text-[12.5px] font-bold text-(--c-accent)">{action}</span>
-    </div>
-  )
-}
-
-/* ---------------- 锁屏与横幅（屏 2） ---------------- */
-
-function BannerHelpScreen() {
-  return (
-    <Phone>
-      <div className="flex flex-1 flex-col pt-12">
-        <div className="px-5">
-          <div className="flex h-9 items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-(--c-surface)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19 8 12l7-7" /></svg>
-            </span>
-          </div>
-          <h1 className="mt-3 text-[26px] font-extrabold tracking-[-.02em] text-(--c-ink)">锁屏与横幅</h1>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-3 px-5">
-          <Bullet
-            title="锁屏显示"
-            path={['通知页', '锁屏显示', '显示所有内容']}
-          />
-          <Bullet
-            title="横幅通知"
-            path={['通知页', '横幅通知', '允许（可同时开悬浮通知）']}
-          />
-          <Bullet
-            title="置顶（重要程度）"
-            path={['通知页右上角', '设为紧急', '优先弹横幅而非静默进状态栏']}
-          />
-        </div>
-
-        <div className="mt-auto" />
-      </div>
-      <div className="px-5 pb-6">
-        <button className="w-full rounded-[16px] bg-(--c-accent) py-4 text-[15.5px] font-bold text-white">去系统设置</button>
-      </div>
-    </Phone>
-  )
-}
-
-function Bullet({ title, path }: { title: string; path: string[] }) {
-  return (
-    <div className="rounded-[18px] bg-(--c-surface) px-4 py-3.5">
-      <div className="text-[14px] font-bold tracking-[-.01em] text-(--c-ink)">{title}</div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] leading-[1.5] font-medium text-(--c-ink4)">
-        {path.map((seg, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && (
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-(--c-ink5)">
-                <path d="m9 5 7 7-7 7" />
-              </svg>
-            )}
-            <span>{seg}</span>
-          </span>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -2864,9 +2806,8 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['todo2-classend', '今天 · 刚下课', () => <Todo2ClassEndScreen />],
   ['me', '我的', () => <MeScreen />],
   ['lock', '锁屏', () => <LockScreen />],
-  ['notif', '通知偏好', () => <NotifPrefScreen />],
-  ['perms', '开启提醒', () => <PermsScreen />],
-  ['banner-help', '锁屏与横幅', () => <BannerHelpScreen />],
+  ['notif', '提醒', () => <NotifPrefScreen />],
+  ['calendar-intro', '加进手机日历', () => <CalendarIntroScreen />],
   ['widget', '桌面小组件', () => <WidgetScreen />],
   ['widget2', '小组件样式', () => <WidgetScreen2 />],
   ['freeday', '今天没有课', () => <FreeDayScreen />],
