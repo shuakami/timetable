@@ -105,18 +105,22 @@ function scrollParent(el: HTMLElement | null): HTMLElement | null {
   return null
 }
 
-/** 所在滚动容器的 scrollTop；未滚动时为 0 */
-export function useScrollTop(ref: React.RefObject<HTMLElement | null>) {
-  const [top, setTop] = useState(0)
+/** 大标题是否已整段滑进标题区下面；只在跨过阈值时触发一次重渲染 */
+function useTitlePassed(h1: React.RefObject<HTMLElement | null>) {
+  const [passed, setPassed] = useState(false)
   useEffect(() => {
-    const sc = scrollParent(ref.current)
-    if (!sc) return
-    const on = () => setTop(sc.scrollTop)
+    const el = h1.current
+    const sc = scrollParent(el)
+    if (!el || !sc) return
+    const on = () => {
+      const spacer = el.previousElementSibling as HTMLElement | null
+      setPassed(sc.scrollTop > 0 && !!spacer && el.getBoundingClientRect().bottom <= sc.getBoundingClientRect().top + spacer.offsetHeight)
+    }
     on()
     sc.addEventListener('scroll', on, { passive: true })
     return () => sc.removeEventListener('scroll', on)
-  }, [ref])
-  return top
+  }, [h1])
+  return passed
 }
 
 /** 羽化随滚动距离渐现：前 24px 内 ease-out 到 1 */
@@ -162,12 +166,14 @@ export function TopVeil({ bleed = 0, feather = 44, progress = 1 }: {
       style={{ left: -bleed, right: -bleed, bottom: -feather }}
     >
       {BLUR_BANDS.map(([r, a, b]) => {
-        const mask = `linear-gradient(to bottom, #000 0%, #000 ${a}%, rgba(0,0,0,0) ${b}%)`
+        /* 层只铺到遮罩消尽处：再往下全透明，模糊却照样要算 */
+        const mask = `linear-gradient(to bottom, #000 0%, #000 ${(a / b) * 100}%, rgba(0,0,0,0) 100%)`
         return (
           <motion.div
             key={r}
-            className="absolute inset-0"
+            className="absolute inset-x-0 top-0"
             style={{
+              height: `${b}%`,
               opacity: progress,
               backdropFilter: `blur(${r}px)`,
               WebkitBackdropFilter: `blur(${r}px)`,
@@ -189,19 +195,24 @@ const BOTTOM_BANDS: [number, number, number][] = [
   [4, 18, 58],
 ]
 
-const BOTTOM_VEIL = 'linear-gradient(to top, var(--c-bg) 0%, var(--c-bg) 42%, rgb(var(--c-bg-rgb) / .85) 66%, rgb(var(--c-bg-rgb) / 0) 100%)'
+/** 底色完全不透明的那段（%）：这段下面的模糊看不见，模糊层从它上沿开始铺 */
+const BOTTOM_SOLID = 42
+const BOTTOM_VEIL = `linear-gradient(to top, var(--c-bg) 0%, var(--c-bg) ${BOTTOM_SOLID}%, rgb(var(--c-bg-rgb) / .85) 66%, rgb(var(--c-bg-rgb) / 0) 100%)`
 
 export function BottomVeil({ height }: { height: number }) {
   const shrink = useImeShrink()
   return (
     <motion.div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[7]" style={{ height, y: shrink }}>
       {BOTTOM_BANDS.map(([r, a, b]) => {
-        const mask = `linear-gradient(to top, #000 0%, #000 ${a}%, rgba(0,0,0,0) ${b}%)`
+        /* 原遮罩在 [BOTTOM_SOLID, b] 这段的取值原样映射到缩小后的层上 */
+        const mask = a > BOTTOM_SOLID
+          ? `linear-gradient(to top, #000 0%, #000 ${((a - BOTTOM_SOLID) / (b - BOTTOM_SOLID)) * 100}%, rgba(0,0,0,0) 100%)`
+          : `linear-gradient(to top, rgba(0,0,0,${(b - BOTTOM_SOLID) / (b - a)}) 0%, rgba(0,0,0,0) 100%)`
         return (
           <div
             key={r}
-            className="absolute inset-0"
-            style={{ backdropFilter: `blur(${r}px)`, WebkitBackdropFilter: `blur(${r}px)`, maskImage: mask, WebkitMaskImage: mask }}
+            className="absolute inset-x-0"
+            style={{ bottom: `${BOTTOM_SOLID}%`, height: `${b - BOTTOM_SOLID}%`, backdropFilter: `blur(${r}px)`, WebkitBackdropFilter: `blur(${r}px)`, maskImage: mask, WebkitMaskImage: mask }}
           />
         )
       })}
@@ -251,12 +262,8 @@ export function StickyHead({ children, bleed = 0, feather, className = '' }: {
 
 export function TopBar({ title, sub, onBack, trail }: { title: string; sub?: string; onBack?: () => void; trail?: React.ReactNode }) {
   const h1 = useRef<HTMLHeadingElement>(null)
-  const top = useScrollTop(h1)
   /* 大标题整段滑进羽化层后，小标题接在返回按钮右侧 */
-  const spacer = h1.current?.previousElementSibling as HTMLElement | null | undefined
-  const sc = scrollParent(h1.current)
-  const passed =
-    top > 0 && !!h1.current && !!spacer && !!sc && h1.current.getBoundingClientRect().bottom <= sc.getBoundingClientRect().top + spacer.offsetHeight
+  const passed = useTitlePassed(h1)
   return (
     <>
       <StickyHead className="px-5 pb-1">
