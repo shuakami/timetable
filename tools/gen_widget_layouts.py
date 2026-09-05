@@ -43,6 +43,9 @@ def head_block(day='w_day', wd='w_wd', sub='w_sub', day_sp='28sp'):
     </LinearLayout>'''
 
 
+EMPTY = '<TextView android:id="@+id/w_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone" android:textSize="12sp" android:textStyle="bold" android:textColor="#8A8E97" android:layout_marginTop="10dp" />'
+
+
 def wrap(body, pad='12dp'):
     # 卡片底是一张可 setColorFilter 的 ImageView：颜色由原生按 App 主题在渲染时决定，不走资源限定符
     return f'''{HEAD}<FrameLayout {NS}
@@ -66,7 +69,7 @@ def write(name, text):
 
 
 # 1) 今日列表
-write('widget_today.xml', wrap('\n'.join([head_block()] + [row(i) for i in range(2)])))
+write('widget_today.xml', wrap('\n'.join([head_block(), EMPTY] + [row(i) for i in range(2)])))
 
 # 2) 下一节倒计时
 next_body = f'''    <TextView android:id="@+id/w_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="10.5sp" android:textStyle="bold" android:textColor="#8A8E97" />
@@ -83,6 +86,7 @@ write('widget_next.xml', wrap(next_body))
 two = f'''    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal">
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical">
 {head_block()}
+{EMPTY}
 {chr(10).join(row(i) for i in range(2))}
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical" android:layout_marginLeft="12dp">
@@ -115,7 +119,8 @@ week_body = f'''    <LinearLayout android:layout_width="match_parent" android:la
         <TextView android:id="@+id/w_week" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold" android:textColor="#16171A" />
         <TextView android:id="@+id/w_date" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="11sp" android:textStyle="bold" android:textColor="#A2A6AF" android:layout_marginLeft="7dp" />
     </LinearLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:layout_marginTop="8dp">
+{EMPTY}
+    <LinearLayout android:id="@+id/w_grid" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:layout_marginTop="8dp">
 {chr(10).join(cols)}
     </LinearLayout>'''
 write('widget_week.xml', wrap(week_body))

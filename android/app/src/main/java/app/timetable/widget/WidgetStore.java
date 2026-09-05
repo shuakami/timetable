@@ -134,6 +134,29 @@ public final class WidgetStore {
         return p.length == 3 ? Integer.parseInt(p[1]) : 1;
     }
 
+    /** 周一 = 1 … 周日 = 7 */
+    public static int weekdayOf(String date) {
+        try {
+            Calendar c = Calendar.getInstance();
+            c.setTime(new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date));
+            return (c.get(Calendar.DAY_OF_WEEK) + 5) % 7 + 1;
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    /** from 到 to 相差的天数（to 在后为正） */
+    public static int daysBetween(String from, String to) {
+        try {
+            SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            long a = f.parse(from).getTime();
+            long b = f.parse(to).getTime();
+            return (int) Math.round((b - a) / 86400000.0);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     public static String weekdayLabel(int weekday) {
         switch (weekday) {
             case 1: return "周一";

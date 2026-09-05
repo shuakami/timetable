@@ -72,23 +72,19 @@ public final class WidgetRender {
         Palette p = palette(ctx);
         v.setInt(R.id.widget_root_bg, "setColorFilter", p.surface);
         theme(ctx, v, p);
-        if (data == null) {
-            return v;
-        }
         String today = WidgetStore.localDate(now);
-        Day d = data.day(today);
         switch (style) {
             case "next":
-                next(ctx, v, p, d, data.day(WidgetStore.nextDate(today)), now);
+                next(ctx, v, p, data, today, now);
                 break;
             case "twoDays":
-                twoDays(ctx, v, p, today, d, data.day(WidgetStore.nextDate(today)), now);
+                twoDays(ctx, v, p, data, today, now);
                 break;
             case "week":
                 week(ctx, v, p, data, today, now);
                 break;
             default:
-                todayList(ctx, v, p, today, d, now);
+                todayList(ctx, v, p, data, today, now);
         }
         return v;
     }
@@ -97,7 +93,7 @@ public final class WidgetRender {
     private static void theme(Context ctx, RemoteViews v, Palette p) {
         paint(ctx, v, p.ink, "w_day", "w_num", "w_week");
         paint(ctx, v, p.accent, "w_wd");
-        paint(ctx, v, p.ink3, "w_label", "w_unit");
+        paint(ctx, v, p.ink3, "w_label", "w_unit", "w_empty");
         paint(ctx, v, p.ink4, "w_sub", "w_sub2", "w_date");
     }
 
@@ -152,15 +148,9 @@ public final class WidgetRender {
         return out;
     }
 
-    private static int remaining(List<Item> items, long now) {
-        int n = 0;
-        for (Item it : items) if (it.endAt > now) n++;
-        return n;
-    }
-
-    private static void head(Context ctx, RemoteViews v, String date, int weekday, String sub) {
+    private static void head(Context ctx, RemoteViews v, String date, String sub) {
         v.setTextViewText(R.id.w_day, String.valueOf(WidgetStore.dayOfMonth(date)));
-        v.setTextViewText(R.id.w_wd, WidgetStore.weekdayLabel(weekday));
+        v.setTextViewText(R.id.w_wd, WidgetStore.weekdayLabel(WidgetStore.weekdayOf(date)));
         v.setTextViewText(R.id.w_sub, sub == null ? "" : sub);
     }
 
@@ -191,14 +181,70 @@ public final class WidgetRender {
         }
     }
 
+    /* ---------------- 空状态 ---------------- */
+
+    private static boolean noData(Data data) {
+        return data == null || data.days.isEmpty();
+    }
+
+    /** 从 fromExclusive 之后（不含）起第一个有课的日子 */
+    private static Day nextClassDay(Data data, String fromExclusive) {
+        if (data == null) return null;
+        for (Day d : data.days) {
+            if (d.date.compareTo(fromExclusive) > 0 && !live(d).isEmpty()) return d;
+        }
+        return null;
+    }
+
+    /** 今天之后某一天的称呼：明天 / 周四 / 10月21日 */
+    private static String dayName(String today, String date) {
+        int diff = WidgetStore.daysBetween(today, date);
+        if (diff == 1) return "明天";
+        if (diff > 1 && diff < 7) return WidgetStore.weekdayLabel(WidgetStore.weekdayOf(date));
+        return WidgetStore.monthOf(date) + "月" + WidgetStore.dayOfMonth(date) + "日";
+    }
+
+    /** 接下来一段时间都没课时给出的原因，一句话 */
+    private static String emptyReason(Data data, String today) {
+        if (noData(data)) return "还没有课表";
+        Day first = null;
+        for (Day d : data.days) if (!live(d).isEmpty()) { first = d; break; }
+        if (first != null && first.date.compareTo(today) > 0 && data.days.get(0).date.compareTo(today) > 0) {
+            return WidgetStore.monthOf(first.date) + "月" + WidgetStore.dayOfMonth(first.date) + "日开学";
+        }
+        String last = data.days.get(data.days.size() - 1).date;
+        if (last.compareTo(today) < 0 && data.week >= data.totalWeeks) return "本学期已结束";
+        return "近两周没有课";
+    }
+
+    private static void empty(Context ctx, RemoteViews v, String text) {
+        int id = id(ctx, "w_empty");
+        if (id == 0) return;
+        v.setViewVisibility(id, text == null ? View.GONE : View.VISIBLE);
+        if (text != null) v.setTextViewText(id, text);
+    }
+
     /* ---------------- 今日列表 ---------------- */
 
-    private static void todayList(Context ctx, RemoteViews v, Palette p, String today, Day d, long now) {
+    private static void todayList(Context ctx, RemoteViews v, Palette p, Data data, String today, long now) {
+        Day d = data != null ? data.day(today) : null;
         List<Item> items = live(d);
-        int left = remaining(items, now);
-        head(ctx, v, today, d != null ? d.weekday : 1, left > 0 ? "还剩 " + left + " 节" : "没有课了");
         Item cur = current(items, now);
         List<Item> show = pending(items, now);
+        String sub;
+        if (!show.isEmpty()) {
+            sub = "还剩 " + show.size() + " 节";
+        } else {
+            Day nx = nextClassDay(data, today);
+            if (nx != null) {
+                show = live(nx);
+                sub = dayName(today, nx.date) + " " + show.size() + " 节";
+            } else {
+                sub = "";
+            }
+        }
+        head(ctx, v, today, sub);
+        empty(ctx, v, show.isEmpty() ? emptyReason(data, today) : null);
         for (int i = 0; i < ROWS; i++) {
             Item it = i < show.size() ? show.get(i) : null;
             row(ctx, v, p, "row", i, it, it != null && it == cur, it != null && it == cur ? left(it, now) : null);
@@ -212,32 +258,40 @@ public final class WidgetRender {
 
     /* ---------------- 下一节 ---------------- */
 
-    private static void next(Context ctx, RemoteViews v, Palette p, Day d, Day tomorrow, long now) {
+    private static void next(Context ctx, RemoteViews v, Palette p, Data data, String today, long now) {
+        Day d = data != null ? data.day(today) : null;
         List<Item> items = live(d);
         Item cur = current(items, now);
-        Item nx = upcoming(items, now);
-        boolean isTomorrow = false;
-        if (cur == null && nx == null) {
-            nx = upcoming(live(tomorrow), now);
-            isTomorrow = nx != null;
-        }
         if (cur != null) {
             v.setTextViewText(R.id.w_label, "上课中");
+            v.setViewVisibility(R.id.w_num, View.VISIBLE);
             v.setTextViewText(R.id.w_num, String.valueOf(Math.max(1, (int) ((cur.endAt - now) / 60000))));
             v.setTextViewText(R.id.w_unit, "分钟后下课");
             row(ctx, v, p, "row", 0, cur, true, null);
             return;
         }
+        Item nx = upcoming(items, now);
+        String label = "下一节";
         if (nx == null) {
-            v.setTextViewText(R.id.w_label, "下一节");
-            v.setTextViewText(R.id.w_num, "—");
-            v.setTextViewText(R.id.w_unit, "这两天没有课");
+            Day nd = nextClassDay(data, today);
+            if (nd != null) {
+                nx = live(nd).get(0);
+                label = dayName(today, nd.date) + "第一节";
+            }
+        }
+        v.setTextViewText(R.id.w_label, label);
+        if (nx == null) {
+            v.setViewVisibility(R.id.w_num, View.GONE);
+            v.setTextViewText(R.id.w_unit, emptyReason(data, today));
             row(ctx, v, p, "row", 0, null, false, null);
             return;
         }
+        v.setViewVisibility(R.id.w_num, View.VISIBLE);
         long mins = (nx.startAt - now) / 60000;
-        v.setTextViewText(R.id.w_label, isTomorrow ? "明天第一节" : "下一节");
-        if (mins >= 60) {
+        if (mins >= 24 * 60) {
+            v.setTextViewText(R.id.w_num, String.valueOf(WidgetStore.daysBetween(today, WidgetStore.localDate(nx.startAt))));
+            v.setTextViewText(R.id.w_unit, "天后");
+        } else if (mins >= 60) {
             v.setTextViewText(R.id.w_num, String.valueOf(mins / 60));
             long rem = mins % 60;
             v.setTextViewText(R.id.w_unit, rem == 0 ? "小时后" : "小时 " + rem + " 分钟后");
@@ -250,18 +304,35 @@ public final class WidgetRender {
 
     /* ---------------- 今天与明天 ---------------- */
 
-    private static void twoDays(Context ctx, RemoteViews v, Palette p, String today, Day d, Day tm, long now) {
+    /** 左列是今天（上完就换成下一个有课的日子），右列是再往后一个有课的日子 */
+    private static void twoDays(Context ctx, RemoteViews v, Palette p, Data data, String today, long now) {
+        Day d = data != null ? data.day(today) : null;
         List<Item> items = live(d);
-        int left = remaining(items, now);
-        head(ctx, v, today, d != null ? d.weekday : 1, left > 0 ? "还剩 " + left + " 节" : "没有课了");
         Item cur = current(items, now);
         List<Item> show = pending(items, now);
+        String sub;
+        String anchor = today;
+        if (!show.isEmpty()) {
+            sub = "还剩 " + show.size() + " 节";
+        } else {
+            Day nx = nextClassDay(data, today);
+            if (nx != null) {
+                show = live(nx);
+                anchor = nx.date;
+                sub = dayName(today, nx.date) + " " + show.size() + " 节";
+            } else {
+                sub = "";
+            }
+        }
+        head(ctx, v, today, sub);
+        empty(ctx, v, show.isEmpty() ? emptyReason(data, today) : null);
         for (int i = 0; i < ROWS; i++) {
             Item it = i < show.size() ? show.get(i) : null;
             row(ctx, v, p, "row", i, it, it != null && it == cur, it != null && it == cur ? left(it, now) : null);
         }
-        List<Item> t = live(tm);
-        v.setTextViewText(R.id.w_sub2, t.isEmpty() ? "明天没有课" : "明天 " + t.size() + " 节");
+        Day second = nextClassDay(data, anchor);
+        List<Item> t = live(second);
+        v.setTextViewText(R.id.w_sub2, second == null ? "" : dayName(today, second.date) + " " + t.size() + " 节");
         for (int i = 0; i < ROWS; i++) {
             row(ctx, v, p, "trow", i, i < t.size() ? t.get(i) : null, false, null);
         }
@@ -269,11 +340,31 @@ public final class WidgetRender {
 
     /* ---------------- 本周网格 ---------------- */
 
+    /** 周末看下一周；整周没课时只留一句原因 */
     private static void week(Context ctx, RemoteViews v, Palette p, Data data, String today, long now) {
+        String dateLabel = WidgetStore.monthOf(today) + "月" + WidgetStore.dayOfMonth(today) + "日";
+        if (noData(data)) {
+            v.setTextViewText(R.id.w_week, "本周");
+            v.setTextViewText(R.id.w_date, dateLabel);
+            v.setViewVisibility(R.id.w_grid, View.GONE);
+            empty(ctx, v, emptyReason(data, today));
+            return;
+        }
         Day cur = data.day(today);
         int week = cur != null ? cur.week : data.week;
+        if (WidgetStore.weekdayOf(today) >= 6 && week < data.totalWeeks && hasClasses(data, week + 1)) {
+            week++;
+            dateLabel = "下周";
+        }
         v.setTextViewText(R.id.w_week, "第 " + week + " 周");
-        v.setTextViewText(R.id.w_date, WidgetStore.monthOf(today) + "月" + WidgetStore.dayOfMonth(today) + "日");
+        v.setTextViewText(R.id.w_date, dateLabel);
+        if (!hasClasses(data, week)) {
+            v.setViewVisibility(R.id.w_grid, View.GONE);
+            empty(ctx, v, emptyReason(data, today));
+            return;
+        }
+        v.setViewVisibility(R.id.w_grid, View.VISIBLE);
+        empty(ctx, v, null);
         List<Day> cols = new ArrayList<>();
         for (Day d : data.days) if (d.week == week && d.weekday <= 5) cols.add(d);
         for (int c = 0; c < 5; c++) {
@@ -300,6 +391,11 @@ public final class WidgetRender {
                 v.setTextColor(id(ctx, cid + "_loc"), p.ink4);
             }
         }
+    }
+
+    private static boolean hasClasses(Data data, int week) {
+        for (Day d : data.days) if (d.week == week && d.weekday <= 5 && !live(d).isEmpty()) return true;
+        return false;
     }
 
 }

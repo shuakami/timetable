@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- 小组件选择器里的预览图源文件。用 tools/gen_widget_previews.sh 截成 PNG。
-     ?w=today|next|twoDays|week 单张；?theme=light|dark|black 配色；?sheet=1 四种样式浅深各一份，用于看效果。 -->
+     ?w=today|next|twoDays|week 单张；?theme=light|dark|black 配色；?sheet=1 四种样式浅深各一份；?sheet=empty 空状态各种情形。 -->
 <html lang="zh">
 <head>
 <meta charset="utf-8" />
@@ -56,7 +56,8 @@ const row = (name, loc, time, color, now) => `
     <div class="grow"><div class="name"${now ? ` style="color:${deep(color, 72)}"` : ''}>${name}</div>${loc ? `<div class="loc">${loc}</div>` : ''}</div>
     ${time ? `<div class="time">${time}</div>` : ''}
   </div>`
-const head = (sub) => `<div class="head"><span class="day">14</span><span class="wd">周二</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`
+const head = (sub, day = '14', wd = '周二') => `<div class="head"><span class="day">${day}</span><span class="wd">${wd}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`
+const empty = (t) => `<div class="label" style="margin-top:10px;font-size:12px">${t}</div>`
 
 const views = {
   today: `<div class="card" style="width:162px;height:162px">
@@ -91,9 +92,44 @@ const views = {
     </div>`
   })(),
 }
+const empties = {
+  todayDone: `<div class="card" style="width:162px;height:162px">
+    ${head('明天 2 节')}
+    <div class="rows">${row('数据结构', '教一 201', '10:00', C.ds)}${row('大学物理', '理科楼 A203', '14:00', C.phy)}</div>
+  </div>`,
+  weekend: `<div class="card" style="width:162px;height:162px">
+    ${head('周一 2 节', '18', '周六')}
+    <div class="rows">${row('大学英语', '外语楼 105', '08:00', C.eng)}${row('高等数学', '教三 302', '10:00', C.math)}</div>
+  </div>`,
+  noData: `<div class="card" style="width:162px;height:162px">${head('')}${empty('还没有课表')}</div>`,
+  holiday: `<div class="card" style="width:162px;height:162px">${head('', '3', '周三')}${empty('9月8日开学')}</div>`,
+  nextDays: `<div class="card" style="width:162px;height:162px">
+    <div class="label">周一第一节</div>
+    <div class="head" style="margin-top:4px;gap:0"><span class="num">2</span><span class="unit">天后</span></div>
+    <div style="margin-top:auto">${row('大学英语', '外语楼 105　李敏', '', C.eng)}</div>
+  </div>`,
+  nextNone: `<div class="card" style="width:162px;height:162px">
+    <div class="label">下一节</div>
+    <div class="unit" style="margin:6px 0 0">本学期已结束</div>
+  </div>`,
+  twoDone: `<div class="card" style="width:338px;height:162px;flex-direction:row;gap:14px">
+    <div class="grow">${head('明天 2 节')}<div class="rows">${row('数据结构', '教一 201', '10:00', C.ds)}${row('大学物理', '理科楼 A203', '14:00', C.phy)}</div></div>
+    <div class="grow"><div class="tm" style="padding-top:6px">周四 2 节</div><div class="rows">${row('高等数学', '教三 302', '08:00', C.math)}${row('线性代数', '教三 110', '14:00', C.la)}</div></div>
+  </div>`,
+  twoNone: `<div class="card" style="width:338px;height:162px;flex-direction:row;gap:14px">
+    <div class="grow">${head('')}${empty('近两周没有课')}</div><div class="grow"></div>
+  </div>`,
+  weekNone: `<div class="card" style="width:338px;height:120px;padding:14px 14px 16px">
+    <div class="head" style="gap:0"><span class="wk">第 18 周</span><span class="dt">1月12日</span></div>${empty('本学期已结束')}
+  </div>`,
+}
 const q = new URLSearchParams(location.search)
 const theme = q.get('theme') || 'light'
-if (q.get('sheet')) {
+if (q.get('sheet') === 'empty') {
+  const e = empties
+  const col = (t) => `<div class="col-sheet t-${t}"><div class="pair">${e.todayDone}${e.weekend}</div><div class="pair">${e.noData}${e.holiday}</div><div class="pair">${e.nextDays}${e.nextNone}</div>${e.twoDone}${e.twoNone}${e.weekNone}</div>`
+  document.body.innerHTML = `<div class="sheet">${col('light')}${col('dark')}</div>`
+} else if (q.get('sheet')) {
   const col = (t) => `<div class="col-sheet t-${t}"><div class="pair">${views.today}${views.next}</div>${views.twoDays}${views.week}</div>`
   document.body.innerHTML = `<div class="sheet">${col('light')}${col('dark')}${col('black')}</div>`
 } else {
