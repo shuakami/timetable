@@ -1585,7 +1585,6 @@ function ThemePage({ onBack }: { onBack: () => void }) {
                 )
               })}
             </div>
-            <div className="mt-2 px-1 text-[12px] font-medium text-(--c-ink4)">取自当前壁纸的 Material You 色板。</div>
           </>
         )}
       </div>
