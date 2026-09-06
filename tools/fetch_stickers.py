@@ -16,6 +16,8 @@ OUT = os.path.join(ROOT, 'public', 'stickers')
 DEVICON = 'https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0'
 TWEMOJI = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@v14.0.2/assets/svg'
 SIMPLE = 'https://cdn.jsdelivr.net/npm/simple-icons@13'
+# Simple Icons 里过时的品牌色，按当前官方标志改用单色
+MONO_OVERRIDE = {'openai'}
 
 
 def get(url: str) -> str:
@@ -64,7 +66,8 @@ def main() -> int:
             svg = strip(get(url))
             if src == 'simple':
                 hexc = simple[sid]
-                fill = 'var(--c-sticker-mono, #1F1F1F)' if hexc.upper() in ('000000', '191919') else f'#{hexc}'
+                mono = sid in MONO_OVERRIDE or hexc.upper() in ('000000', '191919')
+                fill = 'var(--c-sticker-mono, #1F1F1F)' if mono else f'#{hexc}'
                 svg = re.sub(r'(<svg[^>]*>)([\s\S]*)</svg>', lambda m: f'{m.group(1)}<g fill="{fill}">{m.group(2)}</g></svg>', svg, count=1)
         except Exception as e:  # noqa: BLE001
             bad.append(f'{sid} ({e})')
