@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Extract version from tag
         id: version
@@ -88,12 +90,42 @@ jobs:
           cd android
           ./gradlew assembleRelease
 
+      - name: Write release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+          CODE: ${{ steps.version.outputs.versionCode }}
+          REPO: ${{ github.repository }}
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          SIZE=$(stat -c%s "$APK" | awk '{printf "%.1f", $1/1048576}')
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          {
+            echo "<a href=\"https://github.com/$REPO/releases/download/$TAG/app-release.apk\"><img src=\"https://raw.githubusercontent.com/$REPO/main/docs/download-android.svg\" alt=\"Download for Android\" /></a>"
+            echo
+            echo "app-release.apk ${SIZE} MB  "
+            echo "Android 7.0+  "
+            echo "versionCode ${CODE}  "
+            echo "SHA-256 \`${SHA}\`"
+            echo
+            echo "### 变更"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --format='- %s (%h)' "$PREV..$TAG"
+              echo
+              echo "**Full Changelog**: [$PREV...$TAG](https://github.com/$REPO/compare/$PREV...$TAG)"
+            else
+              git log --format='- %s (%h)' "$TAG"
+            fi
+          } > release-notes.md
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: android/app/build/outputs/apk/release/app-release.apk
           name: v${{ steps.version.outputs.version }}
+          body_path: release-notes.md
           draft: false
           prerelease: false
-          generate_release_notes: true
