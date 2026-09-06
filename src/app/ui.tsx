@@ -782,14 +782,15 @@ export function Sheet({
   )
 }
 
-/* 全屏内页：从右侧推入，盖住底栏 */
-export function Page({ children, className = '', root }: { children: React.ReactNode; className?: string; onBack?: () => void; root?: boolean }) {
+/* 全屏内页：从右侧推入，盖住底栏；keep 的页在内置浏览器透明模式下仍可见 */
+export function Page({ children, className = '', root, keep }: { children: React.ReactNode; className?: string; onBack?: () => void; root?: boolean; keep?: boolean }) {
   return (
     <motion.div
       initial={root ? false : { transform: 'translateX(100%)' }}
       animate={{ transform: 'translateX(0%)' }}
       exit={{ transform: 'translateX(100%)' }}
       transition={SLIDE}
+      data-edu-keep={keep ? '' : undefined}
       className="absolute inset-0 z-[40] will-change-transform"
     >
       <div data-veil-host className={`absolute inset-0 flex flex-col overflow-hidden bg-(--c-bg) ${className}`}>

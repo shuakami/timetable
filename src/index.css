@@ -266,3 +266,19 @@ button {
 [data-theme='light'] .intro-hero {
   background: #eaf2fe url('/intro-bg.jpg') center / cover no-repeat;
 }
+
+/* 教务内置浏览器：原生 WebView 在应用 WebView 下面，应用整体透明、只留浏览器页自己的控件 */
+html.tt-edu,
+html.tt-edu body,
+html.tt-edu #root,
+html.tt-edu #root > div,
+html.tt-edu [data-shell] {
+  background: transparent !important;
+}
+html.tt-edu [data-shell] > *:not([data-edu-keep]),
+html.tt-edu #root > div > *:not([data-shell]) {
+  visibility: hidden;
+}
+html.tt-edu [data-edu-keep] [data-veil-host] {
+  background: transparent !important;
+}

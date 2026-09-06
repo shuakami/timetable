@@ -3,6 +3,8 @@ import { guessTerm, parseJcs, parseZfKbList, termLabel, zcdToWeeks } from '../ed
 import { detectSystem, hostOf, isTimetablePage, scrubUrl } from '../edu/systems'
 import { schoolByUrl, schoolCount, searchSchools, urlFromQuery } from '../edu/schools'
 import { wrapRun, zfTermOptions } from '../edu/scripts'
+import { isNewer, issueUrl } from '../edu/release'
+import { parseHtml } from '../importers/html'
 
 describe('正方新版课表解析', () => {
   it('周次串逐段解析，单双周只作用于本段', () => {
@@ -118,5 +120,49 @@ describe('注入脚本包装', () => {
       { id: 'r1', ok: true, r: 2 },
       { id: 'r2', ok: false, e: 'boom' },
     ])
+  })
+})
+
+describe('未识别页出口', () => {
+  it('版本比较：只认数字段，前缀 v 可有可无', () => {
+    expect(isNewer('v1.4.56', '1.4.55')).toBe(true)
+    expect(isNewer('1.5', '1.4.55')).toBe(true)
+    expect(isNewer('1.4.55', '1.4.55')).toBe(false)
+    expect(isNewer('1.4.9', 'v1.4.55')).toBe(false)
+    expect(isNewer('nightly', '1.4.55')).toBe(false)
+    expect(isNewer('1.5.0', '')).toBe(false)
+  })
+
+  it('反馈链接只带脱敏地址、系统猜测、版本号', () => {
+    const u = new URL(issueUrl({ url: 'http://jw.x.edu.cn/kbcx/list.jsp?JSESSIONID=abc&xh=2021001', system: 'zhengfang_new', version: '1.4.55' }))
+    expect(u.pathname).toBe('/shuakami/timetable/issues/new')
+    const body = u.searchParams.get('body') ?? ''
+    expect(body).toContain('http://jw.x.edu.cn/kbcx/list.jsp')
+    expect(body).not.toContain('JSESSIONID')
+    expect(body).not.toContain('2021001')
+    expect(body).toContain('正方教务')
+    expect(body).toContain('1.4.55')
+  })
+})
+
+describe('非正方系统兜底：页面表格通用解析', () => {
+  it('课表网格 HTML 能解出课程', () => {
+    const html = `<html><body><table>
+      <tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th><th>星期四</th><th>星期五</th></tr>
+      <tr><td>1-2</td><td>高等数学<br>1-16周<br>教一 201<br>张三</td><td></td><td>大学英语<br>1-8周(单)<br>外语楼 305</td><td></td><td></td></tr>
+      <tr><td>3-4</td><td></td><td>程序设计<br>3-18周<br>信息楼 A102</td><td></td><td></td><td></td></tr>
+    </table></body></html>`
+    const out = parseHtml(html, { mode: 'grid' })
+    expect(out.courses.map((c) => [c.name, c.weekday, c.startPeriod, c.endPeriod, c.weeks, c.location])).toEqual([
+      ['高等数学', 1, 1, 2, '1-16', '教一 201'],
+      ['大学英语', 3, 1, 2, '1-8单', '外语楼 305'],
+      ['程序设计', 2, 3, 4, '3-18', '信息楼 A102'],
+    ])
+  })
+
+  it('登录页没有课表表格 → 无课程，进未识别', () => {
+    const out = parseHtml('<html><body><form><input name="u"><input name="p"></form></body></html>', { mode: 'grid' })
+    expect(out.courses).toHaveLength(0)
+    expect(out.diagnostics[0].code).toBe('NO_TABLE')
   })
 })

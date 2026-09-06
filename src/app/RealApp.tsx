@@ -26,6 +26,8 @@ import { stickerOfOcc } from '../domain/stickers'
 import { CARD_INSET, buildAxis, cardBreaks } from '../domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './week-axis'
 import { SchedulePage } from './schedule'
+import { EDU_RULE, EduBrowserPage, EduFailPage, EduSchoolPage, PreviewGrid, eduBack, type EduFailInfo } from './edu'
+import type { School } from '../domain/edu/schools'
 import { Sticker, setStickersOn, stickerTilt, useStickersOn } from './Sticker'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { calendarPermission, calendarSupported, clearCalendar, scheduleCalendarSync, syncCalendar } from './calendar'
@@ -1085,7 +1087,7 @@ const KIND_HINT: Record<RuleInputKind, string> = {
 type ImportStage = 'input' | 'preview'
 
 /* 规则列表（内页）：选中一条直接进导入流程 */
-function ImportPage({ onBack, onManual, onEditRule, onRun, onAi }: { onBack: () => void; onManual: () => void; onEditRule: (r: RuleManifest | 'new') => void; onRun: (ruleId: string) => void; onAi: () => void }) {
+function ImportPage({ onBack, onManual, onEditRule, onRun, onAi, onEdu }: { onBack: () => void; onManual: () => void; onEditRule: (r: RuleManifest | 'new') => void; onRun: (ruleId: string) => void; onAi: () => void; onEdu: () => void }) {
   const state = useStore()
   const rules = [...state.savedRules].sort((a, b) => a.createdAt - b.createdAt)
 
@@ -1093,6 +1095,10 @@ function ImportPage({ onBack, onManual, onEditRule, onRun, onAi }: { onBack: () 
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-10 [scrollbar-width:none]">
         <TopBar title="导入课表" onBack={onBack} />
+
+        <div className="mt-6 overflow-hidden rounded-[16px] bg-(--c-surface)">
+          <Row title="从教务系统导入" desc="内置浏览器登录教务，打开课表页后导入" onClick={onEdu} />
+        </div>
 
         <div className="mt-6 text-[12.5px] font-semibold text-(--c-ink3)">规则</div>
         <div className="mt-2.5 overflow-hidden rounded-[16px] bg-(--c-surface)">
@@ -1136,12 +1142,12 @@ function promptTokens(line: string): [string, 'k' | 'p' | 's'][] {
 }
 
 /* AI 转换课表：复制 Prompt → AI 输出 JSON → 粘贴 → 走 JSON 规则解析 */
-function AiImportPage({ onBack, onNext }: { onBack: () => void; onNext: (text: string) => void }) {
+function AiImportPage({ onBack, onNext, attach }: { onBack: () => void; onNext: (text: string) => void; attach?: string }) {
   const [text, setText] = useState('')
   const [copied, setCopied] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   const copy = async () => {
-    if (await copyText(AI_IMPORT_PROMPT)) {
+    if (await copyText(attach ? `${AI_IMPORT_PROMPT.trimEnd()}\n\n—— 课表页面文字 ——\n${attach}` : AI_IMPORT_PROMPT)) {
       setCopied(true)
       haptic('select')
       nativeToast('已复制')
@@ -1165,7 +1171,7 @@ function AiImportPage({ onBack, onNext }: { onBack: () => void; onNext: (text: s
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-6 [scrollbar-width:none]">
-        <TopBar title="让 AI 转换课表" sub="复制这段 Prompt 连同课表交给任意 AI，输出后粘贴即可" onBack={onBack} />
+        <TopBar title="让 AI 转换课表" sub={attach ? '复制这段 Prompt（已附上课表页面文字）交给任意 AI，输出后粘贴即可' : '复制这段 Prompt 连同课表交给任意 AI，输出后粘贴即可'} onBack={onBack} />
 
         <div className="relative mt-6 rounded-[16px] bg-(--c-surface) px-4 py-4">
           <button onClick={copy} className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full transition-opacity active:opacity-60">
@@ -1247,15 +1253,15 @@ function ParsedRow({ nc, sem }: { nc: NormalizedCourse; sem: Semester }) {
 }
 
 /* 导入流程（内页）：输入 → 解析结果 → 回到课表 */
-function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: RuleManifest; initialText?: string; autoRun?: boolean; onBack: () => void; onDone: () => void }) {
-  const [stage, setStage] = useState<ImportStage>('input')
+function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone }: { rule: RuleManifest; initialText?: string; initialOut?: RuleOutput; autoRun?: boolean; onBack: () => void; onDone: () => void }) {
+  const [stage, setStage] = useState<ImportStage>(initialOut ? 'preview' : 'input')
   const [text, setText] = useState(initialText ?? '')
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
   const [fileName, setFileName] = useState('')
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState<'' | 'fetch' | 'parse'>('')
   const [error, setError] = useState('')
-  const [out, setOut] = useState<RuleOutput | null>(null)
+  const [out, setOut] = useState<RuleOutput | null>(initialOut ?? null)
   const [useFileGrid, setUseFileGrid] = useState(false)
   const [sem] = useState<Semester>(() => store.state.semester ?? defaultSemester(mondayOf(todayStr())))
 
@@ -1339,7 +1345,7 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
         <TopBar
           title={stage === 'input' ? rule.name : `${pending?.courses.length ?? 0} 门课`}
           sub={stage === 'input' ? KIND_LABEL[rule.input] : undefined}
-          onBack={stage === 'preview' ? () => setStage('input') : onBack}
+          onBack={stage === 'preview' && !initialOut ? () => setStage('input') : onBack}
         />
 
         <AnimatePresence mode="wait" initial={false}>
@@ -1388,6 +1394,12 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
                   {preview.removed.length > 0 && <span className="text-(--c-danger)">消失 {preview.removed.length}</span>}
                 </div>
                 {out?.semester && <div className="mt-1.5 px-1 text-[12.5px] font-semibold tabular-nums text-(--c-ink4)">{`${md(target.startDate)} 开学，共 ${target.totalWeeks} 周`}</div>}
+
+                {initialOut && pending.courses.length > 0 && (
+                  <div className="mt-2.5">
+                    <PreviewGrid courses={pending.courses} periods={target.timeGrid.length} />
+                  </div>
+                )}
 
                 {fileGrid && (
                   <div className="mt-2.5 flex items-center rounded-[16px] bg-(--c-surface) px-4 py-3">
@@ -2111,7 +2123,11 @@ type Route =
   | { k: 'manual' }
   | { k: 'import' }
   | { k: 'importRun'; ruleId: string; text?: string; auto?: boolean }
-  | { k: 'aiImport' }
+  | { k: 'aiImport'; attach?: string }
+  | { k: 'eduSchool' }
+  | { k: 'eduBrowser'; school: School }
+  | { k: 'eduPreview'; out: RuleOutput }
+  | { k: 'eduFail'; info: EduFailInfo }
   | { k: 'rule'; rule: RuleManifest | null }
   | { k: 'semester' }
   | { k: 'schedule' }
@@ -2245,6 +2261,8 @@ export default function RealApp() {
     else setCompose({ courseId })
   }
   const pop = () => setStack((s) => s.slice(0, -1))
+  /* 浏览器会话已关，预览 / 未识别页直接顶替浏览器页，退回时回到选学校 */
+  const replaceTop = (r: Route) => setStack((s) => [...s.slice(0, -1), r])
   const backToTimetable = () => { setStack([]); setTab(0) }
   /* 头像 / 背景：原生走相册页（单选），浏览器直接选文件；换掉的文件随手删 */
   const applyPhoto = (target: PhotoTarget, ps: CapturedPhoto[]) => {
@@ -2325,6 +2343,7 @@ export default function RealApp() {
     if (stack.length > 0) {
       const top = stack[stack.length - 1]
       if (top.k === 'todoCamera' && cameraLeave.current) void cameraLeave.current().then(pop)
+      else if (top.k === 'eduBrowser' && eduBack.current) void eduBack.current()
       else setStack((s) => s.slice(0, -1))
       return true
     }
@@ -2429,10 +2448,27 @@ export default function RealApp() {
             onEditRule={(x) => push({ k: 'rule', rule: x === 'new' ? null : x })}
             onRun={(ruleId) => push({ k: 'importRun', ruleId })}
             onAi={() => push({ k: 'aiImport' })}
+            onEdu={() => push({ k: 'eduSchool' })}
           />
         )
       case 'aiImport':
-        return <AiImportPage key={key} onBack={pop} onNext={(text) => push({ k: 'importRun', ruleId: 'builtin-json', text })} />
+        return <AiImportPage key={key} attach={r.attach} onBack={pop} onNext={(text) => push({ k: 'importRun', ruleId: 'builtin-json', text })} />
+      case 'eduSchool':
+        return <EduSchoolPage key={key} onBack={pop} onOpen={(school) => push({ k: 'eduBrowser', school })} />
+      case 'eduBrowser':
+        return (
+          <EduBrowserPage
+            key={key}
+            school={r.school}
+            onBack={pop}
+            onImport={(out) => replaceTop({ k: 'eduPreview', out })}
+            onFail={(info) => replaceTop({ k: 'eduFail', info })}
+          />
+        )
+      case 'eduPreview':
+        return <ImportRunPage key={key} rule={EDU_RULE} initialOut={r.out} onBack={pop} onDone={backToTimetable} />
+      case 'eduFail':
+        return <EduFailPage key={key} info={r.info} onBack={pop} onAi={(attach) => replaceTop({ k: 'aiImport', attach })} />
       case 'importRun': {
         const rule = state.savedRules.find((x) => x.id === r.ruleId)
         return rule ? <ImportRunPage key={key} rule={rule} initialText={r.text} autoRun={r.auto} onBack={pop} onDone={backToTimetable} /> : null
@@ -2638,6 +2674,7 @@ export default function RealApp() {
                 setOnboardUnder(true)
                 if (ruleId === 'manual') push({ k: 'manual' })
                 else if (ruleId === 'ai') push({ k: 'aiImport' })
+                else if (ruleId === 'edu') push({ k: 'eduSchool' })
                 else push({ k: 'importRun', ruleId })
               }}
             />

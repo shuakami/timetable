@@ -12,9 +12,9 @@ const DEFAULT_PERIODS = 10
 const DEFAULT_FIRST = 8 * 60
 
 const SOURCES: [string, string][] = [
+  ['edu', '教务系统'],
   ['ai', '让 AI 转换'],
   ['builtin-json', 'JSON'],
-  ['builtin-html', '教务系统'],
   ['builtin-xlsx', 'Excel'],
   ['builtin-ics', '日历'],
   ['builtin-csv', 'CSV'],
