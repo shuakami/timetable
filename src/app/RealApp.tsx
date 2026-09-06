@@ -3,9 +3,9 @@ import { AnimatePresence, animate, motion, useMotionValue, useTransform } from '
 import { flushSync } from 'react-dom'
 import { App as CapApp } from '@capacitor/app'
 import type { Course, Occurrence, Semester, SessionRule, Task, OverrideKind, WidgetStyle } from '../domain/types'
-import { addDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
+import { addDays, diffDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
 import { maskHasWeek, maskToWeeks } from '../domain/weeks'
-import { occurrencesOn, occurrencesInWeek, type Snapshot } from '../domain/engine'
+import { firstClassDate, occurrencesOn, occurrencesInWeek, type Snapshot } from '../domain/engine'
 import { normalize } from '../domain/importer'
 import type { NormalizedCourse, RuleOutput } from '../domain/importer'
 import { runRule, type RuleManifest, type RuleInputKind, DEFAULT_CSV_MAPPING } from '../domain/rules'
@@ -19,7 +19,7 @@ import {
   ChangePage, ConflictPage, CourseDetailPage, CourseEditPage, EditSessionPage,
   ManualAddPage,
 } from './pages'
-import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave } from './todo'
+import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave, dueText, KIND_LABEL as TASK_KIND_LABEL } from './todo'
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
@@ -351,7 +351,7 @@ function CalendarSheet({ snap, mode, anchor, onPick, onClose }: { snap: Snapshot
 /* ---------------- 今天（跨日连续时间线） ---------------- */
 
 function TodayView({
-  snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, onCapture, liftKey,
+  snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, onSemester, onCapture, liftKey,
 }: {
   snap: Snapshot
   anchor: string
@@ -361,6 +361,7 @@ function TodayView({
   onSearch: () => void
   onImport: () => void
   onManual: () => void
+  onSemester: () => void
   onCapture: (kind: 'camera' | 'text', courseId?: string) => void
   liftKey?: string
 }) {
@@ -439,6 +440,13 @@ function TodayView({
   const endKey = ended ? `${ended.date}-${ended.courseId}-${ended.start}` : ''
   const showEnd = ended && !endHidden.includes(endKey)
   const weekend = weekdayOf(anchor) >= 6
+  const termEnd = addDays(snap.semester.startDate, snap.semester.totalWeeks * 7 - 1)
+  /* 学期第一节课还在选中日之后：整个学期还没开课；两周内都没课且已过学期末：学期已结束 */
+  const free = !nothingAtAll && head.length === 0
+  const firstClass = useMemo(() => (free ? firstClassDate(snap, snap.semester.startDate) : null), [snap, free])
+  const notStarted = free && firstClass != null && firstClass > anchor
+  const idle = free && days.length === 1
+  const afterTerm = idle && anchor > termEnd && firstClassDate(snap, anchor) == null
 
   return (
     <>
@@ -456,13 +464,17 @@ function TodayView({
           </div>
           <div className="mt-2 flex items-center gap-2.5 text-[12.5px] font-semibold text-(--c-ink3)">
             {inTerm ? <span>第 {week} 周</span> : <span>学期外</span>}
-            <span className="h-3 w-px bg-(--c-line)" />
-            <span>{week % 2 === 1 ? '单周' : '双周'}</span>
+            {inTerm && (
+              <>
+                <span className="h-3 w-px bg-(--c-line)" />
+                <span>{week % 2 === 1 ? '单周' : '双周'}</span>
+              </>
+            )}
             <span className="h-3 w-px bg-(--c-line)" />
             {head.length > 0 ? (
               <span>{head.length} 节课{anchor === today && <span className="text-(--c-ink5)">，剩 {remain} 节</span>}</span>
             ) : (
-              <span className="text-(--c-ink5)">{nothingAtAll ? '暂无课表' : '今天没有课'}</span>
+              <span className="text-(--c-ink5)">{nothingAtAll ? '暂无课表' : notStarted ? '暂未开课' : afterTerm ? '学期已结束' : '今天没有课'}</span>
             )}
           </div>
         </StickyHead>
@@ -475,6 +487,24 @@ function TodayView({
               title="让课表就位"
               desc="一键导入，或是手动创建。随后的日程追踪与准时提醒，皆会为你准备就绪。"
               actions={[['导入课表', onImport], ['手动添加', onManual]]}
+            />
+          </div>
+        ) : notStarted && idle ? (
+          <div className="mt-14">
+            <EmptyBlock
+              kind="term"
+              title="暂未开课"
+              desc={`课程将于第 ${weekOf(snap.semester, firstClass)} 周（${md(firstClass)}）正式开启`}
+              actions={[[`前往 ${md(firstClass)}`, () => setAnchor(firstClass)]]}
+            />
+          </div>
+        ) : afterTerm ? (
+          <div className="mt-14">
+            <EmptyBlock
+              kind="term"
+              title="学期已结束"
+              desc={`共 ${snap.semester.totalWeeks} 周，止于 ${md(termEnd)}。`}
+              actions={[['学期设置', onSemester]]}
             />
           </div>
         ) : head.length === 0 && days.length === 1 ? (
@@ -505,7 +535,7 @@ function TodayView({
                   </div>
                 )}
                 {day.occ.length === 0 && di === 0 && (
-                  <div className="pb-7 text-[13.5px] font-semibold text-(--c-ink4)">无课程</div>
+                  <div className="pb-7 text-[13.5px] font-semibold text-(--c-ink4)">{notStarted ? '暂未开课' : '无课程'}</div>
                 )}
                 {day.occ.map((o, oi) => {
                   const isLast = oi === day.occ.length - 1
@@ -906,10 +936,21 @@ function Hit({ text, q }: { text: string; q: string }) {
   )
 }
 
-function SearchPalette({ state, onClose, onPickCourse }: { state: State; onClose: () => void; onPickCourse: (c: Course) => void }) {
+function SearchPalette({ state, onClose, onPickCourse, onPickTask }: { state: State; onClose: () => void; onPickCourse: (c: Course) => void; onPickTask: (t: Task) => void }) {
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => inputRef.current?.focus(), [])
+  const today = todayStr()
+
+  const tasks = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return []
+    const hit = (v?: string) => !!v && v.toLowerCase().includes(s)
+    return state.tasks
+      .filter((t) => hit(t.title) || hit(t.note) || hit(t.location) || hit(state.courses.find((c) => c.id === t.courseId)?.name))
+      .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9').localeCompare(b.due ?? '9'))
+      .slice(0, 8)
+  }, [q, state])
 
   const groups = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -937,7 +978,7 @@ function SearchPalette({ state, onClose, onPickCourse }: { state: State; onClose
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="课程、老师、教室"
+            placeholder="课程、老师、教室、待办"
             className="min-w-0 flex-1 bg-transparent text-[14px] font-medium text-(--c-ink) outline-none placeholder:text-(--c-ink5)"
           />
           <button onClick={onClose} className="ml-auto flex-none pl-2 text-[12.5px] font-medium text-(--c-ink3)">取消</button>
@@ -967,8 +1008,30 @@ function SearchPalette({ state, onClose, onPickCourse }: { state: State; onClose
               </div>
             </div>
           ))}
-          {q.trim() && groups.length === 0 && (
-            <div className="rounded-[14px] bg-(--c-surface) px-4 py-5 text-center text-[13px] font-medium text-(--c-ink4)">没有匹配的课程</div>
+          {tasks.length > 0 && (
+            <div>
+              <div className="px-1.5 text-[11.5px] font-medium text-(--c-ink4)">待办</div>
+              <div className="mt-1.5 overflow-hidden rounded-[14px] bg-(--c-surface) p-1">
+                {tasks.map((t) => {
+                  const course = state.courses.find((c) => c.id === t.courseId)
+                  return (
+                    <button key={t.id} onClick={() => onPickTask(t)} className={`flex w-full items-center rounded-[10px] px-2.5 py-2.5 text-left transition-colors active:bg-(--c-surface2) ${t.done ? 'opacity-45' : ''}`}>
+                      <i className="mr-3 h-[26px] w-[3px] flex-none rounded-full" style={{ background: course?.color ?? 'var(--c-ink5)' }} />
+                      <div className="min-w-0 flex-1">
+                        <div className={`truncate text-[13.5px] font-semibold ${t.done ? 'line-through' : ''}`}><Hit text={t.title || '板书'} q={q} /></div>
+                        <div className="mt-[2px] truncate text-[11.5px] font-medium text-(--c-ink4)">
+                          {course?.name ?? TASK_KIND_LABEL[t.kind]}，{dueText(t.due, t.dueMinutes, today)}
+                        </div>
+                      </div>
+                      {t.kind === 'exam' && <span className="ml-2 flex-none rounded-[5px] bg-(--c-rose-soft) px-1.5 py-[2px] text-[10px] font-extrabold text-(--c-rose)">考试</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {q.trim() && groups.length === 0 && tasks.length === 0 && (
+            <div className="rounded-[14px] bg-(--c-surface) px-4 py-5 text-center text-[13px] font-medium text-(--c-ink4)">没有匹配的结果</div>
           )}
         </div>
       </div>
@@ -1164,6 +1227,7 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<ReturnType<Store['previewImport']> | null>(null)
   const [pending, setPending] = useState<ReturnType<typeof normalize> | null>(null)
+  const [semNote, setSemNote] = useState('')
   const sem = store.state.semester ?? defaultSemester(mondayOf(todayStr()))
 
   const parse = async () => {
@@ -1178,6 +1242,7 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
         // 课程表自己导出的文件：学期、节次表照单全收
         target = { ...target, ...out.semester, timeGrid: out.timeGrid ?? target.timeGrid }
         store.setSemester(target)
+        setSemNote(`${md(target.startDate)} 开学，共 ${target.totalWeeks} 周`)
       } else if (out.timeGrid && out.timeGrid.length > target.timeGrid.length) {
         target = { ...target, timeGrid: out.timeGrid }
         store.setSemester(target)
@@ -1295,6 +1360,7 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
                   {preview.protectedKept.length > 0 && <span className="text-(--c-ink3)">保留改动 {preview.protectedKept.length}</span>}
                   {preview.removed.length > 0 && <span className="text-(--c-danger)">消失 {preview.removed.length}</span>}
                 </div>
+                {semNote && <div className="mt-1.5 px-1 text-[12.5px] font-semibold tabular-nums text-(--c-ink4)">{semNote}</div>}
 
                 <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
                   {pending.courses.map((nc) => (
@@ -2416,6 +2482,7 @@ export default function RealApp() {
               onSearch={() => setSearching(true)}
               onImport={() => push({ k: 'import' })}
               onManual={() => push({ k: 'manual' })}
+              onSemester={() => push({ k: 'semester' })}
               onCapture={openCapture}
             />
           )}
@@ -2458,6 +2525,7 @@ export default function RealApp() {
               state={state}
               onClose={() => setSearching(false)}
               onPickCourse={(c) => push({ k: 'course', course: c })}
+              onPickTask={(t) => { setSearching(false); push({ k: 'todoDetail', task: t }) }}
             />
           </motion.div>
         )}

@@ -43,6 +43,7 @@ public final class WidgetStore {
     public static final class Data {
         public int week;
         public int totalWeeks;
+        public String firstClass;
         public final List<Day> days = new ArrayList<>();
 
         public Day day(String date) {
@@ -70,6 +71,7 @@ public final class WidgetStore {
             Data d = new Data();
             d.week = o.optInt("week");
             d.totalWeeks = o.optInt("totalWeeks");
+            d.firstClass = o.isNull("firstClass") ? null : o.optString("firstClass", null);
             JSONArray days = o.optJSONArray("days");
             for (int i = 0; days != null && i < days.length(); i++) {
                 JSONObject dj = days.getJSONObject(i);

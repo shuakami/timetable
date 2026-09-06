@@ -1,7 +1,7 @@
 import type {
   Course, Occurrence, Override, Semester, SessionRule, UserEntry, LocalDate,
 } from './types'
-import { dateOf, inVacation, weekOf, weekdayOf } from './dates'
+import { addDays, dateOf, inVacation, weekOf, weekdayOf } from './dates'
 import { maskHasWeek } from './weeks'
 
 export interface Snapshot {
@@ -98,6 +98,15 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
   out.sort((a, b) => a.start - b.start || a.end - b.end)
   markConflicts(out)
   return out
+}
+
+/** from 起（含）第一个有未停课课程的日子；学期结束前都没有则为 null */
+export function firstClassDate(snap: Snapshot, from: LocalDate): LocalDate | null {
+  const end = addDays(snap.semester.startDate, snap.semester.totalWeeks * 7 - 1)
+  for (let d = from; d <= end; d = addDays(d, 1)) {
+    if (occurrencesOn(snap, d).some((o) => o.status !== 'cancelled')) return d
+  }
+  return null
 }
 
 export function markConflicts(list: Occurrence[]) {

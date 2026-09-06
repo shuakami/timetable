@@ -209,10 +209,9 @@ public final class WidgetRender {
     /** 接下来一段时间都没课时给出的原因，一句话 */
     private static String emptyReason(Data data, String today) {
         if (noData(data)) return "还没有课表";
-        Day first = null;
-        for (Day d : data.days) if (!live(d).isEmpty()) { first = d; break; }
-        if (first != null && first.date.compareTo(today) > 0 && data.days.get(0).date.compareTo(today) > 0) {
-            return WidgetStore.monthOf(first.date) + "月" + WidgetStore.dayOfMonth(first.date) + "日开学";
+        String first = data.firstClass;
+        if (first != null && first.compareTo(today) > 0) {
+            return WidgetStore.monthOf(first) + "月" + WidgetStore.dayOfMonth(first) + "日开课";
         }
         String last = data.days.get(data.days.size() - 1).date;
         if (last.compareTo(today) < 0 && data.week >= data.totalWeeks) return "本学期已结束";

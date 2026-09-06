@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Semester } from '../types'
 import { dateOf, weekOf, weekdayOf, inVacation } from '../dates'
-import { occurrencesOn, identityKey, type Snapshot } from '../engine'
+import { firstClassDate, occurrencesOn, identityKey, type Snapshot } from '../engine'
 import { weeksToMask } from '../weeks'
 
 const sem: Semester = {
@@ -125,5 +125,14 @@ describe('identityKey', () => {
   })
   it('differs by teacher', () => {
     expect(identityKey('高数', '甲', 1, 1)).not.toBe(identityKey('高数', '乙', 1, 1))
+  })
+})
+
+describe('firstClassDate', () => {
+  it('跳过开学后没课的周，找到第一节课', () => {
+    const s = snap({ courses: [course], rules: [{ ...rule, weeksMask: weeksToMask([3, 4]) }] })
+    expect(firstClassDate(s, '2026-08-25')).toBe('2026-09-14')
+    expect(firstClassDate(s, '2026-09-14')).toBe('2026-09-14')
+    expect(firstClassDate(s, '2026-09-22')).toBeNull()
   })
 })

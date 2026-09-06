@@ -1,6 +1,6 @@
 import type { LocalDate, WidgetStyle } from './types'
 import { addDays, atMinutes, dateOf, fmtMinutes, fromDate, weekOf } from './dates'
-import { occurrencesOn, type Snapshot } from './engine'
+import { firstClassDate, occurrencesOn, type Snapshot } from './engine'
 
 /* 桌面小组件的数据快照：JS 只给事实（时间戳、颜色、名字），
    「现在第几节、还剩几节、下一节几分钟后」由原生渲染时算，避免小组件停在旧时间上。 */
@@ -28,6 +28,8 @@ export interface WidgetData {
   style: WidgetStyle
   week: number
   totalWeeks: number
+  /** 学期第一节课的日子，一节课都没有则为空 */
+  firstClass: LocalDate | null
   days: WidgetDay[]
 }
 
@@ -63,6 +65,7 @@ export function buildWidgetData(snap: Snapshot | null, style: WidgetStyle, now: 
     style,
     week,
     totalWeeks: snap?.semester.totalWeeks ?? 0,
+    firstClass: snap ? firstClassDate(snap, snap.semester.startDate) : null,
     days,
   }
 }

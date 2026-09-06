@@ -23,7 +23,7 @@ export interface RuleOutput {
   diagnostics: Diagnostic[]
   timeGrid?: TimeSlot[] // 课表自带节次表时覆盖学期设置
   /** 来源自带学期信息（开学日、周数）时覆盖学期设置 */
-  semester?: Pick<Semester, 'name' | 'startDate' | 'totalWeeks'>
+  semester?: Pick<Semester, 'startDate'> & Partial<Pick<Semester, 'name' | 'totalWeeks'>>
 }
 
 const PHONE_RE = /(?:\+?86[- ]?)?1[3-9]\d(?:[ \-]?\d){8}/
@@ -157,7 +157,16 @@ export function parseJsonTable(text: string): RuleOutput {
       weeks,
     })
   })
-  return { courses, diagnostics: diags, timeGrid: parseTimeSlots((obj as { timeSlots?: unknown }).timeSlots) }
+  const meta = obj as { timeSlots?: unknown; startDate?: unknown; totalWeeks?: unknown; semester?: unknown }
+  const startDate = typeof meta.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(meta.startDate) ? meta.startDate : undefined
+  const totalWeeks = typeof meta.totalWeeks === 'number' && meta.totalWeeks >= 1 && meta.totalWeeks <= 60 ? Math.floor(meta.totalWeeks) : undefined
+  const semName = typeof meta.semester === 'string' && meta.semester.trim() ? meta.semester.trim() : undefined
+  return {
+    courses,
+    diagnostics: diags,
+    timeGrid: parseTimeSlots(meta.timeSlots),
+    ...(startDate ? { semester: { startDate, ...(totalWeeks ? { totalWeeks } : {}), ...(semName ? { name: semName } : {}) } } : {}),
+  }
 }
 
 /* ---------- 规范化：RuleOutput → Course/SessionRule ---------- */

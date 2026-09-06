@@ -16,13 +16,13 @@ import {
 } from './ui'
 
 const KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
-const KIND_LABEL: Record<Task['kind'], string> = { homework: '作业', exam: '考试', memo: '备忘' }
+export const KIND_LABEL: Record<Task['kind'], string> = { homework: '作业', exam: '考试', memo: '备忘' }
 
 const dayDiff = (a: string, b: string) =>
   Math.round((new Date(`${a}T00:00:00`).getTime() - new Date(`${b}T00:00:00`).getTime()) / 86400000)
 
 /** 截止的口语说法：今晚 23:00 / 明天 09:00 / 周四 08:00 / 10月14日 */
-function dueText(due: string | undefined, mins: number | undefined, today: string): string {
+export function dueText(due: string | undefined, mins: number | undefined, today: string): string {
   if (!due) return '没有截止'
   const time = mins != null ? fmtMinutes(mins) : ''
   const diff = dayDiff(due, today)

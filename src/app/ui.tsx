@@ -416,9 +416,10 @@ export function EmptyArt({ kind }: { kind: EmptyKind }) {
     ),
     term: (
       <>
-        <path d="M10 8h22l8 8v24a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" />
-        <path d="M32 8v8h8" />
-        <path d="m18 28 4 4 8-8" />
+        <rect x="6" y="9" width="36" height="32" rx="5" />
+        <path d="M6 18h36M15 5v7M33 5v7" />
+        <path d="M14 26h6M14 34h6M25 26h6" />
+        <rect x="25" y="32" width="6" height="4" rx="1" fill="var(--c-accent)" stroke="none" />
       </>
     ),
     holiday: (

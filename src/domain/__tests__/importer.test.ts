@@ -34,6 +34,15 @@ describe('parseJsonTable', () => {
     expect(out.courses).toHaveLength(1)
     expect(out.courses[0].endPeriod).toBe(2)
     expect(out.diagnostics).toHaveLength(0)
+    expect(out.semester).toBeUndefined()
+  })
+
+  it('picks up startDate / totalWeeks / semester name', () => {
+    const out = parseJsonTable(JSON.stringify({
+      semester: '2026-2027年第1学期', startDate: '2026-08-31', totalWeeks: 20,
+      courses: [{ name: '高数', day: 1, startNode: 1, step: 2, weeks: [3] }],
+    }))
+    expect(out.semester).toEqual({ name: '2026-2027年第1学期', startDate: '2026-08-31', totalWeeks: 20 })
   })
   it('picks teacher phone from field or teacher text', () => {
     const out = parseJsonTable(JSON.stringify({
