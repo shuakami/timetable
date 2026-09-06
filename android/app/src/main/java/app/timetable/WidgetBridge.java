@@ -5,11 +5,20 @@ import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.appwidget.AppWidgetManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
+import android.provider.Settings;
+import android.view.HapticFeedbackConstants;
+import android.view.View;
 import android.widget.Toast;
 
 import com.getcapacitor.JSArray;
@@ -193,6 +202,122 @@ public class WidgetBridge extends Plugin {
     @PluginMethod
     public void ready(PluginCall call) {
         webReady = true;
+        call.resolve();
+    }
+
+    /* ---------------- 剪贴板：WebView 里 navigator.clipboard 读不到、写不稳，走系统 ClipboardManager ---------------- */
+
+    @PluginMethod
+    public void copy(PluginCall call) {
+        String text = call.getString("text");
+        if (text == null) {
+            call.reject("missing text");
+            return;
+        }
+        Activity act = getActivity();
+        if (act == null) {
+            call.reject("no activity");
+            return;
+        }
+        act.runOnUiThread(() -> {
+            ClipboardManager cm = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm == null) {
+                call.reject("no clipboard");
+                return;
+            }
+            cm.setPrimaryClip(ClipData.newPlainText("timetable", text));
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void paste(PluginCall call) {
+        Activity act = getActivity();
+        if (act == null) {
+            call.reject("no activity");
+            return;
+        }
+        act.runOnUiThread(() -> {
+            ClipboardManager cm = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
+            JSObject o = new JSObject();
+            String text = "";
+            if (cm != null && cm.hasPrimaryClip()) {
+                ClipData clip = cm.getPrimaryClip();
+                if (clip != null && clip.getItemCount() > 0) {
+                    CharSequence cs = clip.getItemAt(0).coerceToText(act);
+                    if (cs != null) text = cs.toString();
+                }
+            }
+            o.put("text", text);
+            call.resolve(o);
+        });
+    }
+
+    /* ---------------- 触感：滚轮刻度用系统时钟刻度，选定用确认 ---------------- */
+
+    @PluginMethod
+    public void haptic(PluginCall call) {
+        String kind = call.getString("kind", "tick");
+        Activity act = getActivity();
+        if (act == null) {
+            call.resolve();
+            return;
+        }
+        act.runOnUiThread(() -> {
+            View v = getBridge().getWebView();
+            int c;
+            switch (kind) {
+                case "select":
+                    c = Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.KEYBOARD_TAP;
+                    break;
+                case "reject":
+                    c = Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.REJECT : HapticFeedbackConstants.LONG_PRESS;
+                    break;
+                case "press":
+                    c = HapticFeedbackConstants.KEYBOARD_TAP;
+                    break;
+                case "edge":
+                    c = Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
+                    break;
+                default:
+                    c = Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_FREQUENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
+            }
+            boolean done = v != null && v.performHapticFeedback(c, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
+            if (!done) vibrateFallback(act, kind);
+            call.resolve();
+        });
+    }
+
+    private static void vibrateFallback(Context ctx, String kind) {
+        Vibrator vib;
+        if (Build.VERSION.SDK_INT >= 31) {
+            VibratorManager vm = (VibratorManager) ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+            vib = vm == null ? null : vm.getDefaultVibrator();
+        } else {
+            vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
+        }
+        if (vib == null || !vib.hasVibrator()) return;
+        if (Build.VERSION.SDK_INT >= 29) {
+            int effect = "select".equals(kind) ? VibrationEffect.EFFECT_CLICK
+                    : "reject".equals(kind) ? VibrationEffect.EFFECT_DOUBLE_CLICK
+                    : VibrationEffect.EFFECT_TICK;
+            vib.vibrate(VibrationEffect.createPredefined(effect));
+        } else if (Build.VERSION.SDK_INT >= 26) {
+            vib.vibrate(VibrationEffect.createOneShot("select".equals(kind) ? 12 : 4, VibrationEffect.DEFAULT_AMPLITUDE));
+        }
+    }
+
+    /** 系统的本应用详情页：权限被永久拒绝后从这里放开 */
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        Activity act = getActivity();
+        if (act == null) {
+            call.reject("no activity");
+            return;
+        }
+        Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", act.getPackageName(), null));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        act.startActivity(i);
         call.resolve();
     }
 

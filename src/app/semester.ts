@@ -1,4 +1,4 @@
-import type { Semester } from '../domain/types'
+import type { Semester, TimeSlot } from '../domain/types'
 import { addDays, fromDate, weekdayOf } from '../domain/dates'
 import { uid } from '../domain/store'
 
@@ -18,6 +18,24 @@ export function defaultSemester(startDate: string): Semester {
     vacations: [],
     examWeeks: [],
   }
+}
+
+/** 节次表还是出厂默认（用户没在「作息时间」改过、也没被导入改过） */
+export function isDefaultGrid(grid: TimeSlot[]): boolean {
+  return grid.length === SLOTS.length && grid.every((t, i) => t.start === SLOTS[i][0] && t.end === SLOTS[i][1])
+}
+
+/** 课程节次超出节次表时，按最后一节的时长和 10 分课间往后补 */
+export function extendGrid(grid: TimeSlot[], need: number): TimeSlot[] {
+  if (need <= grid.length) return grid
+  const out = [...grid]
+  while (out.length < need) {
+    const last = out[out.length - 1]
+    const dur = last ? last.end - last.start : 45
+    const start = last ? last.end + 10 : 8 * 60
+    out.push({ index: out.length + 1, start, end: start + dur })
+  }
+  return out
 }
 
 export const todayStr = () => fromDate(new Date())

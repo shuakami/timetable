@@ -1,11 +1,15 @@
-import { useState, type MutableRefObject } from 'react'
+import { useMemo, useState, type MutableRefObject } from 'react'
 import { AnimatePresence } from 'motion/react'
-import { diffDays } from '../domain/dates'
+import { diffDays, fmtMinutes } from '../domain/dates'
+import { DEFAULT_DURATION, DURATION_STEP, MAX_DURATION, MAX_PERIODS, MIN_DURATION, MIN_PERIODS, generateGrid } from '../domain/schedule'
 import { store } from './store'
+import { haptic } from './widgets'
 import { defaultSemester, mondayOf, todayStr } from './semester'
-import { DateInput, Field, Page, PrimaryButton, Row, TextAction, TopBar, md } from './ui'
+import { DateInput, Field, Page, PrimaryButton, Row, Stepper, TextAction, TimeSheet, TopBar, md } from './ui'
 
 const WEEKS = 20
+const DEFAULT_PERIODS = 10
+const DEFAULT_FIRST = 8 * 60
 
 const SOURCES: [string, string][] = [
   ['ai', '让 AI 转换'],
@@ -43,7 +47,7 @@ function Step({ title, sub, onBack, footer, children }: { title: string; sub?: s
   )
 }
 
-/** 首次进入：三个内页，和应用内其他页面同一套推入 */
+/** 首次进入：开学日期 → 作息时间 → 课表来源，和应用内其他页面同一套推入 */
 export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDone: (ruleId: string | null) => void; initialStep?: number; backRef?: MutableRefObject<() => boolean> }) {
   const [step, setStep] = useState(initialStep)
   if (backRef) {
@@ -55,9 +59,14 @@ export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDon
   }
   const [date, setDate] = useState(() => mondayOf(todayStr()))
   const start = mondayOf(date)
+  const [count, setCount] = useState(DEFAULT_PERIODS)
+  const [duration, setDuration] = useState(DEFAULT_DURATION)
+  const [first, setFirst] = useState(DEFAULT_FIRST)
+  const [pickFirst, setPickFirst] = useState(false)
+  const grid = useMemo(() => generateGrid(count, duration, first), [count, duration, first])
 
   const finish = (ruleId: string | null) => {
-    store.setSemester({ ...defaultSemester(start), totalWeeks: WEEKS })
+    store.setSemester({ ...defaultSemester(start), totalWeeks: WEEKS, timeGrid: grid })
     onDone(ruleId)
   }
 
@@ -93,9 +102,57 @@ export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDon
         )}
         {step >= 2 && (
           <Step
+            key="schedule"
+            title="作息时间"
+            sub={`${count} 节 · ${fmtMinutes(grid[0].start)} – ${fmtMinutes(grid[grid.length - 1].end)}`}
+            onBack={() => setStep(1)}
+            footer={<PrimaryButton onClick={() => setStep(3)}>继续</PrimaryButton>}
+          >
+            <div className="rounded-[18px] bg-(--c-surface) px-4">
+              <div className="flex items-center py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">每天节数</span>
+                <Stepper value={count} unit="节" min={MIN_PERIODS} max={MAX_PERIODS} onChange={setCount} />
+              </div>
+              <div className="flex items-center border-t border-(--c-line2) py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">每节时长</span>
+                <Stepper value={duration} unit="分" min={MIN_DURATION} max={MAX_DURATION} step={DURATION_STEP} onChange={setDuration} />
+              </div>
+              <div className="flex items-center border-t border-(--c-line2) py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">第 1 节开始</span>
+                <button
+                  onClick={() => { haptic('press'); setPickFirst(true) }}
+                  className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[15px] font-bold tabular-nums text-(--c-ink) transition-transform duration-150 active:scale-[.96]"
+                >
+                  {fmtMinutes(first)}
+                </button>
+              </div>
+            </div>
+            <div className="mt-5 mb-6 grid grid-cols-2 gap-x-4 rounded-[18px] bg-(--c-surface) px-4 py-2">
+              {grid.map((t, i) => (
+                <div key={t.index} className={`flex items-center py-[7px] ${i >= 2 ? 'border-t border-(--c-line2)' : ''}`}>
+                  <span className="w-[24px] text-[12px] font-bold tabular-nums text-(--c-ink5)">{t.index}</span>
+                  <span className="text-[13px] font-semibold tabular-nums text-(--c-ink)">{fmtMinutes(t.start)}</span>
+                  <span className="mx-1.5 text-[12px] text-(--c-ink5)">–</span>
+                  <span className="text-[13px] font-medium tabular-nums text-(--c-ink4)">{fmtMinutes(t.end)}</span>
+                </div>
+              ))}
+            </div>
+            {pickFirst && (
+              <TimeSheet
+                value={fmtMinutes(first)}
+                title="第 1 节开始"
+                step={5}
+                onPick={(v) => { const [h, m] = v.split(':').map(Number); setFirst(h * 60 + m) }}
+                onClose={() => setPickFirst(false)}
+              />
+            )}
+          </Step>
+        )}
+        {step >= 3 && (
+          <Step
             key="source"
             title="课表来源"
-            onBack={() => setStep(1)}
+            onBack={() => setStep(2)}
             footer={
               <div className="flex justify-center">
                 <TextAction tone="mute" onClick={() => finish(null)}>稍后</TextAction>

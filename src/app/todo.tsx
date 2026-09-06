@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useIsPresent } from 'motion/react'
 import type { Course, Task, TaskPhoto } from '../domain/types'
 import { fmtMinutes, weekdayOf } from '../domain/dates'
@@ -7,7 +7,8 @@ import { captureContext, suggestedDue, type ClassMoment } from '../domain/next-c
 import { uid } from '../domain/store'
 import { store, useStore } from './store'
 import { nowMinutes, todayStr } from './semester'
-import { camera, nativeCamera, type CapturedPhoto, type GalleryItem } from './camera'
+import { camera, nativeCamera, type CapturedPhoto, type GalleryItem, type PermissionStatus } from './camera'
+import { openAppSettings } from './widgets'
 import { PhotoViewer, TaskPhotoImg } from './photo'
 import { useImeY } from './ime'
 import {
@@ -650,22 +651,31 @@ export function PickerPage({ onBack, onDone, single }: { onBack: () => void; onD
   const [more, setMore] = useState(true)
   const [picked, setPicked] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [perm, setPerm] = useState<PermissionStatus>('prompt')
+
+  const load = useCallback(async () => {
+    const status = await camera.request('photos')
+    setPerm(status)
+    if (status !== 'granted') return
+    const list = await camera.listRecent(0)
+    setItems(list)
+    setPage(0)
+    setMore(list.length > 0)
+  }, [])
 
   useEffect(() => {
-    let alive = true
-    void (async () => {
-      const status = await camera.request('photos')
-      if (!alive || status !== 'granted') return
-      const list = await camera.listRecent(0)
-      if (alive) {
-        setItems(list)
-        setMore(list.length > 0)
-      }
-    })()
-    return () => {
-      alive = false
+    void load()
+  }, [load])
+
+  /* 去系统设置放开权限后回来，直接重新拉列表 */
+  useEffect(() => {
+    if (perm === 'granted') return
+    const onShow = () => {
+      if (document.visibilityState === 'visible') void load()
     }
-  }, [])
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [perm, load])
 
   const loadMore = async () => {
     if (!more) return
@@ -705,14 +715,23 @@ export function PickerPage({ onBack, onDone, single }: { onBack: () => void; onD
       >
         {items.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-8 text-center">
-            <div className="text-[15px] font-bold text-white">没有可选的照片</div>
-            <div className="mt-2 text-[12.5px] font-medium text-white/60">允许访问照片，或直接从文件里选择</div>
-            <button
-              onClick={() => void camera.pick().then((ps) => ps.length > 0 && onDone(ps))}
-              className="mt-4 flex h-[34px] items-center rounded-full bg-white px-4 text-[13px] font-bold text-black"
-            >
-              从文件选择
-            </button>
+            <div className="text-[15px] font-bold text-white">{perm === 'granted' ? '没有照片' : '未允许访问照片'}</div>
+            <div className="mt-2 text-[12.5px] font-medium text-white/60">
+              {perm === 'granted' ? '相册里还没有图片' : perm === 'blocked' ? '在系统设置里允许读取照片' : '允许后才能在这里挑选'}
+            </div>
+            <div className="mt-4 flex gap-2.5">
+              {perm === 'blocked' ? (
+                <button onClick={openAppSettings} className="flex h-[34px] items-center rounded-full bg-white px-4 text-[13px] font-bold text-black">去设置</button>
+              ) : perm !== 'granted' ? (
+                <button onClick={() => void load()} className="flex h-[34px] items-center rounded-full bg-white px-4 text-[13px] font-bold text-black">允许访问</button>
+              ) : null}
+              <button
+                onClick={() => void camera.pick().then((ps) => ps.length > 0 && onDone(ps))}
+                className={`flex h-[34px] items-center rounded-full px-4 text-[13px] font-bold ${perm === 'granted' ? 'bg-white text-black' : 'bg-white/12 text-white'}`}
+              >
+                从文件选择
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-3 content-start gap-[3px]">

@@ -17,7 +17,8 @@ export interface GalleryItem {
   height: number
 }
 
-export type PermissionStatus = 'granted' | 'denied' | 'prompt'
+/** blocked：用户选了不再询问，系统对话框不会再出现，只能去系统设置放开 */
+export type PermissionStatus = 'granted' | 'denied' | 'blocked' | 'prompt'
 
 interface TtCameraPlugin {
   checkPermissions(): Promise<{ camera: PermissionStatus; photos: PermissionStatus }>

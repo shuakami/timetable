@@ -13,7 +13,7 @@ import { fetchUrl } from '../domain/importers/url'
 import { AI_IMPORT_PROMPT } from '../domain/ai-prompt'
 import { uid, type Store, type State } from '../domain/store'
 import { store, useStore } from './store'
-import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
+import { defaultSemester, extendGrid, isDefaultGrid, mondayOf, nowMinutes, todayStr } from './semester'
 import Onboarding, { currentWeek } from './Onboarding'
 import {
   ChangePage, ConflictPage, CourseDetailPage, CourseEditPage, EditSessionPage,
@@ -23,16 +23,19 @@ import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskD
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { stickerOfOcc } from '../domain/stickers'
+import { buildAxis } from '../domain/time-axis'
+import { WeekAxis, WeekCard, WeekLines } from './week-axis'
+import { SchedulePage } from './schedule'
 import { Sticker, setStickersOn, stickerTilt, useStickersOn } from './Sticker'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { calendarPermission, calendarSupported, clearCalendar, scheduleCalendarSync, syncCalendar } from './calendar'
-import { nativeToast, syncWidgets } from './widgets'
+import { copyText, haptic, nativeToast, pasteText, syncWidgets } from './widgets'
 import { onIncomingIcs, shareIcs } from './files'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
   ActionSheet, BackPill, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
   TextAction, TextInput, TopBar, WD, WD_SHORT, dockStyle, md, tint, type Ghost, type Rect,
-  DateInput, TimeInput,
+  DateInput, Switch,
 } from './ui'
 
 /* ---------------- 壳 ---------------- */
@@ -625,12 +628,7 @@ function TodayView({
 
 /* ---------------- 周视图 ---------------- */
 
-const HOUR = 42
-/* 卡片能读清课名与地点的最低高度；最短的课不够时放大整个时间轴，不单独拉高卡片 */
-const MIN_CARD = 44
-const MAX_HOUR = 120
-
-/** 一周的日期条 + 时间网格；左右滑时相邻周也各渲染一份 */
+/** 一周的日期条 + 节次网格（纵轴见 domain/time-axis）；左右滑时相邻周也各渲染一份 */
 function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, liftKey, gridRef, onGeometry }: {
   snap: Snapshot
   week: number
@@ -650,16 +648,16 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
   const days = [1, 2, 3, 4, 5, 6, 7].map((wd) => dateOf(sem, week, wd))
   const todayIdx = days.indexOf(today)
 
-  /* 网格范围跟着真实课程走，晚课不会溢出白色区域 */
-  const all = [...byDay.values()].flat()
-  const dayStart = Math.min(8, ...all.map((o) => Math.floor(o.start / 60))) * 60
-  const dayEnd = Math.max(20, ...all.map((o) => Math.ceil(o.end / 60))) * 60
-  const hours: number[] = []
-  for (let h = dayStart / 60; h <= dayEnd / 60; h += 2) hours.push(h)
-  const shortest = Math.min(...all.map((o) => o.end - o.start).filter((m) => m > 0))
-  const hour = Number.isFinite(shortest) ? Math.min(MAX_HOUR, Math.max(HOUR, Math.ceil(((MIN_CARD + 2) * 60) / shortest))) : HOUR
-  const gridH = ((dayEnd - dayStart) / 60) * hour + 8
-  const nowTop = ((now - dayStart) / 60) * hour
+  /* 轴的范围跟着真实课程走：节次之外的早课、晚自习按真实时长延伸，不会溢出 */
+  const axis = useMemo(() => {
+    const all = [...byDay.values()].flat()
+    const span = all.length > 0 ? { start: Math.min(...all.map((o) => o.start)), end: Math.max(...all.map((o) => o.end)) } : undefined
+    return buildAxis(sem.timeGrid, span)
+  }, [sem.timeGrid, byDay])
+  const first = axis.segs[0]
+  const last = axis.segs[axis.segs.length - 1]
+  const gridH = axis.height + 8
+  const nowTop = now >= first.t0 && now <= last.t1 ? axis.y(now) : 0
   useEffect(() => {
     onGeometry?.(todayIdx, nowTop)
   }, [todayIdx, nowTop, onGeometry])
@@ -686,19 +684,9 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
       </div>
 
       <div className="relative mt-2">
-        {hours.map((h, i) => (
-          <div key={h} className="absolute right-0 left-8 h-px bg-(--c-surface2)" style={{ top: i * 2 * hour + 6 }} />
-        ))}
+        <WeekLines axis={axis} />
         <div className="flex pt-1.5">
-          <div className="relative w-8 flex-none">
-            {hours.map((h) => (
-              <div key={h} className="pr-1.5 text-right text-[9.5px] font-semibold tabular-nums text-(--c-ink5)" style={{ height: 2 * hour }}>{h}:00</div>
-            ))}
-            {/* 时间刻度跟随真实课程范围 */}
-            {todayIdx >= 0 && nowTop > 0 && hours.every((h) => Math.abs(now - h * 60) >= 20) && (
-              <div className="absolute right-1.5 text-[9.5px] font-bold tabular-nums text-(--c-accent)" style={{ top: nowTop - 6 }}>{fmtMinutes(now)}</div>
-            )}
-          </div>
+          <WeekAxis axis={axis} nowTop={todayIdx >= 0 && nowTop > 0 ? nowTop : undefined} nowLabel={fmtMinutes(now)} />
           <div ref={gridRef} className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
             {days.map((d, i) => {
               const occ = byDay.get(weekdayOf(d)) ?? []
@@ -712,8 +700,9 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                     const done = d < today || (d === today && o.end <= now)
                     const nowOn = d === today && o.start <= now && now < o.end
                     const lift = liftKey === o.key
-                    const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : 'none'
-                    const cellH = ((o.end - o.start) / 60) * hour - 2
+                    const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : undefined
+                    const top = axis.y(o.start)
+                    const cellH = axis.y(o.end) - top - 2
                     const sticker = !half && cellH >= 44 ? stickerOfOcc(o, snap.courses) : null
                     return (
                       <div
@@ -721,25 +710,30 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                         data-lift
                         className="absolute"
                         style={{
-                          top: ((o.start - dayStart) / 60) * hour,
-                          height: ((o.end - o.start) / 60) * hour - 2,
+                          top,
+                          height: cellH,
                           left: half ? `${lane * 50}%` : 0,
                           width: half ? '50%' : '100%',
+                          opacity: done && !pastCol ? 0.55 : 1,
                         }}
                       >
                       <button
                         {...pressProps(() => onPick(o), (r, el) => onMenu(o, r, el))}
-                        className={`relative h-full w-full overflow-hidden rounded-[9px] px-1 py-1.5 text-left text-[9.5px] leading-[1.35] font-bold transition-transform duration-150 ${lift ? '' : 'active:scale-[.97]'} ${o.status === 'cancelled' ? 'line-through' : ''}`}
-                        style={{
-                          background: tint(o.color, nowOn ? 22 : done ? 7 : 10),
-                          color: `color-mix(in srgb, ${o.color} 85%, var(--c-ink))`,
-                          boxShadow: ring,
-                          opacity: done && !pastCol ? 0.55 : 1,
-                        }}
+                        className={`block h-full w-full transition-transform duration-150 ${lift ? '' : 'active:scale-[.97]'}`}
                       >
-                        <span className="line-clamp-2">{o.name}</span>
-                        {o.location && <div className={`mt-0.5 line-clamp-1 text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{o.location}</div>}
-                        {nowOn && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: ((now - o.start) / 60) * hour }} />}
+                        <WeekCard
+                          name={o.name}
+                          loc={o.location}
+                          color={o.color}
+                          h={cellH}
+                          now={nowOn}
+                          done={done}
+                          progress={nowOn ? axis.y(now) - top : undefined}
+                          half={half}
+                          sticker={sticker}
+                          lineThrough={o.status === 'cancelled'}
+                          ring={ring}
+                        />
                       </button>
                       {sticker && (
                         <Sticker
@@ -747,7 +741,6 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                           size={20}
                           tilt={stickerTilt(o.name)}
                           className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10"
-                          style={done && !pastCol ? { opacity: 0.55 } : undefined}
                         />
                       )}
                       </div>
@@ -1127,25 +1120,24 @@ function AiImportPage({ onBack, onNext }: { onBack: () => void; onNext: (text: s
   const [copied, setCopied] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(AI_IMPORT_PROMPT)
+    if (await copyText(AI_IMPORT_PROMPT)) {
       setCopied(true)
+      haptic('select')
       nativeToast('已复制')
       window.setTimeout(() => setCopied(false), 1500)
-    } catch {
+    } else {
+      haptic('reject')
       nativeToast('复制失败')
     }
   }
   const paste = async () => {
-    try {
-      const t = await navigator.clipboard.readText()
-      if (t.trim()) {
-        setText(t)
-        return
-      }
-    } catch {
-      /* 无读取权限时交给输入框 */
+    const t = await pasteText()
+    if (t.trim()) {
+      setText(t)
+      haptic('select')
+      return
     }
+    nativeToast('剪贴板为空')
     ta.current?.focus()
   }
   const lines = AI_IMPORT_PROMPT.trimEnd().split('\n')
@@ -1242,42 +1234,38 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState<'' | 'fetch' | 'parse'>('')
   const [error, setError] = useState('')
-  const [preview, setPreview] = useState<ReturnType<Store['previewImport']> | null>(null)
-  const [pending, setPending] = useState<ReturnType<typeof normalize> | null>(null)
-  const [semNote, setSemNote] = useState('')
-  const sem = store.state.semester ?? defaultSemester(mondayOf(todayStr()))
+  const [out, setOut] = useState<RuleOutput | null>(null)
+  const [useFileGrid, setUseFileGrid] = useState(false)
+  const [sem] = useState<Semester>(() => store.state.semester ?? defaultSemester(mondayOf(todayStr())))
+
+  /* 文件里的节次表：和当前不同才算“带了作息” */
+  const fileGrid = useMemo(() => {
+    const g = out?.timeGrid
+    if (!g || g.length === 0) return null
+    return JSON.stringify(g) === JSON.stringify(sem.timeGrid) ? null : g
+  }, [out, sem.timeGrid])
+
+  /* 导入后的学期：作息取文件或当前，课程超出节次表时往后补齐 */
+  const target = useMemo<Semester>(() => {
+    if (!out) return sem
+    const meta = out.semester ?? {}
+    const grid = useFileGrid && fileGrid ? fileGrid : sem.timeGrid
+    const need = Math.min(20, Math.max(0, ...out.courses.map((c) => c.endPeriod)))
+    return { ...sem, ...meta, timeGrid: extendGrid(grid, need) }
+  }, [out, sem, fileGrid, useFileGrid])
+  const pending = useMemo(() => (out ? normalize(out, target) : null), [out, target])
+  const preview = useMemo(() => (pending ? store.previewImport(pending.courses) : null), [pending])
 
   const parse = async () => {
     setBusy('parse')
     setError('')
     try {
-      if (!store.state.semester) store.setSemester(sem)
-      const out: RuleOutput = await runRule(rule, { text, bytes: fileBytes ?? undefined }, sem)
-      let target = store.state.semester ?? sem
-      const need = Math.min(20, Math.max(0, ...out.courses.map((c) => c.endPeriod)))
-      if (out.semester) {
-        // 课程表自己导出的文件：学期、节次表照单全收
-        target = { ...target, ...out.semester, timeGrid: out.timeGrid ?? target.timeGrid }
-        store.setSemester(target)
-        setSemNote(`${md(target.startDate)} 开学，共 ${target.totalWeeks} 周`)
-      } else if (out.timeGrid && out.timeGrid.length > target.timeGrid.length) {
-        target = { ...target, timeGrid: out.timeGrid }
-        store.setSemester(target)
-      }
-      if (need > target.timeGrid.length) {
-        const grid = [...target.timeGrid]
-        while (grid.length < need) {
-          const last = grid[grid.length - 1]
-          const dur = last ? last.end - last.start : 45
-          const start = last ? last.end + 10 : 8 * 60
-          grid.push({ index: grid.length + 1, start, end: start + dur })
-        }
-        target = { ...target, timeGrid: grid }
-        store.setSemester(target)
-      }
-      const norm = normalize(out, target)
-      setPending(norm)
-      setPreview(store.previewImport(norm.courses))
+      const res: RuleOutput = await runRule(rule, { text, bytes: fileBytes ?? undefined }, sem)
+      const g = res.timeGrid
+      const differs = !!g && g.length > 0 && JSON.stringify(g) !== JSON.stringify(sem.timeGrid)
+      // 当前作息还是出厂默认、或文件是课程表自己导出的：默认采用文件里的；用户改过的作息不自动覆盖
+      setUseFileGrid(differs && (!!res.semester || isDefaultGrid(sem.timeGrid)))
+      setOut(res)
       setStage('preview')
     } catch (e) {
       setError(e instanceof Error ? e.message : '解析失败')
@@ -1291,8 +1279,9 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
     const t0 = performance.now()
     const failed = pending.diagnostics.filter((d) => d.level === 'error').length
     const hadCourses = store.state.courses.length > 0
+    store.setSemester(target)
     store.applyImport(pending.courses, {
-      id: uid(), semesterId: store.state.semester!.id,
+      id: uid(), semesterId: target.id,
       ruleId: rule.id, ruleName: rule.name, ruleVersion: rule.version,
       at: Date.now(), durationMs: Math.max(1, Math.round(performance.now() - t0)),
       failed, diagnostics: pending.diagnostics,
@@ -1377,11 +1366,23 @@ function ImportRunPage({ rule, initialText, autoRun, onBack, onDone }: { rule: R
                   {preview.protectedKept.length > 0 && <span className="text-(--c-ink3)">保留改动 {preview.protectedKept.length}</span>}
                   {preview.removed.length > 0 && <span className="text-(--c-danger)">消失 {preview.removed.length}</span>}
                 </div>
-                {semNote && <div className="mt-1.5 px-1 text-[12.5px] font-semibold tabular-nums text-(--c-ink4)">{semNote}</div>}
+                {out?.semester && <div className="mt-1.5 px-1 text-[12.5px] font-semibold tabular-nums text-(--c-ink4)">{`${md(target.startDate)} 开学，共 ${target.totalWeeks} 周`}</div>}
+
+                {fileGrid && (
+                  <div className="mt-2.5 flex items-center rounded-[16px] bg-(--c-surface) px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-bold">采用文件里的作息时间</div>
+                      <div className="mt-0.5 truncate text-[12px] font-medium tabular-nums text-(--c-ink4)">
+                        {`${fileGrid.length} 节 ${fmtMinutes(fileGrid[0].start)}–${fmtMinutes(fileGrid[fileGrid.length - 1].end)}，当前 ${sem.timeGrid.length} 节`}
+                      </div>
+                    </div>
+                    <Switch on={useFileGrid} onChange={setUseFileGrid} />
+                  </div>
+                )}
 
                 <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
                   {pending.courses.map((nc) => (
-                    <ParsedRow key={nc.course.identityKey} nc={nc} sem={sem} />
+                    <ParsedRow key={nc.course.identityKey} nc={nc} sem={target} />
                   ))}
                   {pending.courses.length === 0 && (
                     <div className="px-4 py-8 text-center text-[13px] font-medium text-(--c-ink4)">没有解析出课程</div>
@@ -1503,7 +1504,7 @@ function RuleEditorPage({ rule, onBack }: { rule: RuleManifest | null; onBack: (
 
 /* ---------------- 我的 ---------------- */
 
-type MePage = 'semester' | 'history' | 'trash' | 'courses' | 'import' | 'share' | 'changes' | 'notif' | 'widget' | 'theme' | 'profile' | 'stats' | 'erase'
+type MePage = 'semester' | 'schedule' | 'history' | 'trash' | 'courses' | 'import' | 'share' | 'changes' | 'notif' | 'widget' | 'theme' | 'profile' | 'stats' | 'erase'
 
 const WIDGET_LABEL: Record<WidgetStyle, string> = {
   today: '今日课程',
@@ -1524,6 +1525,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
   const groups: [string, [string, string, MePage][]][] = [
     ['课表', [
       ['学期', sem ? `${sem.name}，第 ${Math.max(0, Math.min(sem.totalWeeks, week))} / ${sem.totalWeeks} 周` : '未设置', 'semester'],
+      ['作息时间', sem ? `${sem.timeGrid.length} 节，${fmtMinutes(sem.timeGrid[0]?.start ?? 0)} 起` : '未设置', 'schedule'],
       ['课程', `${live.length} 门`, 'courses'],
       ['导入课表', '', 'import'],
       ['分享课表', '', 'share'],
@@ -1963,14 +1965,7 @@ function SemesterSettings({ sem, onBack }: { sem: Semester; onBack: () => void }
   const [name, setName] = useState(sem.name)
   const [date, setDate] = useState(sem.startDate)
   const [weeks, setWeeks] = useState(sem.totalWeeks)
-  const [grid, setGrid] = useState(sem.timeGrid)
   const start = mondayOf(date)
-
-  const setSlot = (index: number, which: 'start' | 'end', hhmm: string) => {
-    const [h, m] = hhmm.split(':').map(Number)
-    if (Number.isNaN(h) || Number.isNaN(m)) return
-    setGrid((g) => g.map((t) => (t.index === index ? { ...t, [which]: h * 60 + m } : t)))
-  }
 
   return (
     <SubPage title="学期" sub={`第 ${Math.max(1, currentWeek(start))} 周，共 ${weeks} 周`} onBack={onBack}>
@@ -1980,17 +1975,6 @@ function SemesterSettings({ sem, onBack }: { sem: Semester; onBack: () => void }
         <Field k="总周数"><TextInput type="number" min={1} max={64} value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} /></Field>
       </div>
 
-      <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">节次时间</div>
-      <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
-        {grid.map((t) => (
-          <div key={t.index} className="flex items-center px-4 py-2.5">
-            <span className="w-[62px] flex-none text-[12.5px] font-medium text-(--c-ink4)">第 {t.index} 节</span>
-            <TimeInput value={fmtMinutes(t.start)} onChange={(v) => setSlot(t.index, 'start', v)} className="w-auto text-[13.5px]" />
-            <span className="px-2 text-[13px] text-(--c-ink5)">–</span>
-            <TimeInput value={fmtMinutes(t.end)} onChange={(v) => setSlot(t.index, 'end', v)} className="w-auto text-[13.5px]" />
-          </div>
-        ))}
-      </div>
 
       <div className="mt-8">
         <PrimaryButton
@@ -2000,7 +1984,6 @@ function SemesterSettings({ sem, onBack }: { sem: Semester; onBack: () => void }
               name: name.trim() || sem.name,
               startDate: start,
               totalWeeks: Math.min(64, Math.max(1, weeks)),
-              timeGrid: grid,
             })
             onBack()
           }}
@@ -2110,6 +2093,7 @@ type Route =
   | { k: 'aiImport' }
   | { k: 'rule'; rule: RuleManifest | null }
   | { k: 'semester' }
+  | { k: 'schedule' }
   | { k: 'history' }
   | { k: 'trash' }
   | { k: 'courses' }
@@ -2436,6 +2420,8 @@ export default function RealApp() {
         return <RuleEditorPage key={key} rule={r.rule} onBack={pop} />
       case 'semester':
         return <SemesterSettings key={key} sem={snap.semester} onBack={pop} />
+      case 'schedule':
+        return <SchedulePage key={key} sem={snap.semester} onBack={pop} />
       case 'history':
         return <HistoryPage key={key} onBack={pop} />
       case 'trash':

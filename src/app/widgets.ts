@@ -12,6 +12,10 @@ interface WidgetBridgePlugin {
   systemDark(): Promise<{ dark: boolean }>
   dynamicColors(): Promise<DynamicColors>
   toast(o: { text: string }): Promise<void>
+  copy(o: { text: string }): Promise<void>
+  paste(): Promise<{ text: string }>
+  haptic(o: { kind: HapticKind }): Promise<void>
+  openAppSettings(): Promise<void>
   addListener(event: 'systemDark', cb: (o: { dark: boolean }) => void): Promise<PluginListenerHandle>
   addListener(event: 'dynamicColors', cb: (o: DynamicColors) => void): Promise<PluginListenerHandle>
 }
@@ -41,6 +45,68 @@ export function syncNativeTheme(bg: string, light: boolean, system: boolean): vo
 export function nativeToast(text: string): void {
   if (!native()) return
   WidgetBridge.toast({ text }).catch(() => undefined)
+}
+
+/** 写剪贴板：原生走 ClipboardManager，浏览器走 navigator.clipboard，都不行时回退到隐藏 textarea + execCommand */
+export async function copyText(text: string): Promise<boolean> {
+  if (native()) {
+    try {
+      await WidgetBridge.copy({ text })
+      return true
+    } catch {
+      /* 落到下面的 web 路径 */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    /* 不安全上下文或无权限 */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+/** 读剪贴板：原生一定能读；浏览器取不到时返回空串，调用方自己改为聚焦输入框 */
+export async function pasteText(): Promise<string> {
+  if (native()) {
+    try {
+      return (await WidgetBridge.paste()).text
+    } catch {
+      return ''
+    }
+  }
+  try {
+    return await navigator.clipboard.readText()
+  } catch {
+    return ''
+  }
+}
+
+export type HapticKind = 'tick' | 'edge' | 'select' | 'press' | 'reject'
+
+/** 触感反馈：原生走系统 HapticFeedbackConstants（滚轮刻度 / 确认 / 边界），浏览器里安静 */
+export function haptic(kind: HapticKind = 'tick'): void {
+  if (!native()) return
+  WidgetBridge.haptic({ kind }).catch(() => undefined)
+}
+
+/** 系统里本应用的详情页（权限） */
+export function openAppSettings(): void {
+  if (!native()) return
+  WidgetBridge.openAppSettings().catch(() => undefined)
 }
 
 /** 系统深浅色以原生 uiMode 为准：先取当前值，之后跟随变化 */

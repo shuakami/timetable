@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { stickerOf } from './domain/stickers'
 import { Sticker, stickerTilt } from './app/Sticker'
+import { buildAxis } from './domain/time-axis'
+import { WeekAxis, WeekCard, WeekLines } from './app/week-axis'
 
 const C = {
   math: '#6D78D6',
@@ -118,7 +120,6 @@ const days: Day[] = [
 
 const todayIndex = days.findIndex((d) => d.today)
 const nowLabel = '11:02'
-const nowTop = 127
 const todayDate = 14
 
 function DayPicker({ active, lead, trail, className = '', style }: { active: number; lead?: React.ReactNode; trail?: React.ReactNode; className?: string; style?: React.CSSProperties }) {
@@ -289,36 +290,42 @@ function TodayScreen({ overlay }: { overlay?: React.ReactNode }) {
 
 /* ---------------- 02 week ---------------- */
 
-type Ev = { name: string; loc: string; color: string; top: number; h: number; now?: boolean }
+/* top/h 是旧的按钟点排的坐标（导入预览等小图还在用）；p 是节次区间，周视图按节次轴排 */
+type Ev = { name: string; loc: string; color: string; top: number; h: number; p?: [number, number]; now?: boolean }
 const weekCols: Ev[][] = [
   [
-    { name: '大学英语', loc: '外语楼105', color: C.eng, top: 0, h: 72 },
-    { name: '高等数学', loc: '教三302', color: C.math, top: 84, h: 72 },
-    { name: '短课演示', loc: '40分钟', color: C.pol, top: 252, h: 28 },
-    { name: '思想道德', loc: '教二404', color: C.pol, top: 322, h: 72 },
+    { name: '大学英语', loc: '外语楼105', color: C.eng, top: 0, h: 72, p: [1, 2] },
+    { name: '高等数学', loc: '教三302', color: C.math, top: 84, h: 72, p: [3, 4] },
+    { name: '短课演示', loc: '40分钟', color: C.pol, top: 252, h: 28, p: [5, 5] },
+    { name: '思想道德', loc: '教二404', color: C.pol, top: 322, h: 72, p: [7, 8] },
   ],
   [
-    { name: '大学英语', loc: '外语楼105', color: C.eng, top: 0, h: 72 },
-    { name: '高等数学', loc: '上课中', color: C.math, top: 84, h: 72, now: true },
-    { name: '数据结构', loc: '教一201', color: C.ds, top: 252, h: 72 },
-    { name: '体育', loc: '东区馆', color: C.phy, top: 336, h: 72 },
-    { name: '线代习题', loc: '教三110', color: C.la, top: 462, h: 72 },
+    { name: '大学英语', loc: '外语楼105', color: C.eng, top: 0, h: 72, p: [1, 2] },
+    { name: '高等数学', loc: '上课中', color: C.math, top: 84, h: 72, p: [3, 4], now: true },
+    { name: '数据结构', loc: '教一201', color: C.ds, top: 252, h: 72, p: [5, 6] },
+    { name: '体育', loc: '东区馆', color: C.phy, top: 336, h: 72, p: [7, 8] },
+    { name: '线代习题', loc: '教三110', color: C.la, top: 462, h: 72, p: [9, 10] },
   ],
   [
-    { name: '数据结构', loc: '教一201', color: C.ds, top: 84, h: 72 },
-    { name: '大学物理', loc: '理科楼A', color: C.phy, top: 252, h: 72 },
+    { name: '数据结构', loc: '教一201', color: C.ds, top: 84, h: 72, p: [3, 4] },
+    { name: '大学物理', loc: '理科楼A', color: C.phy, top: 252, h: 72, p: [5, 6] },
   ],
   [
-    { name: '高等数学', loc: '教三302', color: C.math, top: 0, h: 72 },
-    { name: '线性代数', loc: '教三110', color: C.la, top: 252, h: 72 },
-    { name: '形势政策', loc: '教二404', color: C.pol, top: 336, h: 72 },
+    { name: '高等数学', loc: '教三302', color: C.math, top: 0, h: 72, p: [1, 2] },
+    { name: '线性代数', loc: '教三110', color: C.la, top: 252, h: 72, p: [5, 6] },
+    { name: '形势政策', loc: '教二404', color: C.pol, top: 336, h: 72, p: [7, 8] },
   ],
   [
-    { name: '大学物理', loc: '理科楼A', color: C.phy, top: 0, h: 72 },
-    { name: '数据结构', loc: '机房B2', color: C.ds, top: 84, h: 72 },
+    { name: '大学物理', loc: '理科楼A', color: C.phy, top: 0, h: 72, p: [1, 2] },
+    { name: '数据结构', loc: '机房B2', color: C.ds, top: 84, h: 72, p: [3, 4] },
   ],
   [],
 ]
+
+/* 默认作息：10 节，45 分钟一节 */
+const protoGrid = [480, 535, 600, 655, 840, 895, 960, 1015, 1140, 1195].map((s, i) => ({ index: i + 1, start: s, end: s + 45 }))
+const weekAxis = buildAxis(protoGrid)
+const nowMin = 11 * 60 + 2
 
 function tint(color: string, pct: number) {
   return `color-mix(in srgb, ${color} ${pct}%, var(--c-tint-base))`
@@ -348,55 +355,39 @@ function WeekScreen({ overlay }: { overlay?: React.ReactNode }) {
             />
 
             <div className="relative mt-2">
-              {[0, 84, 168, 252, 336, 420, 504].map((t) => (
-                <div key={t} className="absolute right-0 left-8 h-px bg-(--c-line2)" style={{ top: t + 6 }} />
-              ))}
+              <WeekLines axis={weekAxis} />
               <div className="flex pt-1.5">
-                <div className="relative w-8 flex-none">
-                  {['8:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].map((t) => (
-                    <div key={t} className="h-[84px] pr-1.5 text-right text-[9.5px] font-semibold tabular-nums text-(--c-ink4b)">{t}</div>
-                  ))}
-                  <div className="absolute right-1.5 text-[9.5px] font-bold tabular-nums text-(--c-accent)" style={{ top: nowTop - 6 }}>{nowLabel}</div>
-                </div>
-                <div className="relative flex h-[536px] flex-1 gap-[5px]">
+                <WeekAxis axis={weekAxis} nowTop={weekAxis.y(nowMin)} nowLabel={nowLabel} />
+                <div className="relative flex flex-1 gap-[5px]" style={{ height: weekAxis.height }}>
                   {weekCols.map((col, i) => {
                     const pastCol = i < todayIndex
+                    const nowY = weekAxis.y(nowMin)
                     return (
                       <div key={i} className={`relative flex-1 ${pastCol ? 'opacity-45' : ''}`}>
                         {col.map((ev) => {
-                          const done = i < todayIndex || (i === todayIndex && ev.top + ev.h <= nowTop)
-                          const sticker = ev.h >= 44 ? stickerOf(ev.name) : null
+                          const [p0, p1] = ev.p ?? [1, 2]
+                          const t0 = protoGrid[p0 - 1].start
+                          const t1 = p0 === p1 && ev.h < 40 ? t0 + 40 : protoGrid[p1 - 1].end
+                          const top = weekAxis.y(t0)
+                          const h = weekAxis.y(t1) - top - 2
+                          const done = i < todayIndex || (i === todayIndex && t1 <= nowMin)
+                          const sticker = h >= 44 ? stickerOf(ev.name) : null
                           return (
-                            <div key={ev.name + ev.top} className="absolute inset-x-0" style={{ top: ev.top, height: ev.h }}>
-                              <div
-                                className="relative h-full w-full overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
-                                style={{
-                                  background: tint(ev.color, ev.now ? 22 : done ? 7 : 10),
-                                  color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
-                                  boxShadow: ev.now ? `inset 0 0 0 1.5px ${ev.color}` : undefined,
-                                  opacity: done && !pastCol ? 0.55 : 1,
-                                }}
-                              >
-                                {ev.name}
-                                <div className={`mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{ev.loc}</div>
-                                {ev.now && (
-                                  <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: nowTop - ev.top }} />
-                                )}
-                              </div>
+                            <div key={ev.name + ev.top} className="absolute inset-x-0" style={{ top, height: h, opacity: done && !pastCol ? 0.55 : 1 }}>
+                              <WeekCard name={ev.name} loc={ev.loc} color={ev.color} h={h} now={ev.now} done={done} progress={nowY - top} sticker={sticker} />
                               {sticker && (
                                 <Sticker
                                   id={sticker}
                                   size={20}
                                   tilt={stickerTilt(ev.name)}
                                   className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10"
-                                  style={done && !pastCol ? { opacity: 0.55 } : undefined}
                                 />
                               )}
                             </div>
                           )
                         })}
                         {i === todayIndex && (
-                          <div className="pointer-events-none absolute right-[-2px] left-[-2px] z-20" style={{ top: nowTop }}>
+                          <div className="pointer-events-none absolute right-[-2px] left-[-2px] z-20" style={{ top: nowY }}>
                             <i className="block h-[1.5px] w-full rounded-full bg-(--c-accent)" />
                           </div>
                         )}
@@ -740,6 +731,15 @@ function LinkScreen() {
         </div>
 
         <div className="mt-5 text-[12.5px] font-semibold text-(--c-ink3)">解析出 18 门课</div>
+
+        {/* 文件自带节次表且与当前不同：默认采用（当前仍是出厂作息时），用户改过的作息不自动覆盖 */}
+        <div className="mt-2.5 flex items-center rounded-[16px] bg-(--c-surface) px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-bold text-(--c-ink)">采用文件里的作息时间</div>
+            <div className="mt-0.5 truncate text-[12px] font-medium tabular-nums text-(--c-ink4)">12 节 08:00–22:10，当前 10 节</div>
+          </div>
+          <span className="relative h-[26px] w-[44px] flex-none rounded-full bg-(--c-accent)"><i className="absolute top-[3px] right-[3px] h-[20px] w-[20px] rounded-full bg-white" /></span>
+        </div>
 
         <div className="mt-2.5 rounded-[16px] bg-(--c-surface) px-3 pt-2.5 pb-3">
           <div className="flex gap-[4px]">
@@ -1971,6 +1971,188 @@ function NotifPrefScreen() {
   )
 }
 
+/* ---------------- 作息时间：总节数 + 标准时长，每节只填开始，下课自动算；单节下课可单独改 ---------------- */
+
+/* [开始分钟, 单独改过的下课分钟?] */
+const scheduleStarts: [number, number?][] = [
+  [480], [535], [600], [655],
+  [840], [895], [960], [1015],
+  [1140], [1195], [1250, 1285],
+  [1300],
+]
+const SCHED_DUR = 45
+const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const gapText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} 小时${m % 60 ? ` ${m % 60} 分` : ''}` : `${m} 分`)
+
+function Stepper({ value, unit }: { value: number; unit?: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="flex h-[28px] w-[28px] items-center justify-center rounded-full bg-(--c-surface2)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.6" strokeLinecap="round"><path d="M5 12h14" /></svg>
+      </span>
+      <span className="min-w-[56px] text-center text-[15px] font-bold tabular-nums text-(--c-ink)">
+        {value}{unit && <span className="ml-0.5 text-[12px] font-semibold text-(--c-ink4)">{unit}</span>}
+      </span>
+      <span className="flex h-[28px] w-[28px] items-center justify-center rounded-full bg-(--c-surface2)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+      </span>
+    </div>
+  )
+}
+
+function ScheduleScreen({ overlay }: { overlay?: React.ReactNode }) {
+  const rows = scheduleStarts.map(([s, e], i) => ({ i: i + 1, s, e: e ?? s + SCHED_DUR, custom: e != null }))
+  const last = rows[rows.length - 1]
+  return (
+    <Phone tall>
+      <div className="relative flex-1 pt-12">
+        <SubHead title="作息时间" sub={`${rows.length} 节 · 每节 ${SCHED_DUR} 分钟 · ${hm(rows[0].s)} – ${hm(last.e)}`} />
+        <div className="mt-6 px-5">
+          <div className="rounded-[18px] bg-(--c-surface) px-4">
+            <div className="flex items-center py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">总节数</span>
+              <Stepper value={rows.length} unit="节" />
+            </div>
+            <div className="flex items-center border-t border-(--c-line2) py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">标准时长</span>
+              <Stepper value={SCHED_DUR} unit="分" />
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-baseline px-0.5">
+            <span className="flex-1 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">节次</span>
+            <span className="text-[12px] font-bold tracking-[-.01em] text-(--c-accent)">按间隔排布</span>
+          </div>
+          <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+            {rows.map((r, i) => {
+              const prev = rows[i - 1]
+              const gap = prev ? r.s - prev.e : 0
+              const big = gap >= 60
+              return (
+                <React.Fragment key={r.i}>
+                  {prev && (
+                    <div className={`flex items-center ${big ? 'h-[30px]' : 'h-[18px]'}`}>
+                      <span className="w-[30px] flex-none" />
+                      <span className={`flex-1 border-t border-dashed ${big ? 'border-(--c-line)' : 'border-transparent'}`} />
+                      <span className={`px-2 text-[11px] font-semibold tabular-nums ${big ? 'text-(--c-ink4)' : 'text-(--c-ink5)'}`}>{big ? (r.s < 15 * 60 ? '午休' : r.s < 20 * 60 ? '晚饭' : '休息') + ' ' : ''}{gapText(gap)}</span>
+                      <span className={`flex-1 border-t border-dashed ${big ? 'border-(--c-line)' : 'border-transparent'}`} />
+                    </div>
+                  )}
+                  <div className="flex items-center py-1.5">
+                    <span className="w-[30px] flex-none text-[12.5px] font-bold tabular-nums text-(--c-ink4)">{r.i}</span>
+                    <span className="w-[64px] rounded-[10px] bg-(--c-surface2) py-1.5 text-center text-[15px] font-bold tabular-nums text-(--c-ink)">{hm(r.s)}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mx-2.5 flex-none"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
+                    <span className={`w-[64px] py-1.5 text-center text-[15px] tabular-nums ${r.custom ? 'rounded-[10px] font-bold text-(--c-ink)' : 'font-medium text-(--c-ink4)'}`} style={r.custom ? { boxShadow: 'inset 0 0 0 1.5px var(--c-accent)' } : undefined}>{hm(r.e)}</span>
+                    <span className="flex-1" />
+                    {r.custom && <span className="text-[11.5px] font-bold text-(--c-accent)">恢复 {SCHED_DUR} 分</span>}
+                  </div>
+                </React.Fragment>
+              )
+            })}
+            <div className="h-2" />
+          </div>
+        </div>
+        <div className="sticky bottom-0 mt-6 px-5 pb-6 pt-3" style={{ background: 'var(--c-fade)' }}>
+          <div className="rounded-[18px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">保存</div>
+        </div>
+        {overlay}
+      </div>
+    </Phone>
+  )
+}
+
+/* 引导第 2 步：三个数生成整天作息，午休/晚饭自动跳；细调去「我的 · 作息时间」 */
+function OnboardScheduleScreen() {
+  const n = 14
+  const dur = 45
+  const gap = 10
+  /* 午休/晚饭截止先按紧的排，最后一节拖过 23:00 再放宽（与 domain/schedule.generateGrid 同步） */
+  let rows: [number, number][] = []
+  for (const [noon, dusk] of [[12 * 60, 18 * 60], [12 * 60 + 30, 18 * 60 + 30], [Infinity, Infinity]]) {
+    rows = []
+    let s = 480
+    for (let i = 0; i < n; i++) {
+      const e = s + dur
+      rows.push([s, e])
+      s = e + gap
+      if (s < 14 * 60 && s + dur > noon) s = 14 * 60
+      else if (s >= 14 * 60 && s < 19 * 60 && s + dur > dusk) s = 19 * 60
+    }
+    if (rows[n - 1][1] <= 23 * 60) break
+  }
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col pt-12">
+        <SubHead title="作息时间" sub={`${n} 节 · ${hm(rows[0][0])} – ${hm(rows[n - 1][1])}`} />
+        <div className="mt-6 px-5">
+          <div className="rounded-[18px] bg-(--c-surface) px-4">
+            <div className="flex items-center py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">每天节数</span>
+              <Stepper value={n} unit="节" />
+            </div>
+            <div className="flex items-center border-t border-(--c-line2) py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">每节时长</span>
+              <Stepper value={dur} unit="分" />
+            </div>
+            <div className="flex items-center border-t border-(--c-line2) py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">第 1 节开始</span>
+              <span className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[15px] font-bold tabular-nums text-(--c-ink)">08:00</span>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-x-4 rounded-[18px] bg-(--c-surface) px-4 py-2">
+            {rows.map(([a, b], i) => (
+              <div key={i} className={`flex items-center py-[7px] ${i >= 2 ? 'border-t border-(--c-line2)' : ''}`}>
+                <span className="w-[24px] text-[12px] font-bold tabular-nums text-(--c-ink5)">{i + 1}</span>
+                <span className="text-[13px] font-semibold tabular-nums text-(--c-ink)">{hm(a)}</span>
+                <span className="mx-1.5 text-[12px] text-(--c-ink5)">–</span>
+                <span className="text-[13px] font-medium tabular-nums text-(--c-ink4)">{hm(b)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-auto" />
+      </div>
+      <div className="px-5 pb-6">
+        <div className="rounded-[18px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">继续</div>
+      </div>
+    </Phone>
+  )
+}
+
+/* 改某节开始：时:分滚轮 + 「之后的节次一起移」 */
+function ScheduleTimeSheet() {
+  const hours = ['12', '13', '14', '15', '16']
+  const mins = ['50', '55', '00', '05', '10']
+  return (
+    <div className="absolute inset-0 z-[20]" style={{ background: 'var(--c-scrim)' }}>
+      <div className="absolute inset-x-0 bottom-0 rounded-t-[26px] bg-(--c-surface) px-5 pt-5 pb-9 shadow-(--c-lift-shadow)">
+        <div className="flex items-baseline justify-between">
+          <div className="text-[17px] font-extrabold tracking-[-.02em] text-(--c-ink)">第 5 节 开始</div>
+          <div className="text-[13px] font-semibold tabular-nums text-(--c-ink4)">14:00 → 14:45</div>
+        </div>
+        <div className="relative mt-3 flex items-center gap-2 px-10 py-3" style={{ height: 200 + 24 }}>
+          <div className="pointer-events-none absolute inset-x-10 top-1/2 h-[40px] -translate-y-1/2 rounded-[10px] bg-(--c-surface2)" />
+          {[hours, mins].map((col, ci) => (
+            <React.Fragment key={ci}>
+              {ci === 1 && <span className="text-[18px] font-bold text-(--c-ink3)">:</span>}
+              <div className="relative flex flex-1 flex-col">
+                {col.map((t, i) => (
+                  <span key={t} className={`flex h-[40px] items-center justify-center text-[16px] tabular-nums ${i === 2 ? 'font-bold text-(--c-ink)' : 'font-medium text-(--c-ink4)'}`} style={{ opacity: i === 2 ? 1 : i === 1 || i === 3 ? 0.7 : 0.3 }}>{t}</span>
+                ))}
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="mt-1 flex items-center rounded-[14px] bg-(--c-row-muted) px-3.5 py-3">
+          <span className="flex-1 text-[13.5px] font-semibold text-(--c-ink)">之后的节次一起移</span>
+          <span className="relative h-[26px] w-[44px] rounded-full bg-(--c-accent)"><i className="absolute top-[3px] right-[3px] h-[20px] w-[20px] rounded-full bg-white" /></span>
+        </div>
+        <div className="mt-4 rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">确定</div>
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- 首次：加进手机日历 ---------------- */
 
 const calendarIntroRows: [string, string, string][] = [
@@ -3199,6 +3381,9 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['erase', '清除数据', () => <EraseScreen />],
   ['lock', '锁屏', () => <LockScreen />],
   ['notif', '提醒', () => <NotifPrefScreen />],
+  ['schedule', '作息时间', () => <ScheduleScreen />],
+  ['schedule-time', '作息时间 · 改开始', () => <ScheduleScreen overlay={<ScheduleTimeSheet />} />],
+  ['onboard-schedule', '引导 · 作息时间', () => <OnboardScheduleScreen />],
   ['calendar-intro', '同步至系统日历', () => <CalendarIntroScreen />],
   ['widget', '桌面小组件', () => <WidgetScreen />],
   ['widget2', '小组件样式', () => <WidgetScreen2 />],

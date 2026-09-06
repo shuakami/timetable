@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TtCamera.class);
         registerPlugin(TtCalendar.class);
         registerPlugin(TtFiles.class);
+        registerPlugin(TtEdu.class);
         super.onCreate(savedInstanceState);
         TtFiles.handleIntent(this, getIntent());
         ThemeApply.applySaved(this, getBridge().getWebView());

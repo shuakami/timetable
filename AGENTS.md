@@ -97,7 +97,7 @@ README 用图走浏览器，不用模拟器：
 
 1. `npm run build && npx vite preview --port 4173`
 2. Chrome 打开 `http://localhost:4173/`，设备模拟 375×812（或用 `public/shots.html` 一次排多屏）。
-3. 引导页定格：`?onboardStep=0|1|2&still=1`。
+3. 引导页定格：`?onboardStep=0|1|2|3&still=1`（2 为作息时间）。
 4. 多屏拼版：375×812 截图横向排列、`#EDEDEB` 底、圆角 40。
 5. 小组件预览：`tools/gen_widget_previews.sh`。
 6. 图标/开屏改动，出对比图；monochrome 层控制在 68dp 安全区内。

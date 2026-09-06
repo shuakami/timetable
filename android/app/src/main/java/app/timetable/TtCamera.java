@@ -36,6 +36,7 @@ import androidx.camera.core.ZoomState;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
@@ -66,7 +67,10 @@ import java.util.concurrent.Executors;
         name = "TtCamera",
         permissions = {
                 @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
-                @Permission(alias = "photos", strings = { Manifest.permission.READ_EXTERNAL_STORAGE, "android.permission.READ_MEDIA_IMAGES" }),
+                // 按 SDK 拆开：同一次请求里带上 manifest 已用 maxSdkVersion 裁掉的权限，Capacitor 会在回调里整个 reject
+                @Permission(alias = "photos", strings = { Manifest.permission.READ_EXTERNAL_STORAGE }),
+                @Permission(alias = "media", strings = { "android.permission.READ_MEDIA_IMAGES" }),
+                @Permission(alias = "media14", strings = { "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VISUAL_USER_SELECTED" }),
                 @Permission(alias = "save", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE }),
         }
 )
@@ -96,6 +100,13 @@ public class TtCamera extends Plugin {
         return Build.VERSION.SDK_INT >= 33 ? "android.permission.READ_MEDIA_IMAGES" : Manifest.permission.READ_EXTERNAL_STORAGE;
     }
 
+    /** Android 14 连“选中的照片”一起要，系统对话框才会把部分授权当成结果交回来 */
+    private String photosAlias() {
+        if (Build.VERSION.SDK_INT >= 34) return "media14";
+        if (Build.VERSION.SDK_INT >= 33) return "media";
+        return "photos";
+    }
+
     private boolean has(String permission) {
         return ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED;
     }
@@ -120,22 +131,30 @@ public class TtCamera extends Plugin {
     @PluginMethod
     public void requestPermission(PluginCall call) {
         String kind = call.getString("kind", "camera");
-        String permission = "photos".equals(kind) ? photosPermission() : Manifest.permission.CAMERA;
-        if (has(permission)) {
+        boolean photos = "photos".equals(kind);
+        if (photos ? hasPhotos() : has(Manifest.permission.CAMERA)) {
             JSObject o = new JSObject();
             o.put("status", "granted");
             call.resolve(o);
             return;
         }
-        requestPermissionForAlias("photos".equals(kind) ? "photos" : "camera", call, "permissionResult");
+        requestPermissionForAlias(photos ? photosAlias() : "camera", call, "permissionResult");
     }
 
     @PermissionCallback
     private void permissionResult(PluginCall call) {
         String kind = call.getString("kind", "camera");
-        boolean ok = "photos".equals(kind) ? hasPhotos() : has(Manifest.permission.CAMERA);
+        boolean photos = "photos".equals(kind);
+        boolean ok = photos ? hasPhotos() : has(Manifest.permission.CAMERA);
         JSObject o = new JSObject();
-        o.put("status", ok ? "granted" : "denied");
+        if (ok) {
+            o.put("status", "granted");
+        } else {
+            // 不再弹系统对话框的那种拒绝，页面要换成“去设置”
+            String perm = photos ? photosPermission() : Manifest.permission.CAMERA;
+            boolean again = getActivity() != null && ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), perm);
+            o.put("status", again ? "denied" : "blocked");
+        }
         call.resolve(o);
     }
 
