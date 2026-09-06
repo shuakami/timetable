@@ -136,6 +136,9 @@ function parseTableMode(grid: string[][], opts: HtmlTableOptions): RuleOutput {
   return { courses, diagnostics: diags }
 }
  
+/** 像教室的行：带楼/馆/室等字，或「教一 201」「理教302」「A-301」这种短前缀 + 房号 */
+const LOCATION_RE = /楼|馆|室|区|号|[A-Z]\d{2,}|^[\u4e00-\u9fa5]{1,4}\s*[A-Z]?-?\d{2,4}$/
+
 const DEFAULT_WEEKS_RE = /((?:\d+(?:-\d+)?(?:[,，]\d+(?:-\d+)?)*)\s*周?\s*[（(]?(单|双)?[)）]?周?)/
  
 function parseGridMode(grid: string[][], opts: HtmlGridOptions): RuleOutput {
@@ -162,11 +165,11 @@ function parseGridMode(grid: string[][], opts: HtmlGridOptions): RuleOutput {
         if (!wm) {
           diags.push({ level: 'warn', code: 'NO_WEEKS', message: `「${name}」没有识别出周次，按整学期处理`, at: { snippet: block } })
         }
-        const weeks = wm ? wm[1].replace(/周/g, '').replace(/[（(]/, '').replace(/[)）]/, '') : '1-52'
-        const location = lines.slice(1).find((l) => /楼|馆|室|区|号|[A-Z]\d{2,}/.test(l))
+        const weeks = wm ? wm[1].replace(/周/g, '').replace(/[（(]/, '').replace(/[)）]/, '').trim() : '1-52'
+        const location = lines.slice(1).find((l) => LOCATION_RE.test(l))
         const cleanPhone = extractPhone(block)
         const phoneLine = cleanPhone ? lines.find((l) => l.replace(/[\s\-]/g, '').includes(cleanPhone)) : undefined
-        const teacher = lines.slice(1).find((l) => l !== location && l !== phoneLine && !weeksRe.test(l) && !/楼|馆|室|区|号|[A-Z]\d{2,}/.test(l) && !(cleanPhone && l.replace(/[\s\-]/g, '').includes(cleanPhone)))
+        const teacher = lines.slice(1).find((l) => l !== location && l !== phoneLine && !weeksRe.test(l) && !LOCATION_RE.test(l) && !(cleanPhone && l.replace(/[\s\-]/g, '').includes(cleanPhone)))
         // rowspan 展开后同一门课出现在连续多行：合并为一个节次区间
         const key = `${name}|${wd}|${weeks}`
         const prev = seen.get(key)

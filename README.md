@@ -108,3 +108,5 @@ Gradle 下载慢时在 `~/.gradle/init.gradle` 加国内镜像；见 [AGENTS.md]
 ## 许可
 
 GPL-3.0
+
+学校教务索引（`src/domain/edu/schools.json`）整理自 [baoozak/timetable](https://github.com/baoozak/timetable)（MIT）。

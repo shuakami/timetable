@@ -39,7 +39,7 @@
 
 ### 安全
 
-不做账号密码收集、不做教务系统登录抓取。导入只处理用户主动粘贴或选择的内容。
+不收集账号密码，不在后台登录或抓取教务系统。教务导入走内置浏览器（`TtEdu`）：用户自己在学校页面登录；只在用户点「导入」时读当前页或调同源接口（教务页后自动读一次课程数量用于胶囊文案，不落库）；先预览再应用；浏览器 Cookie/存储与应用隔离，打开和离开时清空；只注入随应用打包的脚本，不下载执行远程脚本。其余导入只处理用户主动粘贴或选择的内容。
 
 ---
 
@@ -56,6 +56,7 @@
 | 原生桥（对话框、Toast、返回键、小组件） | `src/app/native.ts`、`src/app/widgets.ts`、`android/.../WidgetBridge.java`、`MainActivity.java` |
 | 周次/节次/冲突算法 | `src/domain/engine.ts`、`weeks.ts`、`dates.ts` |
 | 导入解析、诊断、normalize | `src/domain/importer.ts`、`importers/*`、`rules.ts` |
+| 教务导入（选学校/内置浏览器/未识别页） | `src/app/edu.tsx`、`src/app/edu-browser.ts`、`src/domain/edu/*`、`android/.../TtEdu.java` |
 | AI Prompt 文本 | `src/domain/ai-prompt.ts` |
 | Store、持久化、导入合并 | `src/domain/store.ts`、`persistence/` |
 | 桌面小组件 | `android/.../widget/`、`src/domain/widget-data.ts`、`tools/` |
