@@ -67,6 +67,7 @@
   --c-mono-punc: #B0B4BD;
   --c-row-muted: #FAFAFA;
   --c-sticker-edge: #FFFFFF;
+  --c-sticker-mono: #1F1F1F;
   --c-sticker-edge-w: .07;
   --c-sticker-shadow: drop-shadow(0 1px 2px rgba(27, 28, 32, .22));
 }
@@ -114,6 +115,7 @@
   --c-mono-punc: #6F737C;
   --c-row-muted: #26272C;
   --c-sticker-edge: #3A3B41;
+  --c-sticker-mono: #E6E6E3;
   --c-sticker-edge-w: .045;
   --c-sticker-shadow: drop-shadow(0 2px 4px rgba(0, 0, 0, .55));
 }
@@ -161,6 +163,7 @@
   --c-mono-punc: #6F737C;
   --c-row-muted: #1D1D20;
   --c-sticker-edge: #2C2C30;
+  --c-sticker-mono: #E6E6E3;
   --c-sticker-edge-w: .045;
   --c-sticker-shadow: drop-shadow(0 2px 4px rgba(0, 0, 0, .6));
 }
