@@ -23,7 +23,7 @@ import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskD
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { stickerOfOcc } from '../domain/stickers'
-import { CARD_INSET, buildAxis } from '../domain/time-axis'
+import { CARD_INSET, buildAxis, rowHeights } from '../domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './week-axis'
 import { SchedulePage } from './schedule'
 import { EDU_RULE, EduBrowserPage, EduFailPage, EduSchoolPage, PreviewGrid, eduBack, type EduFailInfo } from './edu'
@@ -650,12 +650,15 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
   const days = [1, 2, 3, 4, 5, 6, 7].map((wd) => dateOf(sem, week, wd))
   const todayIdx = days.indexOf(today)
 
-  /* 轴的范围跟着真实课程走：节次之外的早课、晚自习按真实时长延伸，不会溢出 */
+  /* 列宽决定卡片里文字折几行；首次按视口估，挂载后用真实宽度 */
+  const [colW, setColW] = useState(() => (Math.min(window.innerWidth, 430) - 98) / 7)
+
+  /* 轴的范围跟着真实课程走：节次之外的早课、晚自习按真实时长延伸，不会溢出；行高按这一行卡片实际需要的高度来 */
   const axis = useMemo(() => {
     const all = [...byDay.values()].flat()
     const span = all.length > 0 ? { start: Math.min(...all.map((o) => o.start)), end: Math.max(...all.map((o) => o.end)) } : undefined
-    return buildAxis(sem.timeGrid, span)
-  }, [sem.timeGrid, byDay])
+    return buildAxis(sem.timeGrid, span, rowHeights(sem.timeGrid, all.map((o) => ({ start: o.start, end: o.end, name: o.name, loc: o.location })), colW))
+  }, [sem.timeGrid, byDay, colW])
   const first = axis.segs[0]
   const last = axis.segs[axis.segs.length - 1]
   const gridH = axis.height + 8
@@ -664,8 +667,6 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
     onGeometry?.(todayIdx, nowTop)
   }, [todayIdx, nowTop, onGeometry])
 
-  /* 列宽决定卡片里文字折几行；首次按视口估，挂载后用真实宽度 */
-  const [colW, setColW] = useState(() => (Math.min(window.innerWidth, 430) - 98) / 7)
   const gridEl = useRef<HTMLDivElement | null>(null)
   const setGridEl = useCallback((el: HTMLDivElement | null) => {
     gridEl.current = el

@@ -2,7 +2,7 @@ import type { Minutes, TimeSlot } from './types'
 
 /**
  * 周视图的纵轴：按节次分段的分段线性时间轴。
- * 每节固定一行高度（课名、地点总能放下），课间压成窄带，长课间（午休、晚饭）压成一条带标签的分隔带；
+ * 每节一行，行高按这一行里卡片实际需要的高度来（见 rowHeights），课间压成窄带，长课间（午休、晚饭）压成一条带标签的分隔带；
  * 落在节次之外的时间（早课、晚自习）按真实时长线性延伸。任意时刻都能映射到唯一纵坐标，卡片高度仍随时长单调增长。
  */
 export interface AxisSeg {
@@ -23,7 +23,10 @@ export interface TimeAxis {
   y(t: Minutes): number
 }
 
+/** 行高上限：两行课名 + 两行地点 */
 export const AXIS_ROW = 60
+/** 行高下限：空行、连堂课的后半节；左侧序号 + 时刻刚好放下 */
+export const AXIS_ROW_MIN = 32
 export const AXIS_GAP = 6
 export const AXIS_WIDE_GAP = 22
 /** 卡片相对节次边界的内缩：相邻两节连排时上下各留这么多 */
@@ -44,8 +47,9 @@ function linear(t0: Minutes, t1: Minutes, y0: number, kind: AxisSeg['kind']): Ax
   return { kind, t0, t1, y0, y1: y0 + ((t1 - t0) / 60) * AXIS_PAD_PER_HOUR }
 }
 
-export function buildAxis(grid: TimeSlot[], span?: { start: Minutes; end: Minutes }): TimeAxis {
+export function buildAxis(grid: TimeSlot[], span?: { start: Minutes; end: Minutes }, rows?: Map<number, number>): TimeAxis {
   const slots = [...grid].filter((s) => s.end > s.start).sort((a, b) => a.start - b.start)
+  const rowH = (index: number) => (rows ? Math.min(AXIS_ROW, Math.max(AXIS_ROW_MIN, Math.ceil(rows.get(index) ?? 0))) : AXIS_ROW)
   const segs: AxisSeg[] = []
   let y = 0
   const push = (s: AxisSeg) => {
@@ -68,7 +72,7 @@ export function buildAxis(grid: TimeSlot[], span?: { start: Minutes; end: Minute
         else if (gap > 0) push({ kind: 'gap', t0: cursor, t1: t0, y0: y, y1: y + AXIS_GAP })
       }
       if (s.end > t0) {
-        push({ kind: 'period', t0, t1: s.end, y0: y, y1: y + AXIS_ROW, index: s.index })
+        push({ kind: 'period', t0, t1: s.end, y0: y, y1: y + rowH(s.index), index: s.index })
         cursor = s.end
       }
     })
@@ -180,6 +184,29 @@ export function fitLoc(loc: string, lines: number, w: number): string {
   return '…' + chars.slice(i).join('')
 }
 
+/** 一张卡想完整显示需要的高度（含上下内缩）：课名最多两行，地点最多两行 */
+export function cardNeed(w: number, name: string, loc?: string): number {
+  const aw = w - CARD_PAD_X * 2
+  const nameLines = Math.min(2, linesFor(name, CARD_NAME_PX, aw))
+  const locLines = loc ? Math.min(2, linesFor(locBase(loc, aw), CARD_LOC_PX, aw)) : 0
+  return CARD_PAD * 2 + nameLines * CARD_LINE + (locLines > 0 ? CARD_LOC_GAP + locLines * CARD_LOC_LINE : 0) + CARD_INSET * 2
+}
+
+/**
+ * 每节的行高需求：取覆盖这一节的卡片里最高的需求；跨多节的课把需求（扣掉中间的课间）平摊到各节，
+ * 所以连堂课的后半节不会被擑高。结果交给 buildAxis，在那里夹到 [AXIS_ROW_MIN, AXIS_ROW]。
+ */
+export function rowHeights(grid: TimeSlot[], cards: { start: Minutes; end: Minutes; name: string; loc?: string }[], w: number): Map<number, number> {
+  const rows = new Map<number, number>()
+  for (const c of cards) {
+    const covered = grid.filter((s) => s.start < c.end && c.start < s.end)
+    if (covered.length === 0) continue
+    const per = (cardNeed(w, c.name, c.loc) - AXIS_GAP * (covered.length - 1)) / covered.length
+    for (const s of covered) rows.set(s.index, Math.max(rows.get(s.index) ?? 0, per))
+  }
+  return rows
+}
+
 export function cardFit(h: number, w: number, name: string, loc?: string): CardFit | null {
   const aw = w - CARD_PAD_X * 2
   const needName = linesFor(name, CARD_NAME_PX, aw)
@@ -190,8 +217,9 @@ export function cardFit(h: number, w: number, name: string, loc?: string): CardF
   const budget = h - CARD_PAD * 2
   const maxName = Math.floor(budget / CARD_LINE)
   if (maxName < 1) return { nameLines: 1, locLines: 0, dense: true }
-  /* 有地点时课名最多占到还剩一行地点的位置 */
-  const nameCap = needLoc > 0 ? Math.max(1, Math.floor((budget - CARD_LOC_GAP - CARD_LOC_LINE) / CARD_LINE)) : maxName
+  /* 有地点时先给地点留够位（最多两行），课名用剩下的；连一行地点都留不出时课名至少一行 */
+  const locWant = Math.min(needLoc, 2)
+  const nameCap = needLoc > 0 ? Math.max(1, Math.floor((budget - CARD_LOC_GAP - locWant * CARD_LOC_LINE) / CARD_LINE)) : maxName
   const nameLines = Math.min(needName, nameCap)
   const rest = budget - nameLines * CARD_LINE - CARD_LOC_GAP
   const locLines = needLoc > 0 ? Math.min(needLoc, Math.max(0, Math.floor(rest / CARD_LOC_LINE))) : 0
