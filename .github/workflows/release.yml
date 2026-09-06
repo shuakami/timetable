@@ -104,10 +104,17 @@ jobs:
           {
             echo "<a href=\"https://github.com/$REPO/releases/download/$TAG/app-release.apk\"><img src=\"https://raw.githubusercontent.com/$REPO/main/docs/download-android.svg\" alt=\"Download for Android\" /></a>"
             echo
-            echo "app-release.apk ${SIZE} MB  "
-            echo "Android 7.0+  "
-            echo "versionCode ${CODE}  "
-            echo "SHA-256 \`${SHA}\`"
+            echo "<details>"
+            echo "<summary>APK 信息</summary>"
+            echo
+            echo "<table>"
+            echo "<tr><td>文件</td><td>app-release.apk</td></tr>"
+            echo "<tr><td>大小</td><td>${SIZE} MB</td></tr>"
+            echo "<tr><td>系统</td><td>Android 7.0+</td></tr>"
+            echo "<tr><td>versionCode</td><td>${CODE}</td></tr>"
+            echo "<tr><td>SHA-256</td><td><code>${SHA}</code></td></tr>"
+            echo "</table>"
+            echo "</details>"
             echo
             echo "### 变更"
             echo
