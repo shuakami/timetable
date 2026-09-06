@@ -23,7 +23,7 @@ import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskD
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { stickerOfOcc } from '../domain/stickers'
-import { CARD_INSET, buildAxis, cardBreaks } from '../domain/time-axis'
+import { CARD_INSET, buildAxis } from '../domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './week-axis'
 import { SchedulePage } from './schedule'
 import { EDU_RULE, EduBrowserPage, EduFailPage, EduSchoolPage, PreviewGrid, eduBack, type EduFailInfo } from './edu'
@@ -714,17 +714,22 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
               return (
                 <div key={d} className={`relative flex-1 ${pastCol ? 'opacity-45' : ''}`}>
                   {occ.map((o) => {
-                    const lanes = occ.filter((x) => x !== o && x.start < o.end && o.start < x.end)
-                    const half = lanes.length > 0
-                    const lane = half ? occ.filter((x) => x.start < o.end && o.start < x.end).indexOf(o) : 0
+                    /* 冲突：同一时段的课按开始时间叠放，前一张在上，后一张右移露边，右上角标门数 */
+                    const cluster = occ.filter((x) => x.start < o.end && o.start < x.end).sort((a, b) => a.start - b.start || a.key.localeCompare(b.key))
+                    const lane = cluster.indexOf(o)
+                    const stacked = cluster.length > 1
                     const done = d < today || (d === today && o.end <= now)
                     const nowOn = d === today && o.start <= now && now < o.end
                     const lift = liftKey === o.key
-                    const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : undefined
                     const top = axis.y(o.start) + CARD_INSET
                     const cellH = axis.y(o.end) - top - CARD_INSET
-                    const cardW = half ? (colW - 2) / 2 : colW
-                    const sticker = !half && cellH >= 44 ? stickerOfOcc(o, snap.courses) : null
+                    const covered = lane > 0 ? Math.max(0, ...cluster.slice(0, lane).map((x) => axis.y(x.end) - CARD_INSET - top)) : 0
+                    const ring = nowOn
+                      ? `inset 0 0 0 1.5px ${o.color}`
+                      : stacked || o.conflict
+                        ? `inset 0 0 0 1.5px ${lane > 0 ? 'rgba(217,169,75,.55)' : '#D9A94B'}`
+                        : undefined
+                    const sticker = !stacked && cellH >= 44 ? stickerOfOcc(o, snap.courses) : null
                     return (
                       <div
                         key={o.key}
@@ -733,8 +738,9 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                         style={{
                           top,
                           height: cellH,
-                          left: half ? `calc(${lane * 50}% + ${lane}px)` : 0,
-                          width: half ? 'calc(50% - 1px)' : '100%',
+                          left: lane * 5,
+                          right: -lane * 5,
+                          zIndex: stacked ? 6 - lane : undefined,
                           opacity: done && !pastCol ? 0.55 : 1,
                         }}
                       >
@@ -747,17 +753,22 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                           loc={o.location}
                           color={o.color}
                           h={cellH}
-                          w={cardW}
+                          w={colW}
                           now={nowOn}
                           done={done}
                           progress={nowOn ? axis.y(now) - top : undefined}
-                          half={half}
                           sticker={sticker}
                           lineThrough={o.status === 'cancelled'}
                           ring={ring}
-                          breaks={cardBreaks(axis, o.start, o.end, top)}
+                          textTop={Math.min(covered, cellH)}
+                          tone={stacked && !nowOn ? 14 : undefined}
                         />
                       </button>
+                      {stacked && lane === 0 && (
+                        <span className="pointer-events-none absolute top-[-5px] right-[-6px] z-10 flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[#D9A94B] text-[8.5px] leading-none font-bold text-white ring-[2px] ring-(--c-bg)">
+                          {cluster.length}
+                        </span>
+                      )}
                       {sticker && (
                         <Sticker
                           id={sticker}
