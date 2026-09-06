@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { stickerOf } from './domain/stickers'
 import { Sticker, stickerTilt } from './app/Sticker'
-import { CARD_INSET, buildAxis, cardBreaks } from './domain/time-axis'
+import { CARD_INSET, buildAxis } from './domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './app/week-axis'
 
 const C = {
@@ -376,7 +376,7 @@ function WeekScreen({ overlay }: { overlay?: React.ReactNode }) {
                           const sticker = h >= 44 ? stickerOf(ev.name) : null
                           return (
                             <div key={ev.name + ev.top} className="absolute inset-x-0" style={{ top, height: h, opacity: done && !pastCol ? 0.55 : 1 }}>
-                              <WeekCard name={ev.name} loc={ev.loc} color={ev.color} h={h} w={PROTO_COL_W} now={ev.now} done={done} progress={nowY - top} sticker={sticker} breaks={cardBreaks(weekAxis, t0, t1, top)} />
+                              <WeekCard name={ev.name} loc={ev.loc} color={ev.color} h={h} w={PROTO_COL_W} now={ev.now} done={done} progress={nowY - top} sticker={sticker} />
                               {sticker && (
                                 <Sticker
                                   id={sticker}

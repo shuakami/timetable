@@ -25,7 +25,7 @@ export interface TimeAxis {
 
 export const AXIS_ROW = 60
 export const AXIS_GAP = 6
-export const AXIS_WIDE_GAP = 28
+export const AXIS_WIDE_GAP = 22
 /** 卡片相对节次边界的内缩：相邻两节连排时上下各留这么多 */
 export const CARD_INSET = 1.5
 export const AXIS_PAD_PER_HOUR = 42
@@ -88,18 +88,10 @@ export function buildAxis(grid: TimeSlot[], span?: { start: Minutes; end: Minute
   return { segs, height: y, y: yOf }
 }
 
-/** 卡片里落在课间上的区段（相对卡片顶部），画成更浅的一段 */
-export function cardBreaks(axis: TimeAxis, start: Minutes, end: Minutes, top: number): { top: number; h: number }[] {
-  return axis.segs
-    .filter((s) => s.kind === 'gap' && s.t0 >= start && s.t1 <= end)
-    .map((s) => ({ top: s.y0 - top, h: s.y1 - s.y0 }))
-}
-
 /**
  * 卡片按自身高度和宽度决定课名、地点各排几行：先保课名，再保地点，两者都按可用宽度折行而不是一刀截断。
  * 行高：课名 9.5px/1.3 = 12.35，地点 8.5px/1.25 = 10.625；地点上方 2px；内边距上下各 4（dense 为 2）。
  * 一节课（60 - 3 内缩）恰好放下两行课名 + 两行地点。
- * narrow（冲突并排的半宽卡）一行只摆得下一两个字，课名竖着排，地点只在能完整放下时才出现。
  */
 export interface CardFit {
   nameLines: number
@@ -188,20 +180,10 @@ export function fitLoc(loc: string, lines: number, w: number): string {
   return '…' + chars.slice(i).join('')
 }
 
-export function cardFit(h: number, w: number, name: string, loc?: string, narrow = false): CardFit | null {
+export function cardFit(h: number, w: number, name: string, loc?: string): CardFit | null {
   const aw = w - CARD_PAD_X * 2
   const needName = linesFor(name, CARD_NAME_PX, aw)
   const needLoc = loc ? linesFor(locBase(loc, aw), CARD_LOC_PX, aw) : 0
-
-  if (narrow) {
-    const budget = h - CARD_PAD_DENSE * 2
-    const total = Math.floor(budget / CARD_LINE)
-    if (total < 1) return null
-    const nameLines = Math.min(needName, total, 10)
-    const rest = budget - nameLines * CARD_LINE - CARD_LOC_GAP
-    const locLines = needLoc > 0 && Math.floor(rest / CARD_LOC_LINE) >= needLoc ? needLoc : 0
-    return { nameLines, locLines, dense: nameLines < 2 }
-  }
 
   if (h < 17) return null
   if (h < 26) return { nameLines: 1, locLines: 0, dense: true }

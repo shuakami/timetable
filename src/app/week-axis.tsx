@@ -7,8 +7,11 @@ function clampStyle(lines: number): React.CSSProperties | undefined {
   return lines > 1 ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: lines } : undefined
 }
 
-/** 周视图卡片：按自身高宽决定课名、地点各排几行；跨课间的卡在课间处画浅一段 */
-export function WeekCard({ name, loc, color, h, w, now, done, progress, half, sticker, lineThrough, ring, breaks }: {
+/**
+ * 周视图卡片：按自身高宽决定课名、地点各排几行。
+ * 冲突时后一张卡叠在前一张下面右移 5px 露出一条边（原型做法）；textTop 是它被盖住的高度，文字从露出的部分开始排。
+ */
+export function WeekCard({ name, loc, color, h, w, now, done, progress, sticker, lineThrough, ring, textTop = 0, tone }: {
   name: string
   loc?: string
   color: string
@@ -17,26 +20,24 @@ export function WeekCard({ name, loc, color, h, w, now, done, progress, half, st
   now?: boolean
   done?: boolean
   progress?: number
-  half?: boolean
   sticker?: string | null
   lineThrough?: boolean
   ring?: string
-  breaks?: { top: number; h: number }[]
+  textTop?: number
+  tone?: number
 }) {
-  const fit = cardFit(h, w, name, loc, half)
+  const fit = cardFit(h - textTop, w, name, loc)
   const lineCls = (n: number) => (n > 1 ? 'overflow-hidden wrap-anywhere' : 'truncate')
   return (
     <div
-      className={`relative h-full w-full overflow-hidden text-left font-bold ${half ? 'rounded-[6px]' : 'rounded-[9px]'} ${fit?.dense ? 'px-1 py-0.5' : 'px-1 py-1'} ${lineThrough ? 'line-through' : ''}`}
+      className={`relative h-full w-full overflow-hidden rounded-[9px] text-left font-bold ${fit?.dense ? 'px-1 py-0.5' : 'px-1 py-1'} ${lineThrough ? 'line-through' : ''}`}
       style={{
-        background: tint(color, now ? 22 : done ? 7 : 10),
+        background: tint(color, tone ?? (now ? 22 : done ? 7 : 10)),
         color: `color-mix(in srgb, ${color} 85%, var(--c-ink-mix))`,
         boxShadow: ring ?? (now ? `inset 0 0 0 1.5px ${color}` : undefined),
+        paddingTop: textTop > 0 ? textTop + (fit?.dense ? 2 : 4) : undefined,
       }}
     >
-      {breaks?.map((b, i) => (
-        <div key={i} className="pointer-events-none absolute inset-x-0 bg-(--c-surface)/55" style={{ top: b.top, height: b.h }} />
-      ))}
       {fit && (
         <div className={`relative text-[9.5px] leading-[1.3] ${lineCls(fit.nameLines)}`} style={clampStyle(fit.nameLines)}>
           {name}
@@ -74,8 +75,8 @@ export function WeekAxis({ axis, nowTop, nowLabel }: { axis: TimeAxis; nowTop?: 
 }
 
 /**
- * 网格线：节与节之间一条横线，落在课间正中；长课间不画线，整段铺成一条底色带并写上说明，
- * 带子本身就是分隔，上下两节不再另画线。
+ * 网格线：节与节之间一条横线，落在课间正中；长课间（午休/晚饭）的那条线从中间断开写上说明，
+ * 仍是一条线，不另起一套带子。
  */
 export function WeekLines({ axis }: { axis: TimeAxis }) {
   return (
@@ -91,10 +92,12 @@ export function WeekLines({ axis }: { axis: TimeAxis }) {
           return (
             <div
               key={i}
-              className="absolute inset-x-0 flex items-center justify-center rounded-[8px] bg-(--c-surface2) text-[9px] font-semibold tabular-nums text-(--c-ink4)"
+              className="absolute right-0 left-8 flex items-center gap-2 text-[9px] leading-none font-semibold tabular-nums text-(--c-ink4)"
               style={{ top: s.y0 + 6, height: s.y1 - s.y0 }}
             >
-              {s.label}
+              <i className="h-px flex-1 bg-(--c-line2)" />
+              <span>{s.label}</span>
+              <i className="h-px flex-1 bg-(--c-line2)" />
             </div>
           )
         }

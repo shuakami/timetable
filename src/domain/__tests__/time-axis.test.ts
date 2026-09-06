@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TimeSlot } from '../types'
-import { AXIS_GAP, AXIS_PAD_PER_HOUR, AXIS_ROW, AXIS_WIDE_GAP, CARD_INSET, buildAxis, cardBreaks, cardFit, fitLoc, gapLabel, textWidth } from '../time-axis'
+import { AXIS_GAP, AXIS_PAD_PER_HOUR, AXIS_ROW, AXIS_WIDE_GAP, CARD_INSET, buildAxis, cardFit, fitLoc, gapLabel, textWidth } from '../time-axis'
 
 const grid: TimeSlot[] = [480, 535, 600, 655, 840, 895, 960, 1015, 1140, 1195].map((s, i) => ({ index: i + 1, start: s, end: s + 45 }))
 
@@ -63,17 +63,6 @@ describe('gapLabel', () => {
   })
 })
 
-describe('cardBreaks', () => {
-  it('跨课间的卡片拿到课间区段，单节卡拿不到', () => {
-    const axis = buildAxis(grid)
-    const top = axis.y(480) + CARD_INSET
-    expect(cardBreaks(axis, 480, 580, top)).toEqual([{ top: AXIS_ROW - CARD_INSET, h: AXIS_GAP }])
-    expect(cardBreaks(axis, 480, 525, top)).toEqual([])
-    /* 1–4 节连上：两条短课间 */
-    expect(cardBreaks(axis, 480, 700, top)).toHaveLength(3)
-  })
-})
-
 describe('textWidth', () => {
   it('全角按 1em，ASCII 更窄', () => {
     expect(textWidth('理教', 10)).toBe(20)
@@ -109,15 +98,5 @@ describe('cardFit', () => {
     expect(cardFit(30, W, '数据结构', '计科楼 A302')).toEqual({ nameLines: 1, locLines: 0, dense: false })
     expect(cardFit(20, W, '数据结构', '计科楼 A302')).toEqual({ nameLines: 1, locLines: 0, dense: true })
     expect(cardFit(12, W, '数据结构')).toBeNull()
-  })
-
-  it('半宽卡课名竖排，地点只在能完整放下时才出现', () => {
-    const half = (W - 2) / 2
-    /* 一行一个字：理/教/3/0/2 */
-    expect(cardFit(TWO, half, '大学物理', '理教 302', true)).toEqual({ nameLines: 4, locLines: 5, dense: false })
-    expect(fitLoc('理教 302', 5, half)).toBe('理教302')
-    expect(cardFit(ONE, half, '大学物理', '理教 302', true)).toEqual({ nameLines: 4, locLines: 0, dense: false })
-    expect(cardFit(22, half, '大学物理', undefined, true)).toEqual({ nameLines: 1, locLines: 0, dense: true })
-    expect(cardFit(10, half, '大学物理', undefined, true)).toBeNull()
   })
 })
