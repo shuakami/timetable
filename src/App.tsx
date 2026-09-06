@@ -791,6 +791,252 @@ function LinkScreen() {
   )
 }
 
+/* ---------------- 05b import from edu system ---------------- */
+
+const eduSchools: [string, string][] = [
+  ['山东大学', '正方教务'],
+  ['山东师范大学', '正方教务'],
+  ['山东财经大学', '强智教务'],
+  ['山东科技大学', '青果教务'],
+  ['山东理工大学', '正方教务'],
+  ['山东农业大学', '正方教务'],
+  ['山东建筑大学', '正方教务'],
+  ['山东中医药大学', '强智教务'],
+]
+
+function EduEntryScreen({ typing = true }: { typing?: boolean }) {
+  const list = typing ? eduSchools : eduSchools.slice(0, 1)
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col overflow-hidden px-5 pt-12">
+        <TopBar title="选择学校" />
+
+        <div className="mt-6 flex h-[44px] items-center rounded-[14px] bg-(--c-surface) px-4">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink4)" strokeWidth="2.4" strokeLinecap="round" className="mr-2.5 flex-none"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          {typing ? (
+            <span className="text-[14.5px] font-semibold text-(--c-ink)">山东<i className="ml-[1px] inline-block h-[16px] w-[1.5px] translate-y-[2px] bg-(--c-accent)" /></span>
+          ) : (
+            <span className="text-[14.5px] font-medium text-(--c-ink4)">学校名或教务网址</span>
+          )}
+        </div>
+
+        {!typing && <div className="mt-6 text-[12.5px] font-semibold text-(--c-ink3)">最近</div>}
+        <div className={`${typing ? 'mt-4' : 'mt-2.5'} overflow-hidden rounded-[16px] bg-(--c-surface)`}>
+          {list.map(([name, sys], i) => (
+            <div key={name} className={`flex items-center px-4 py-3.5 ${i > 0 ? 'border-t border-(--c-surface2)' : ''}`}>
+              <span className="flex-1 text-[14px] font-bold text-(--c-ink)">{name}</span>
+              <span className="mr-2.5 text-[12px] font-medium text-(--c-ink4)">{sys}</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4" className="flex-none"><path d="m9 5 7 7-7 7" /></svg>
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </Phone>
+  )
+}
+
+const eduTerms = ['2025-2026 学年 第 1 学期', '2024-2025 学年 第 2 学期', '2024-2025 学年 第 1 学期']
+
+function EduTermSheet() {
+  return (
+    <div className="absolute inset-0 z-[20]" style={{ background: 'var(--c-scrim)' }}>
+      <div className="absolute inset-x-0 bottom-0 rounded-t-[26px] bg-(--c-surface) px-5 pt-5 pb-9 shadow-(--c-lift-shadow)">
+        <div className="text-[17px] font-extrabold tracking-[-.02em] text-(--c-ink)">导入哪个学期？</div>
+        <div className="mt-4 space-y-2">
+          {eduTerms.map((t, i) => {
+            const on = i === 0
+            return (
+              <div
+                key={t}
+                className="flex items-center rounded-[12px] px-3.5 py-3"
+                style={{ background: on ? 'var(--c-accent-soft)' : 'var(--c-row-muted)', boxShadow: on ? 'inset 0 0 0 1.5px var(--c-accent)' : undefined }}
+              >
+                <span className="mr-3 flex h-[17px] w-[17px] flex-none items-center justify-center rounded-full border-[1.8px]" style={{ borderColor: on ? 'var(--c-accent)' : 'var(--c-radio-border)', background: on ? 'var(--c-accent)' : 'transparent' }}>
+                  {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.6"><path d="m6 12.5 4 4 8-9" /></svg>}
+                </span>
+                <span className={`text-[13.5px] font-bold text-(--c-ink) ${on ? '' : 'opacity-55'}`}>{t}</span>
+              </div>
+            )
+          })}
+        </div>
+        <div className="mt-5 rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">继续</div>
+      </div>
+    </div>
+  )
+}
+
+/* 内置浏览器：页面内容是学校的，我们只叠一个悬浮胶囊 */
+function EduBrowserScreen({ ready = true, overlay }: { ready?: boolean; overlay?: React.ReactNode }) {
+  const cells = ['高等数学（下）', '大学英语（三）', '数据结构', '大学物理', '线性代数', '形势与政策']
+  return (
+    <Phone>
+      <div className="relative flex flex-1 flex-col overflow-hidden pt-12">
+        <div className="flex items-center gap-3 px-5">
+          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4"><path d="M15 19 8 12l7-7" /></svg>
+          </div>
+          <div className="flex h-9 min-w-0 flex-1 items-center rounded-full bg-(--c-surface) px-4">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink4)" strokeWidth="2.4" className="mr-2 flex-none"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+            <span className="min-w-0 truncate text-[12.5px] font-semibold text-(--c-ink2)">jwglxt.sdu.edu.cn</span>
+          </div>
+          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.4" strokeLinecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+          </div>
+        </div>
+
+        {/* 教务页面示意：按实际网页风格灰级展示，不用我们的主题色 */}
+        {!ready ? (
+          <div className="mt-4 flex flex-1 flex-col items-center overflow-hidden bg-white pt-16">
+            <div className="text-[15px] font-bold text-[#1F2937]">教学管理信息服务平台</div>
+            <div className="mt-1 text-[10px] text-[#9CA3AF]">山东大学</div>
+            <div className="mt-8 w-[260px] space-y-2.5">
+              <div className="h-10 rounded-[4px] border border-[#D1D5DB] px-3 text-[11px] leading-10 text-[#9CA3AF]">学号</div>
+              <div className="h-10 rounded-[4px] border border-[#D1D5DB] px-3 text-[11px] leading-10 text-[#9CA3AF]">密码</div>
+              <div className="flex gap-2.5">
+                <div className="h-10 flex-1 rounded-[4px] border border-[#D1D5DB] px-3 text-[11px] leading-10 text-[#9CA3AF]">验证码</div>
+                <div className="h-10 w-[92px] rounded-[4px] bg-[#F3F4F6]" />
+              </div>
+              <div className="mt-1 h-10 rounded-[4px] bg-[#2563EB] text-center text-[12px] leading-10 font-semibold text-white">登录</div>
+            </div>
+          </div>
+        ) : (
+        <div className="mt-4 flex-1 overflow-hidden bg-white">
+          <div className="flex h-9 items-center border-b border-[#E5E7EB] bg-[#F5F6F8] px-4 text-[11px] font-semibold text-[#374151]">学生课表查询 · 2025-2026 学年 第 1 学期</div>
+          <div className="grid grid-cols-[28px_repeat(5,1fr)] text-[8px] text-[#4B5563]">
+            {['', '周一', '周二', '周三', '周四', '周五'].map((d, i) => (
+              <div key={i} className="border-r border-b border-[#E5E7EB] bg-[#FAFAFB] py-1.5 text-center font-semibold">{d}</div>
+            ))}
+            {Array.from({ length: 5 }).map((_, r) => (
+              <React.Fragment key={r}>
+                <div className="flex h-[62px] items-center justify-center border-r border-b border-[#E5E7EB] bg-[#FAFAFB] font-semibold">{r * 2 + 1}-{r * 2 + 2}</div>
+                {Array.from({ length: 5 }).map((_, c) => {
+                  const k = (r * 5 + c) % 7
+                  const on = k < 6 && (r + c) % 2 === 0
+                  return (
+                    <div key={c} className="h-[62px] border-r border-b border-[#E5E7EB] p-[3px]">
+                      {on && (
+                        <div className="h-full rounded-[3px] bg-[#EEF2FF] px-1 py-[3px] leading-[1.35] text-[#3730A3]">
+                          <div className="font-semibold">{cells[k]}</div>
+                          <div className="mt-[1px] text-[7px] text-[#6366F1]">1-16周 教三302</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+        )}
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-9 z-[9] flex justify-center">
+          <span className={`flex h-[36px] items-center gap-1.5 rounded-full px-4 text-[13px] font-bold ${ready ? 'text-(--c-accent)' : 'text-(--c-ink3)'}`} style={dockStyle}>
+            {ready ? '导入 32 门课' : '登录后打开课表页'}
+          </span>
+        </div>
+        {overlay}
+      </div>
+    </Phone>
+  )
+}
+
+function EduPreviewScreen() {
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col overflow-hidden px-5 pt-12">
+        <TopBar title="32 门课" />
+
+        <div className="mt-6 rounded-[16px] bg-(--c-surface) px-3 pt-2.5 pb-3">
+          <div className="flex gap-[4px]">
+            {['一', '二', '三', '四', '五', '六'].map((w) => (
+              <div key={w} className="flex-1 text-center text-[9.5px] font-semibold text-(--c-ink4)">{w}</div>
+            ))}
+          </div>
+          <div className="relative mt-1.5 flex h-[152px] gap-[4px]">
+            {[0, 50, 100].map((t) => (
+              <div key={t} className="absolute inset-x-0 h-px bg-(--c-line2)" style={{ top: t + 48 }} />
+            ))}
+            {weekCols.map((col, i) => (
+              <div key={i} className="relative flex-1">
+                {col.map((ev) => (
+                  <div
+                    key={ev.name + ev.top}
+                    className="absolute inset-x-0 overflow-hidden rounded-[5px] px-1 py-[3px] text-[7.5px] leading-[1.25] font-bold"
+                    style={{ top: ev.top * 0.28, height: ev.h * 0.28, background: tint(ev.color, 14), color: `color-mix(in srgb, ${ev.color} 88%, var(--c-ink-mix))` }}
+                  >
+                    {ev.name}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-baseline justify-between px-1">
+          <span className="text-[12.5px] font-semibold text-(--c-ink3)">新增 32 门</span>
+          <span className="text-[11.5px] font-semibold text-(--c-ink4)">学期开始 9月1日</span>
+        </div>
+        <div className="mt-2.5 space-y-2">
+          {parsed.slice(0, 3).map((p) => (
+            <div key={p.name} className="flex items-center overflow-hidden rounded-[12px] pr-3.5" style={{ background: tint(p.color, 7) }}>
+              <i className="mr-3 h-[42px] w-[3px] flex-none rounded-full" style={{ background: p.color }} />
+              <div className="flex-1 py-2.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[13.5px] font-bold tracking-[-.01em] text-(--c-ink)">{p.name}</span>
+                  <span className="ml-2 flex-none text-[11px] font-semibold tabular-nums text-(--c-ink3)">{p.weeks}</span>
+                </div>
+                <div className="mt-[3px] text-[11.5px] font-medium tabular-nums text-(--c-ink3)">{p.when}　{p.loc}　{p.teacher}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+        <div className="pb-8">
+          <div className="rounded-[16px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">导入</div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
+function EduFailScreen() {
+  const options: [string, string][] = [
+    ['让 AI 转换', '用这一页的内容'],
+    ['反馈这个页面', '帮我们支持你的学校'],
+  ]
+  return (
+    <Phone>
+      <div className="flex flex-1 flex-col overflow-hidden px-5 pt-12">
+        <TopBar title="没有识别到课表" />
+
+        <div className="mt-6 rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+          <div className="text-[11.5px] font-semibold text-(--c-ink4)">页面</div>
+          <div className="mt-1.5 truncate font-mono text-[12.5px] text-(--c-ink)">jw.xxu.edu.cn/xsxk/kbcx_list.jsp</div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-[16px] bg-(--c-surface)">
+          {options.map(([t, d], i) => (
+            <div key={t} className={`flex items-center px-4 py-3.5 ${i > 0 ? 'border-t border-(--c-surface2)' : ''}`}>
+              <div className="flex-1">
+                <div className="text-[14px] font-bold text-(--c-ink)">{t}</div>
+                <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{d}</div>
+              </div>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4" className="flex-none"><path d="m9 5 7 7-7 7" /></svg>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+        <div className="pb-8">
+          <div className="rounded-[16px] bg-(--c-surface) py-[15px] text-center text-[15px] font-bold text-(--c-ink)">返回</div>
+        </div>
+      </div>
+    </Phone>
+  )
+}
+
 /* ---------------- 06 let AI write the rule ---------------- */
 
 const promptLines: [string, string][][] = [
@@ -2935,6 +3181,13 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['add', '规则导入', () => <AddScreen />],
   ['link', '链接添加规则', () => <LinkScreen />],
   ['airule', 'AI 生成规则', () => <AiRuleScreen />],
+  ['edu', '教务导入 · 选学校', () => <EduEntryScreen typing={false} />],
+  ['edu-search', '教务导入 · 搜索', () => <EduEntryScreen />],
+  ['edu-browser', '教务导入 · 浏览器', () => <EduBrowserScreen />],
+  ['edu-browser-wait', '教务导入 · 未到课表页', () => <EduBrowserScreen ready={false} />],
+  ['edu-term', '教务导入 · 选学期', () => <EduBrowserScreen overlay={<EduTermSheet />} />],
+  ['edu-preview', '教务导入 · 预览', () => <EduPreviewScreen />],
+  ['edu-fail', '教务导入 · 未识别', () => <EduFailScreen />],
   ['todo', '待办', () => <TodoScreen />],
   ['todo2', '待办 · 重做', () => <Todo2Screen />],
   ['todo2-compose', '待办 · 写一句', () => <Todo2ComposeScreen />],
