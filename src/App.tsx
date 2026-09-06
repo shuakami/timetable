@@ -189,14 +189,17 @@ function CourseRow({ c, last }: { c: Course; last?: boolean }) {
       </div>
       <div className={`min-w-0 flex-1 pl-4 ${last ? 'pb-7' : ''} ${past ? 'opacity-50' : ''}`}>
         <div className="relative rounded-[16px] bg-(--c-surface) px-4 py-3.5">
-          {sticker && <Sticker id={sticker} size={46} tilt={stickerTilt(c.name)} className="absolute -top-3 -right-1.5" />}
-          <div className={`text-[16px] leading-[1.25] font-bold tracking-[-.01em] text-(--c-ink) ${sticker ? 'pr-8' : ''}`}>{c.name}</div>
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <div className="min-w-0 text-[12.5px] font-medium text-(--c-ink3)">{c.loc}，{c.teacher}</div>
-            {c.state === 'next' && c.extra && (
-              <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">{c.extra}</span>
-            )}
-            {past && <span className="flex-none text-[11px] font-semibold text-(--c-ink4b)">已结束</span>}
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-[16px] leading-[1.25] font-bold tracking-[-.01em] text-(--c-ink)">{c.name}</div>
+              <div className="mt-1 flex items-center gap-2 text-[12.5px] font-medium text-(--c-ink3)">
+                <span className="min-w-0 truncate">{c.loc}，{c.teacher}</span>
+                {c.state === 'next' && c.extra && (
+                  <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">{c.extra}</span>
+                )}
+              </div>
+            </div>
+            {sticker && <Sticker id={sticker} size={24} tilt={-4} className="flex-none" />}
           </div>
           {now && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 11:02，还剩 38 分钟</div>}
           {c.state === 'next' && <div className="mt-1.5 text-[12px] font-semibold text-(--c-ink3)">下一节，午休后 14:00 开始</div>}

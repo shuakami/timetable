@@ -570,28 +570,26 @@ function TodayView({
                         </div>
                       </div>
                       <div className={`min-w-0 flex-1 pl-4 ${isLast ? 'pb-7' : ''} ${past || o.status === 'cancelled' ? 'opacity-50' : ''}`}>
-                      {/* 每节课一张卡；学科贴纸压在卡片右上角，长按抬起时先隐去 */}
+                      {/* 每节课一张卡；右侧竖列放学科贴纸和状态标签，右边缘对齐，长按抬起时贴纸先隐去 */}
                       <div data-lift className="relative rounded-[16px] bg-(--c-surface) px-4 py-3.5">
-                        {sticker && (
-                          <Sticker id={sticker} size={46} tilt={stickerTilt(o.name)} hidden={liftKey === o.key} className="absolute -top-3 -right-1.5" />
-                        )}
-                        {/* 标题独占一行，让位给右上角贴纸；状态标签放到地点行右侧 */}
-                        <div className={`text-[16px] leading-[1.25] font-bold tracking-[-.01em] ${sticker ? 'pr-8' : ''} ${o.status === 'cancelled' ? 'line-through' : ''}`}>{o.name}</div>
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <div className="min-w-0 text-[12.5px] font-medium text-(--c-ink3)">{[o.location, o.teacher].filter(Boolean).join('，') || '—'}</div>
-                          {o.conflict && <span className="flex-none rounded-[7px] bg-(--c-amber-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-amber)">冲突</span>}
-                          {o.status === 'moved' && <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">已调课</span>}
-                          {!nowOn && o.key === nextKey && (
-                            <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold tabular-nums text-(--c-accent)">还有 {fmtDuration(o.start - now)}</span>
-                          )}
-                          {o.status === 'cancelled' && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">停课</span>}
-                          {o.status === 'leave' && <span className="flex-none rounded-[7px] bg-(--c-rose-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-rose)">请假</span>}
-                          {(o.status === 'done' || (past && o.status === 'normal')) && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">已上</span>}
-                          {o.muted && o.status === 'normal' && !past && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">静音</span>}
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className={`text-[16px] leading-[1.25] font-bold tracking-[-.01em] ${o.status === 'cancelled' ? 'line-through' : ''}`}>{o.name}</div>
+                            <div className="mt-1 flex items-center gap-2 text-[12.5px] font-medium text-(--c-ink3)">
+                              <span className="min-w-0 truncate">{[o.location, o.teacher].filter(Boolean).join('，') || '—'}</span>
+                              {o.conflict && <span className="flex-none rounded-[7px] bg-(--c-amber-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-amber)">冲突</span>}
+                              {o.status === 'moved' && <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">已调课</span>}
+                              {o.status === 'cancelled' && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">停课</span>}
+                              {o.status === 'leave' && <span className="flex-none rounded-[7px] bg-(--c-rose-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-rose)">请假</span>}
+                              {o.muted && o.status === 'normal' && !past && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">静音</span>}
+                            </div>
+                          </div>
+                          {sticker && <Sticker id={sticker} size={24} tilt={-4} hidden={liftKey === o.key} className="flex-none" />}
                         </div>
                         {nowOn && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 {fmtMinutes(now)}，还剩 {fmtDuration(o.end - now)}</div>}
-                        {!nowOn && o.key === nextKey && (
-                          <div className="mt-1.5 text-[12px] font-semibold tabular-nums text-(--c-ink3)">下一节，{fmtMinutes(o.start)} 开始</div>
+                        {!nowOn && o.key === nextKey && (o.start - now <= 60
+                          ? <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">还有 {fmtDuration(o.start - now)}，{fmtMinutes(o.start)} 开始</div>
+                          : <div className="mt-1.5 text-[12px] font-semibold tabular-nums text-(--c-ink3)">下一节，{fmtMinutes(o.start)} 开始</div>
                         )}
                       </div>
                       </div>
