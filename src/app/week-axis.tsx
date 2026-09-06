@@ -1,14 +1,19 @@
 import React from 'react'
-import { cardFit, type TimeAxis } from '../domain/time-axis'
+import { cardFit, fitLoc, type TimeAxis } from '../domain/time-axis'
 import { fmtMinutes } from '../domain/dates'
 import { tint } from './ui'
 
-/** 周视图卡片：按自身高度决定放课名几行、要不要地点 */
-export function WeekCard({ name, loc, color, h, now, done, progress, half, sticker, lineThrough, ring }: {
+function clampStyle(lines: number): React.CSSProperties | undefined {
+  return lines > 1 ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: lines } : undefined
+}
+
+/** 周视图卡片：按自身高宽决定课名、地点各排几行；跨课间的卡在课间处画浅一段 */
+export function WeekCard({ name, loc, color, h, w, now, done, progress, half, sticker, lineThrough, ring, breaks }: {
   name: string
   loc?: string
   color: string
   h: number
+  w: number
   now?: boolean
   done?: boolean
   progress?: number
@@ -16,26 +21,35 @@ export function WeekCard({ name, loc, color, h, now, done, progress, half, stick
   sticker?: string | null
   lineThrough?: boolean
   ring?: string
+  breaks?: { top: number; h: number }[]
 }) {
-  const fit = cardFit(h, half)
+  const fit = cardFit(h, w, name, loc, half)
+  const lineCls = (n: number) => (n > 1 ? 'overflow-hidden wrap-anywhere' : 'truncate')
   return (
     <div
-      className={`relative h-full w-full overflow-hidden rounded-[9px] text-left font-bold ${fit?.dense || half ? 'px-1 py-0.5' : 'px-1 py-1.5'} ${lineThrough ? 'line-through' : ''}`}
+      className={`relative h-full w-full overflow-hidden text-left font-bold ${half ? 'rounded-[6px]' : 'rounded-[9px]'} ${fit?.dense ? 'px-1 py-0.5' : 'px-1 py-1'} ${lineThrough ? 'line-through' : ''}`}
       style={{
         background: tint(color, now ? 22 : done ? 7 : 10),
         color: `color-mix(in srgb, ${color} 85%, var(--c-ink-mix))`,
         boxShadow: ring ?? (now ? `inset 0 0 0 1.5px ${color}` : undefined),
       }}
     >
+      {breaks?.map((b, i) => (
+        <div key={i} className="pointer-events-none absolute inset-x-0 bg-(--c-surface)/55" style={{ top: b.top, height: b.h }} />
+      ))}
       {fit && (
-        <div
-          className={`text-[9.5px] leading-[1.35] ${fit.lines > 1 ? 'overflow-hidden' : 'truncate'} ${half ? 'break-all' : ''}`}
-          style={fit.lines > 1 ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: fit.lines } : undefined}
-        >
+        <div className={`relative text-[9.5px] leading-[1.3] ${lineCls(fit.nameLines)}`} style={clampStyle(fit.nameLines)}>
           {name}
         </div>
       )}
-      {fit?.loc && loc && <div className={`mt-0.5 truncate text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{loc}</div>}
+      {fit && fit.locLines > 0 && loc && (
+        <div
+          className={`relative mt-0.5 text-[8.5px] leading-[1.25] font-semibold opacity-60 ${lineCls(fit.locLines)} ${sticker && fit.locLines === 1 ? 'pr-2.5' : ''}`}
+          style={clampStyle(fit.locLines)}
+        >
+          {fitLoc(loc, fit.locLines, w)}
+        </div>
+      )}
       {now && progress != null && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: progress }} />}
     </div>
   )
@@ -59,22 +73,33 @@ export function WeekAxis({ axis, nowTop, nowLabel }: { axis: TimeAxis; nowTop?: 
   )
 }
 
-/** 每节顶部一条横线；长课间画成带说明的虚线分隔带 */
+/**
+ * 网格线：节与节之间一条横线，落在课间正中；长课间不画线，整段铺成一条底色带并写上说明，
+ * 带子本身就是分隔，上下两节不再另画线。
+ */
 export function WeekLines({ axis }: { axis: TimeAxis }) {
   return (
     <>
-      {axis.segs.map((s, i) => (
-        <React.Fragment key={i}>
-          {s.kind === 'period' && <div className="absolute right-0 left-8 h-px bg-(--c-line2)" style={{ top: s.y0 + 6 }} />}
-          {s.kind === 'gap' && s.label && (
-            <div className="absolute right-0 left-8 flex items-center" style={{ top: s.y0 + 6, height: s.y1 - s.y0 }}>
-              <span className="flex-1 border-t border-dashed border-(--c-line)" />
-              <span className="px-2 text-[9px] font-semibold tabular-nums text-(--c-ink5)">{s.label}</span>
-              <span className="flex-1 border-t border-dashed border-(--c-line)" />
+      {axis.segs.map((s, i) => {
+        const prev = axis.segs[i - 1]
+        if (s.kind === 'period') {
+          if (prev?.kind === 'gap' && prev.label) return null
+          const y = prev?.kind === 'gap' ? (prev.y0 + prev.y1) / 2 : s.y0
+          return <div key={i} className="absolute right-0 left-8 h-px bg-(--c-line2)" style={{ top: y + 6 }} />
+        }
+        if (s.kind === 'gap' && s.label) {
+          return (
+            <div
+              key={i}
+              className="absolute inset-x-0 flex items-center justify-center rounded-[8px] bg-(--c-surface2) text-[9px] font-semibold tabular-nums text-(--c-ink4)"
+              style={{ top: s.y0 + 6, height: s.y1 - s.y0 }}
+            >
+              {s.label}
             </div>
-          )}
-        </React.Fragment>
-      ))}
+          )
+        }
+        return null
+      })}
     </>
   )
 }

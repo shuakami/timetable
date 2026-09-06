@@ -23,7 +23,7 @@ import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskD
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
 import { stickerOfOcc } from '../domain/stickers'
-import { buildAxis } from '../domain/time-axis'
+import { CARD_INSET, buildAxis, cardBreaks } from '../domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './week-axis'
 import { SchedulePage } from './schedule'
 import { Sticker, setStickersOn, stickerTilt, useStickersOn } from './Sticker'
@@ -639,7 +639,7 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
   onPick: (o: Occurrence) => void
   onMenu: (o: Occurrence, r: Rect, el: HTMLElement) => void
   liftKey?: string
-  gridRef?: React.RefObject<HTMLDivElement>
+  gridRef?: React.MutableRefObject<HTMLDivElement | null>
   onGeometry?: (todayIdx: number, nowTop: number) => void
 }) {
   const sem = snap.semester
@@ -661,6 +661,24 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
   useEffect(() => {
     onGeometry?.(todayIdx, nowTop)
   }, [todayIdx, nowTop, onGeometry])
+
+  /* 列宽决定卡片里文字折几行；首次按视口估，挂载后用真实宽度 */
+  const [colW, setColW] = useState(() => (Math.min(window.innerWidth, 430) - 98) / 7)
+  const gridEl = useRef<HTMLDivElement | null>(null)
+  const setGridEl = useCallback((el: HTMLDivElement | null) => {
+    gridEl.current = el
+    if (gridRef) gridRef.current = el
+  }, [gridRef])
+  useEffect(() => {
+    const el = gridEl.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([e]) => {
+      const w = (e.contentRect.width - 6 * 5) / 7
+      if (w > 0) setColW(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <>
@@ -687,7 +705,7 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
         <WeekLines axis={axis} />
         <div className="flex pt-1.5">
           <WeekAxis axis={axis} nowTop={todayIdx >= 0 && nowTop > 0 ? nowTop : undefined} nowLabel={fmtMinutes(now)} />
-          <div ref={gridRef} className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
+          <div ref={setGridEl} className="relative flex flex-1 gap-[5px]" style={{ height: gridH }}>
             {days.map((d, i) => {
               const occ = byDay.get(weekdayOf(d)) ?? []
               const pastCol = d < today
@@ -701,8 +719,9 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                     const nowOn = d === today && o.start <= now && now < o.end
                     const lift = liftKey === o.key
                     const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : undefined
-                    const top = axis.y(o.start)
-                    const cellH = axis.y(o.end) - top - 2
+                    const top = axis.y(o.start) + CARD_INSET
+                    const cellH = axis.y(o.end) - top - CARD_INSET
+                    const cardW = half ? (colW - 2) / 2 : colW
                     const sticker = !half && cellH >= 44 ? stickerOfOcc(o, snap.courses) : null
                     return (
                       <div
@@ -712,8 +731,8 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                         style={{
                           top,
                           height: cellH,
-                          left: half ? `${lane * 50}%` : 0,
-                          width: half ? '50%' : '100%',
+                          left: half ? `calc(${lane * 50}% + ${lane}px)` : 0,
+                          width: half ? 'calc(50% - 1px)' : '100%',
                           opacity: done && !pastCol ? 0.55 : 1,
                         }}
                       >
@@ -726,6 +745,7 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                           loc={o.location}
                           color={o.color}
                           h={cellH}
+                          w={cardW}
                           now={nowOn}
                           done={done}
                           progress={nowOn ? axis.y(now) - top : undefined}
@@ -733,6 +753,7 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                           sticker={sticker}
                           lineThrough={o.status === 'cancelled'}
                           ring={ring}
+                          breaks={cardBreaks(axis, o.start, o.end, top)}
                         />
                       </button>
                       {sticker && (
