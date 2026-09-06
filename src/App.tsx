@@ -1004,6 +1004,7 @@ function EduPreviewScreen() {
 function EduFailScreen() {
   const options: [string, string][] = [
     ['让 AI 转换', '用这一页的内容'],
+    ['更新到最新版本', '1.5.1 可能已支持'],
     ['反馈这个页面', '帮我们支持你的学校'],
   ]
   return (
