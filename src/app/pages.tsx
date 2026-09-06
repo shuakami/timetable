@@ -376,7 +376,7 @@ function StickerPicker({ course, onPick, onClose }: { course: Course; onPick: (i
           <button
             onClick={() => onPick(undefined)}
             aria-label="自动"
-            className={`flex aspect-square items-center justify-center rounded-[16px] bg-(--c-bg) transition-transform duration-150 active:scale-[.94] ${course.sticker === undefined ? 'ring-2 ring-(--c-accent)' : ''}`}
+            className={`flex aspect-square items-center justify-center rounded-[16px] bg-(--c-bg) transition-transform duration-150 active:scale-[.94] ${course.sticker === undefined ? 'ring-2 ring-inset ring-(--c-accent)' : ''}`}
           >
             {auto ? <Sticker id={auto} size={38} /> : <span className="h-[38px] w-[38px] rounded-full border-[1.8px] border-dashed border-(--c-ink5)" />}
           </button>
@@ -387,7 +387,7 @@ function StickerPicker({ course, onPick, onClose }: { course: Course; onPick: (i
             <button
               key={id}
               onClick={() => onPick(id)}
-              className={`flex aspect-square items-center justify-center rounded-[16px] bg-(--c-bg) transition-transform duration-150 active:scale-[.94] ${on ? 'ring-2 ring-(--c-accent)' : ''}`}
+              className={`flex aspect-square items-center justify-center rounded-[16px] bg-(--c-bg) transition-transform duration-150 active:scale-[.94] ${on ? 'ring-2 ring-inset ring-(--c-accent)' : ''}`}
             >
               <Sticker id={id} size={38} />
             </button>
