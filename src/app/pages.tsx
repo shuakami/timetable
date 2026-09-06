@@ -6,6 +6,8 @@ import { occurrencesOn, type Snapshot } from '../domain/engine'
 import { maskHasWeek } from '../domain/weeks'
 import { COURSE_COLORS } from '../domain/palette'
 import { uid } from '../domain/store'
+import { stickerOf } from '../domain/stickers'
+import { Sticker, stickerTilt } from './Sticker'
 import { store, useStore } from './store'
 import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
 import {
@@ -175,6 +177,7 @@ export function CourseDetailPage({
   const absent = passed.filter((s) => ovOf(s.ruleId, s.date)?.kind === 'leave')
   const rate = passed.length > 0 ? Math.round((attended.length / passed.length) * 100) : 0
   const weeksSpan = sessions.length > 0 ? `${md(sessions[0].date)} – ${md(sessions[sessions.length - 1].date)}` : ''
+  const sticker = stickerOf(cur.name)
   const tasks = state.tasks.filter((t) => t.courseId === cur.id)
   const changes = state.changes.filter((c) => c.target === cur.id || rules.some((r) => r.id === c.target))
 
@@ -197,12 +200,13 @@ export function CourseDetailPage({
         />
 
         <div className="mt-3 space-y-3">
-        <Card>
-          <div className="flex items-start justify-between">
+        <Card className="relative">
+          {sticker && <Sticker id={sticker} size={74} tilt={stickerTilt(cur.name)} className="absolute -top-[18px] -right-1.5" />}
+          <div className={`flex items-start justify-between ${sticker ? 'pr-16' : ''}`}>
             <div className="text-[12.5px] font-medium text-(--c-ink3)">
               {[cur.source === 'import' ? '规则导入' : '手动添加', weeksSpan].filter(Boolean).join('，')}
             </div>
-            <i className="mt-1 ml-3 h-[10px] w-[10px] flex-none rounded-full" style={{ background: cur.color }} />
+            {!sticker && <i className="mt-1 ml-3 h-[10px] w-[10px] flex-none rounded-full" style={{ background: cur.color }} />}
           </div>
           <div className="mt-5">
             {([

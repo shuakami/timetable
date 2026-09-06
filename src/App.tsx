@@ -1,4 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { stickerOf } from './domain/stickers'
+import { Sticker, stickerTilt } from './app/Sticker'
 
 const C = {
   math: '#6D78D6',
@@ -162,37 +164,44 @@ function DateStrip({ active }: { active: number }) {
   )
 }
 
-function CourseRow({ c }: { c: Course }) {
+/* 每节课一张卡；学科贴纸压在卡片右上角，卡片不描边，正在上的课只用主题色文字 */
+function CourseRow({ c, last }: { c: Course; last?: boolean }) {
   const past = c.state === 'past'
   const now = c.state === 'now'
+  const sticker = stickerOf(c.name)
   return (
-    <div className="flex">
-      <div className={`w-11 flex-none pt-0.5 text-left ${past ? 'opacity-50' : ''}`}>
+    <div className="flex py-1.5">
+      <div className={`w-11 flex-none pt-3.5 text-left ${past ? 'opacity-50' : ''}`}>
         <div className="text-[11px] font-bold text-(--c-ink2)">{c.jie}</div>
         <div className="mt-1 text-[11px] font-medium tabular-nums text-(--c-ink4)">{c.start}</div>
         <div className="text-[11px] font-medium tabular-nums text-(--c-ink5)">{c.end}</div>
       </div>
-      <div className="relative ml-3 w-[2px] flex-none self-stretch bg-(--c-line)">
-        {past && <i className="absolute inset-0 bg-(--c-accent)" />}
-        {now && (
-          <>
-            <i className="absolute inset-x-0 top-0 h-[55%] bg-(--c-accent)" />
-            <i className="absolute top-[55%] left-1/2 h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-(--c-accent) bg-(--c-surface)" />
-          </>
-        )}
-      </div>
-      <div className={`flex-1 pb-7 pl-4 ${past ? 'opacity-50' : ''}`}>
-        <div className="flex items-start justify-between">
-          <div className="text-[16px] leading-[1.25] font-bold tracking-[-.01em] text-(--c-ink)">{c.name}</div>
-          {c.state === 'next' && c.extra && (
-            <span className="ml-2 flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">{c.extra}</span>
+      <div className={`-my-1.5 ml-3 w-[2px] flex-none self-stretch ${last ? 'pb-7' : ''}`}>
+        <div className="relative h-full bg-(--c-line)">
+          {past && <i className="absolute inset-0 bg-(--c-accent)" />}
+          {now && (
+            <>
+              <i className="absolute inset-x-0 top-0 h-[55%] bg-(--c-accent)" />
+              <i className="absolute top-[55%] left-1/2 h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-(--c-accent) bg-(--c-surface)" />
+            </>
           )}
-          {past && <span className="ml-2 flex-none text-[11px] font-semibold text-(--c-ink4b)">已结束</span>}
         </div>
-        <div className="mt-1 text-[12.5px] font-medium text-(--c-ink3)">{c.loc}，{c.teacher}</div>
-        {now && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 11:02，还剩 38 分钟</div>}
-        {c.state === 'next' && <div className="mt-1.5 text-[12px] font-semibold text-(--c-ink3)">下一节，午休后 14:00 开始</div>}
-        {c.state === 'later' && c.extra && <div className="mt-1.5 text-[12px] font-semibold text-(--c-ink3)">{c.extra}</div>}
+      </div>
+      <div className={`min-w-0 flex-1 pl-4 ${last ? 'pb-7' : ''} ${past ? 'opacity-50' : ''}`}>
+        <div className="relative rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+          {sticker && <Sticker id={sticker} size={46} tilt={stickerTilt(c.name)} className="absolute -top-3 -right-1.5" />}
+          <div className={`text-[16px] leading-[1.25] font-bold tracking-[-.01em] text-(--c-ink) ${sticker ? 'pr-8' : ''}`}>{c.name}</div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <div className="min-w-0 text-[12.5px] font-medium text-(--c-ink3)">{c.loc}，{c.teacher}</div>
+            {c.state === 'next' && c.extra && (
+              <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">{c.extra}</span>
+            )}
+            {past && <span className="flex-none text-[11px] font-semibold text-(--c-ink4b)">已结束</span>}
+          </div>
+          {now && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 11:02，还剩 38 分钟</div>}
+          {c.state === 'next' && <div className="mt-1.5 text-[12px] font-semibold text-(--c-ink3)">下一节，午休后 14:00 开始</div>}
+          {c.state === 'later' && c.extra && <div className="mt-1.5 text-[12px] font-semibold text-(--c-ink3)">{c.extra}</div>}
+        </div>
       </div>
     </div>
   )
@@ -260,8 +269,8 @@ function TodayScreen({ overlay }: { overlay?: React.ReactNode }) {
               }}
             >
               {di > 0 && <DayDivider day={day} />}
-              {day.courses.map((c) => (
-                <CourseRow key={day.key + c.name + c.start} c={c} />
+              {day.courses.map((c, ci) => (
+                <CourseRow key={day.key + c.name + c.start} c={c} last={ci === day.courses.length - 1} />
               ))}
             </div>
           ))}
@@ -357,23 +366,32 @@ function WeekScreen({ overlay }: { overlay?: React.ReactNode }) {
                       <div key={i} className={`relative flex-1 ${pastCol ? 'opacity-45' : ''}`}>
                         {col.map((ev) => {
                           const done = i < todayIndex || (i === todayIndex && ev.top + ev.h <= nowTop)
+                          const sticker = ev.h >= 44 ? stickerOf(ev.name) : null
                           return (
-                            <div
-                              key={ev.name + ev.top}
-                              className="absolute inset-x-0 overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
-                              style={{
-                                top: ev.top,
-                                height: ev.h,
-                                background: tint(ev.color, ev.now ? 22 : done ? 7 : 10),
-                                color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
-                                boxShadow: ev.now ? `inset 0 0 0 1.5px ${ev.color}` : undefined,
-                                opacity: done && !pastCol ? 0.55 : 1,
-                              }}
-                            >
-                              {ev.name}
-                              <div className="mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60">{ev.loc}</div>
-                              {ev.now && (
-                                <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: nowTop - ev.top }} />
+                            <div key={ev.name + ev.top} className="absolute inset-x-0" style={{ top: ev.top, height: ev.h }}>
+                              <div
+                                className="relative h-full w-full overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
+                                style={{
+                                  background: tint(ev.color, ev.now ? 22 : done ? 7 : 10),
+                                  color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
+                                  boxShadow: ev.now ? `inset 0 0 0 1.5px ${ev.color}` : undefined,
+                                  opacity: done && !pastCol ? 0.55 : 1,
+                                }}
+                              >
+                                {ev.name}
+                                <div className={`mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{ev.loc}</div>
+                                {ev.now && (
+                                  <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: nowTop - ev.top }} />
+                                )}
+                              </div>
+                              {sticker && (
+                                <Sticker
+                                  id={sticker}
+                                  size={20}
+                                  tilt={stickerTilt(ev.name)}
+                                  className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10"
+                                  style={done && !pastCol ? { opacity: 0.55 } : undefined}
+                                />
                               )}
                             </div>
                           )
@@ -495,8 +513,9 @@ function DetailScreen({ tall }: { tall?: boolean }) {
           </div>
         </div>
 
-        <Card>
-          <div className="text-[22px] font-extrabold tracking-[-.01em] text-(--c-ink)">高等数学（下）</div>
+        <Card className="relative">
+          <Sticker id="math-calc" size={74} tilt={stickerTilt('高等数学（下）')} className="absolute -top-[18px] -right-1.5" />
+          <div className="pr-16 text-[22px] font-extrabold tracking-[-.01em] text-(--c-ink)">高等数学（下）</div>
           <div className="mt-1.5 text-[12.5px] font-medium text-(--c-ink3)">必修课，5 学分，9月2日 – 12月18日</div>
           <div className="mt-5">
             {([
@@ -2855,22 +2874,24 @@ function LongPressScreen() {
                     <div key={i} className="relative flex-1">
                       {c.map((ev) => {
                         const pressed = i === col && ev.top === evTop
+                        const sticker = ev.h >= 44 ? stickerOf(ev.name) : null
                         return (
-                          <div
-                            key={ev.name + ev.top}
-                            className="absolute inset-x-0 overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
-                            style={{
-                              top: ev.top,
-                              height: ev.h,
-                              background: tint(ev.color, pressed ? 20 : 10),
-                              color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
-                              boxShadow: pressed ? `inset 0 0 0 1.5px ${ev.color}, var(--c-lift-shadow)` : undefined,
-                              transform: pressed ? 'scale(1.06)' : undefined,
-                              zIndex: pressed ? 40 : undefined,
-                            }}
-                          >
-                            {ev.name}
-                            <div className="mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60">{ev.loc}</div>
+                          <div key={ev.name + ev.top} className="absolute inset-x-0" style={{ top: ev.top, height: ev.h, zIndex: pressed ? 40 : undefined }}>
+                            <div
+                              className="relative h-full w-full overflow-hidden rounded-[9px] px-1 py-1.5 text-[9.5px] leading-[1.35] font-bold"
+                              style={{
+                                background: tint(ev.color, pressed ? 20 : 10),
+                                color: `color-mix(in srgb, ${ev.color} 85%, var(--c-ink-mix))`,
+                                boxShadow: pressed ? `inset 0 0 0 1.5px ${ev.color}, var(--c-lift-shadow)` : undefined,
+                                transform: pressed ? 'scale(1.06)' : undefined,
+                              }}
+                            >
+                              {ev.name}
+                              <div className={`mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{ev.loc}</div>
+                            </div>
+                            {sticker && (
+                              <Sticker id={sticker} size={20} tilt={stickerTilt(ev.name)} hidden={pressed} className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10" />
+                            )}
                           </div>
                         )
                       })}

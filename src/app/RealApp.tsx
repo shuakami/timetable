@@ -22,6 +22,8 @@ import {
 import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave, dueText, KIND_LABEL as TASK_KIND_LABEL } from './todo'
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
+import { stickerOf } from '../domain/stickers'
+import { Sticker, setStickersOn, stickerTilt, useStickersOn } from './Sticker'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { calendarPermission, calendarSupported, clearCalendar, scheduleCalendarSync, syncCalendar } from './calendar'
 import { nativeToast, syncWidgets } from './widgets'
@@ -526,7 +528,7 @@ function TodayView({
               return (
               <div key={day.date} data-day={day.date}>
                 {day.occ.length > 0 && (
-                  <div className="flex items-baseline justify-between pb-7">
+                  <div className="flex items-baseline justify-between pb-[22px]">
                     <div className="flex items-baseline gap-2.5">
                       <span className="text-[17px] leading-none font-extrabold tracking-[-.02em]">{day.rel}</span>
                       <span className="text-[12.5px] font-semibold text-(--c-ink4)">{md(day.date)}{day.rel !== WD[weekdayOf(day.date)] ? ` ${WD[weekdayOf(day.date)]}` : ''}</span>
@@ -543,20 +545,20 @@ function TodayView({
                   const past = (isToday && o.end <= now) || day.date < today
                   const nowOn = isToday && o.start <= now && now < o.end
                   const pct = ((now - o.start) / Math.max(1, o.end - o.start)) * 100
+                  const sticker = stickerOf(o.name)
                   return (
                     <Fragment key={o.key}>
-                    <div className="relative -mx-3 w-[calc(100%+24px)] rounded-[18px]">
                     <button
                       {...pressProps(() => onPick(o), (r, el) => onMenu(o, r, el))}
-                      className={`flex w-full px-3 py-2 text-left transition-transform duration-150 ${liftKey === o.key ? '' : 'active:scale-[.985]'}`}
+                      className={`flex w-full py-1.5 text-left transition-transform duration-150 ${liftKey === o.key ? '' : 'active:scale-[.985]'}`}
                     >
-                      <div className={`w-11 flex-none pt-0.5 ${past ? 'opacity-50' : ''}`}>
+                      <div className={`w-11 flex-none pt-3.5 ${past ? 'opacity-50' : ''}`}>
                         <div className="text-[11px] font-bold text-(--c-ink2)">{o.startPeriod === o.endPeriod ? `${o.startPeriod}节` : `${o.startPeriod}–${o.endPeriod}节`}</div>
                         <div className="mt-1 text-[11px] font-medium tabular-nums text-(--c-ink4)">{fmtMinutes(o.start)}</div>
                         <div className="text-[11px] font-medium tabular-nums text-(--c-ink5)">{fmtMinutes(o.end)}</div>
                       </div>
                       {/* 时间轴在一天里贯穿，最后一节下方留出与日期标题下方等高的空白 */}
-                      <div className={`-my-2 ml-3 w-[2px] flex-none self-stretch ${isLast ? 'pb-7' : ''}`}>
+                      <div className={`-my-1.5 ml-3 w-[2px] flex-none self-stretch ${isLast ? 'pb-7' : ''}`}>
                         <div className="relative h-full bg-(--c-line)">
                           {past && <i className="absolute inset-0 bg-(--c-accent)" />}
                           {nowOn && (
@@ -567,21 +569,26 @@ function TodayView({
                           )}
                         </div>
                       </div>
-                      <div className={`flex-1 pb-7 pl-4 ${past || o.status === 'cancelled' ? 'opacity-50' : ''}`}>
-                      <div data-lift>
-                        <div className="flex items-start justify-between">
-                          <div className={`text-[16px] leading-[1.25] font-bold tracking-[-.01em] ${o.status === 'cancelled' ? 'line-through' : ''}`}>{o.name}</div>
-                          {o.conflict && <span className="ml-2 flex-none rounded-[7px] bg-(--c-amber-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-amber)">冲突</span>}
-                          {o.status === 'moved' && <span className="ml-2 flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">已调课</span>}
+                      <div className={`min-w-0 flex-1 pl-4 ${isLast ? 'pb-7' : ''} ${past || o.status === 'cancelled' ? 'opacity-50' : ''}`}>
+                      {/* 每节课一张卡；学科贴纸压在卡片右上角，长按抬起时先隐去 */}
+                      <div data-lift className="relative rounded-[16px] bg-(--c-surface) px-4 py-3.5">
+                        {sticker && (
+                          <Sticker id={sticker} size={46} tilt={stickerTilt(o.name)} hidden={liftKey === o.key} className="absolute -top-3 -right-1.5" />
+                        )}
+                        {/* 标题独占一行，让位给右上角贴纸；状态标签放到地点行右侧 */}
+                        <div className={`text-[16px] leading-[1.25] font-bold tracking-[-.01em] ${sticker ? 'pr-8' : ''} ${o.status === 'cancelled' ? 'line-through' : ''}`}>{o.name}</div>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <div className="min-w-0 text-[12.5px] font-medium text-(--c-ink3)">{[o.location, o.teacher].filter(Boolean).join('，') || '—'}</div>
+                          {o.conflict && <span className="flex-none rounded-[7px] bg-(--c-amber-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-amber)">冲突</span>}
+                          {o.status === 'moved' && <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">已调课</span>}
                           {!nowOn && o.key === nextKey && (
-                            <span className="ml-2 flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold tabular-nums text-(--c-accent)">还有 {fmtDuration(o.start - now)}</span>
+                            <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold tabular-nums text-(--c-accent)">还有 {fmtDuration(o.start - now)}</span>
                           )}
-                          {o.status === 'cancelled' && <span className="ml-2 flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">停课</span>}
-                          {o.status === 'leave' && <span className="ml-2 flex-none rounded-[7px] bg-(--c-rose-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-rose)">请假</span>}
-                          {(o.status === 'done' || (past && o.status === 'normal')) && <span className="ml-2 flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">已上</span>}
-                          {o.muted && o.status === 'normal' && !past && <span className="ml-2 flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">静音</span>}
+                          {o.status === 'cancelled' && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">停课</span>}
+                          {o.status === 'leave' && <span className="flex-none rounded-[7px] bg-(--c-rose-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-rose)">请假</span>}
+                          {(o.status === 'done' || (past && o.status === 'normal')) && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">已上</span>}
+                          {o.muted && o.status === 'normal' && !past && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">静音</span>}
                         </div>
-                        <div className="mt-1 text-[12.5px] font-medium text-(--c-ink3)">{[o.location, o.teacher].filter(Boolean).join('，') || '—'}</div>
                         {nowOn && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 {fmtMinutes(now)}，还剩 {fmtDuration(o.end - now)}</div>}
                         {!nowOn && o.key === nextKey && (
                           <div className="mt-1.5 text-[12px] font-semibold tabular-nums text-(--c-ink3)">下一节，{fmtMinutes(o.start)} 开始</div>
@@ -589,7 +596,6 @@ function TodayView({
                       </div>
                       </div>
                     </button>
-                    </div>
                     {showEnd && ended && day.date === ended.date && o.courseId === ended.courseId && o.start === ended.start && (
                       <ClassEndCard
                         moment={ended}
@@ -708,6 +714,8 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                     const nowOn = d === today && o.start <= now && now < o.end
                     const lift = liftKey === o.key
                     const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : 'none'
+                    const cellH = ((o.end - o.start) / 60) * hour - 2
+                    const sticker = !half && cellH >= 44 ? stickerOf(o.name) : null
                     return (
                       <div
                         key={o.key}
@@ -730,9 +738,19 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                         }}
                       >
                         <span className="line-clamp-2">{o.name}</span>
-                        {o.location && <div className="mt-0.5 line-clamp-1 text-[8.5px] leading-[1.3] font-semibold opacity-60">{o.location}</div>}
+                        {o.location && <div className={`mt-0.5 line-clamp-1 text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{o.location}</div>}
                         {nowOn && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: ((now - o.start) / 60) * hour }} />}
                       </button>
+                      {sticker && (
+                        <Sticker
+                          id={sticker}
+                          size={20}
+                          tilt={stickerTilt(o.name)}
+                          hidden={lift}
+                          className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10"
+                          style={done && !pastCol ? { opacity: 0.55 } : undefined}
+                        />
+                      )}
                       </div>
                     )
                   })}
@@ -1842,6 +1860,7 @@ const THEME_ORDER: ThemePref[] = ['system', 'light', 'dark', 'black']
 function ThemePage({ onBack }: { onBack: () => void }) {
   const theme = useTheme()
   const [dyn, dynOk] = useDynamic()
+  const stickers = useStickersOn()
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-[130px] [scrollbar-width:none]">
@@ -1907,6 +1926,25 @@ function ThemePage({ onBack }: { onBack: () => void }) {
             </div>
           </>
         )}
+        <div className="mt-6 px-1 text-[12px] font-bold text-(--c-ink4)">课程贴纸 Beta</div>
+        <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
+          {([[true, '显示'], [false, '隐藏']] as const).map(([v, label], i) => {
+            const on = stickers === v
+            return (
+              <button
+                key={label}
+                onClick={() => setStickersOn(v)}
+                className={`flex w-full items-center py-3.5 text-left transition-opacity active:opacity-60 ${i ? 'border-t border-(--c-surface2)' : ''}`}
+              >
+                <span className={`flex-1 text-[14px] font-semibold ${on ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{label}</span>
+                {on && (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-accent)' }} strokeWidth="2.6"><path d="m5 13 4.5 4.5L19 7" /></svg>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-2 px-1 text-[11.5px] font-medium text-(--c-ink4)">按课程名自动匹配学科图形。</div>
       </div>
     </Page>
   )
@@ -2470,14 +2508,7 @@ export default function RealApp() {
               anchor={anchor}
               setAnchor={setAnchor}
               onPick={openOccurrence}
-              onMenu={(o, a, el) => {
-                const pad = 10
-                setMenu({
-                  occ: o,
-                  anchor: { x: a.x - pad, y: a.y - pad, w: a.w + pad * 2, h: a.h + pad * 2 },
-                  ghost: { el, rect: a, radius: 16, scale: 1.015, bg: 'var(--c-surface)', pad },
-                })
-              }}
+              onMenu={(o, a, el) => setMenu({ occ: o, anchor: a, ghost: { el, rect: a, radius: 16, scale: 1.03, bg: 'var(--c-surface)' } })}
               liftKey={menu?.occ.key}
               onSearch={() => setSearching(true)}
               onImport={() => push({ k: 'import' })}

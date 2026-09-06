@@ -839,6 +839,7 @@ export function Popover({ anchor, ghost, onClose, children }: { anchor: Rect; gh
     clone.style.left = `${pad}px`
     clone.style.width = `${ghost.rect.w}px`
     clone.style.height = `${ghost.rect.h}px`
+    clone.querySelectorAll<HTMLElement>('[data-sticker]').forEach((s) => (s.style.display = 'none'))
     host.replaceChildren(clone)
   }, [ghost, pad])
   return (
