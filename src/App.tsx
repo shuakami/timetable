@@ -1002,11 +1002,7 @@ function EduPreviewScreen() {
 }
 
 function EduFailScreen() {
-  const options: [string, string][] = [
-    ['让 AI 转换', '用这一页的内容'],
-    ['更新到最新版本', '1.5.1 可能已支持'],
-    ['反馈这个页面', '帮我们支持你的学校'],
-  ]
+  const options = ['让 AI 转换', '更新到最新版本', '反馈这个页面']
   return (
     <Phone>
       <div className="flex flex-1 flex-col overflow-hidden px-5 pt-12">
@@ -1018,12 +1014,9 @@ function EduFailScreen() {
         </div>
 
         <div className="mt-6 overflow-hidden rounded-[16px] bg-(--c-surface)">
-          {options.map(([t, d], i) => (
+          {options.map((t, i) => (
             <div key={t} className={`flex items-center px-4 py-3.5 ${i > 0 ? 'border-t border-(--c-surface2)' : ''}`}>
-              <div className="flex-1">
-                <div className="text-[14px] font-bold text-(--c-ink)">{t}</div>
-                <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{d}</div>
-              </div>
+              <span className="flex-1 text-[14px] font-bold text-(--c-ink)">{t}</span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4" className="flex-none"><path d="m9 5 7 7-7 7" /></svg>
             </div>
           ))}
