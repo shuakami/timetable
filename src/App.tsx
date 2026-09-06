@@ -83,13 +83,12 @@ const days: Day[] = [
     key: 'mon', rel: '', date: '10月13日', w: '周一', d: '13', n: 4, courses: [],
   },
   {
-    key: 'today', rel: '今天', date: '10月14日', w: '周二', d: '14', n: 5, today: true,
+    key: 'today', rel: '今天', date: '10月14日', w: '周二', d: '14', n: 4, today: true,
     courses: [
       { jie: '1–2节', start: '08:00', end: '09:40', name: '大学英语（三）', loc: '外语楼 105', teacher: '陈晓', color: C.eng, state: 'past' },
       { jie: '3–4节', start: '10:00', end: '11:40', name: '高等数学（下）', loc: '教学三楼 302', teacher: '王立群', color: C.math, state: 'now', extra: '还剩 38 分钟' },
-      { jie: '5–6节', start: '14:00', end: '15:40', name: '数据结构', loc: '教学一楼 201', teacher: '李慕华', color: C.ds, state: 'next', extra: '作业今晚截止' },
+      { jie: '5–6节', start: '14:00', end: '15:40', name: '数据结构', loc: '教学一楼 201', teacher: '李慕华', color: C.ds, state: 'next' },
       { jie: '7–8节', start: '16:00', end: '17:40', name: '体育（羽毛球）', loc: '东区体育馆', teacher: '记得带球拍', color: C.phy, state: 'later' },
-      { jie: '9–10节', start: '19:00', end: '20:40', name: '线性代数习题课', loc: '教学三楼 110', teacher: '选到课', color: C.la, state: 'later' },
     ],
   },
   {
@@ -194,9 +193,6 @@ function CourseRow({ c, last }: { c: Course; last?: boolean }) {
               <div className="text-[16px] leading-[1.25] font-bold tracking-[-.01em] text-(--c-ink)">{c.name}</div>
               <div className="mt-1 flex items-center gap-2 text-[12.5px] font-medium text-(--c-ink3)">
                 <span className="min-w-0 truncate">{c.loc}，{c.teacher}</span>
-                {c.state === 'next' && c.extra && (
-                  <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">{c.extra}</span>
-                )}
               </div>
             </div>
             {sticker && <Sticker id={sticker} size={24} tilt={-4} className="flex-none" />}
@@ -259,7 +255,7 @@ function TodayScreen({ overlay }: { overlay?: React.ReactNode }) {
             <span className="h-3 w-px bg-(--c-line)" />
             <span>单周</span>
             <span className="h-3 w-px bg-(--c-line)" />
-            <span>5 节课<span className="text-(--c-ink4)">，剩 3 节</span></span>
+            <span>4 节课<span className="text-(--c-ink4)">，剩 2 节</span></span>
           </div>
         </div>
 
@@ -488,7 +484,7 @@ function CalendarSheet({ mode }: { mode: 'day' | 'week' }) {
         <div className="mt-5 flex items-baseline justify-between pt-1">
           <div className="flex items-baseline gap-2.5">
             <span className="text-[14px] font-bold text-(--c-ink)">{mode === 'day' ? '10月14日 周二' : '第 7 周'}</span>
-            <span className="text-[12px] font-semibold tabular-nums text-(--c-ink4)">{mode === 'day' ? '5 节课，08:00 – 20:40' : '10.13 – 10.19，单周，18 节课'}</span>
+            <span className="text-[12px] font-semibold tabular-nums text-(--c-ink4)">{mode === 'day' ? '4 节课，08:00 – 17:40' : '10.13 – 10.19，单周，18 节课'}</span>
           </div>
           <span className="text-[12.5px] font-bold text-(--c-accent)">收起</span>
         </div>
@@ -1359,7 +1355,7 @@ function Todo2ClassEndScreen() {
             <span className="h-3 w-px bg-(--c-line)" />
             <span>单周</span>
             <span className="h-3 w-px bg-(--c-line)" />
-            <span>5 节课<span className="text-(--c-ink4)">，剩 3 节</span></span>
+            <span>4 节课<span className="text-(--c-ink4)">，剩 2 节</span></span>
           </div>
         </div>
 
