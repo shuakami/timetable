@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { stickerOf } from './domain/stickers'
 import { Sticker, stickerTilt } from './app/Sticker'
-import { CARD_INSET, buildAxis } from './domain/time-axis'
+import { CARD_INSET, buildAxis, rowHeights } from './domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './app/week-axis'
 
 const C = {
@@ -324,9 +324,17 @@ const weekCols: Ev[][] = [
 
 /* 默认作息：10 节，45 分钟一节 */
 const protoGrid = [480, 535, 600, 655, 840, 895, 960, 1015, 1140, 1195].map((s, i) => ({ index: i + 1, start: s, end: s + 45 }))
-const weekAxis = buildAxis(protoGrid)
 /* 375 宽样机下的列宽 */
 const PROTO_COL_W = 39
+const weekAxis = buildAxis(
+  protoGrid,
+  undefined,
+  rowHeights(
+    protoGrid,
+    weekCols.flat().filter((e) => e.p).map((e) => ({ start: protoGrid[e.p![0] - 1].start, end: protoGrid[e.p![1] - 1].end, name: e.name, loc: e.loc })),
+    PROTO_COL_W,
+  ),
+)
 const nowMin = 11 * 60 + 2
 
 function tint(color: string, pct: number) {

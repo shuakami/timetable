@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TimeSlot } from '../types'
-import { AXIS_GAP, AXIS_PAD_PER_HOUR, AXIS_ROW, AXIS_WIDE_GAP, CARD_INSET, buildAxis, cardFit, fitLoc, gapLabel, textWidth } from '../time-axis'
+import { AXIS_GAP, AXIS_PAD_PER_HOUR, AXIS_ROW, AXIS_ROW_MIN, AXIS_WIDE_GAP, CARD_INSET, buildAxis, cardFit, cardNeed, fitLoc, gapLabel, rowHeights, textWidth } from '../time-axis'
 
 const grid: TimeSlot[] = [480, 535, 600, 655, 840, 895, 960, 1015, 1140, 1195].map((s, i) => ({ index: i + 1, start: s, end: s + 45 }))
 
@@ -51,6 +51,38 @@ describe('buildAxis', () => {
     const overlap = buildAxis([{ index: 1, start: 480, end: 530 }, { index: 2, start: 520, end: 570 }])
     expect(overlap.segs.map((s) => [s.t0, s.t1])).toEqual([[480, 530], [530, 570]])
     expect(buildAxis([]).height).toBe(12 * AXIS_PAD_PER_HOUR)
+  })
+})
+
+describe('rowHeights', () => {
+  const w = 40
+  it('空行取下限，单节满卡取上限', () => {
+    const rows = rowHeights(grid, [{ start: 600, end: 645, name: '概率论与数理统计', loc: '计科楼A302' }], w)
+    const axis = buildAxis(grid, undefined, rows)
+    const period = (i: number) => axis.segs.find((s) => s.kind === 'period' && s.index === i)!
+    expect(period(1).y1 - period(1).y0).toBe(AXIS_ROW_MIN)
+    const need = cardNeed(w, '概率论与数理统计', '计科楼A302')
+    expect(period(3).y1 - period(3).y0).toBe(Math.ceil(need))
+    expect(Math.ceil(need)).toBeLessThanOrEqual(AXIS_ROW)
+    expect(need).toBeGreaterThan(AXIS_ROW - 2)
+  })
+
+  it('连堂课把需求摊到各节，后半节不被擑高，卡片总高仍够用', () => {
+    const card = { start: 480, end: 580, name: '高等数学A', loc: '理教3楼 204' }
+    const rows = rowHeights(grid, [card], w)
+    expect(rows.get(1)).toBe(rows.get(2))
+    expect(rows.get(1)!).toBeLessThan(AXIS_ROW_MIN)
+    const axis = buildAxis(grid, undefined, rows)
+    expect(axis.y(580) - axis.y(480)).toBe(2 * AXIS_ROW_MIN + AXIS_GAP)
+    expect(axis.y(580) - axis.y(480)).toBeGreaterThanOrEqual(cardNeed(w, card.name, card.loc))
+  })
+
+  it('同一行取最高需求', () => {
+    const rows = rowHeights(grid, [
+      { start: 480, end: 525, name: '体育', loc: '操场' },
+      { start: 480, end: 525, name: '马克思主义基本原理', loc: '教学楼B-301' },
+    ], w)
+    expect(rows.get(1)).toBe(Math.max(cardNeed(w, '体育', '操场'), cardNeed(w, '马克思主义基本原理', '教学楼B-301')))
   })
 })
 

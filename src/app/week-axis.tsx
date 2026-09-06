@@ -48,7 +48,7 @@ export function WeekCard({ name, loc, color, h, w, now, done, progress, sticker,
           className={`relative mt-0.5 text-[8.5px] leading-[1.25] font-semibold opacity-60 ${lineCls(fit.locLines)} ${sticker && fit.locLines === 1 ? 'pr-2.5' : ''}`}
           style={clampStyle(fit.locLines)}
         >
-          {fitLoc(loc, fit.locLines, w)}
+          {fitLoc(loc, fit.locLines, sticker && fit.locLines === 1 ? w - 10 : w)}
         </div>
       )}
       {now && progress != null && <div className="pointer-events-none absolute inset-x-0 top-0 bg-(--c-surface)/60" style={{ height: progress }} />}
