@@ -5,7 +5,7 @@ const ON_KEY = 'tt.stickers'
 let stickersOn = localStorage.getItem(ON_KEY) !== '0'
 const onListeners = new Set<() => void>()
 
-/** 课程贴纸开关（Beta）：默认开，关掉后所有 Sticker 不渲染 */
+/** 课程贴纸开关：默认开，关掉后所有 Sticker 不渲染 */
 export function setStickersOn(on: boolean) {
   stickersOn = on
   if (on) localStorage.removeItem(ON_KEY)
@@ -80,7 +80,7 @@ export function Sticker({ id, size, tilt = 0, hidden, className = '', style }: {
     <span
       data-sticker
       aria-hidden
-      className={`sticker ${className}`}
+      className={`sticker transition-opacity duration-150 ${className}`}
       style={{ width: size, height: size, transform: tilt ? `rotate(${tilt}deg)` : undefined, ...style, opacity: hidden ? 0 : style?.opacity ?? 1 }}
     >
       <svg width={size} height={size} viewBox={art.vb}>

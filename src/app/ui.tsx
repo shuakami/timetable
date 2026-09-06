@@ -811,6 +811,8 @@ export interface Ghost {
   bg?: string
   /** 副本四周向外扩出的内边距（把内容块包成一张卡） */
   pad?: number
+  /** 允许贴纸等元素溢出副本边界 */
+  overhang?: boolean
 }
 
 const MENU_SPRING = { type: 'spring', bounce: 0.28, duration: 0.42 } as const
@@ -839,7 +841,6 @@ export function Popover({ anchor, ghost, onClose, children }: { anchor: Rect; gh
     clone.style.left = `${pad}px`
     clone.style.width = `${ghost.rect.w}px`
     clone.style.height = `${ghost.rect.h}px`
-    clone.querySelectorAll<HTMLElement>('[data-sticker]').forEach((s) => (s.style.display = 'none'))
     host.replaceChildren(clone)
   }, [ghost, pad])
   return (
@@ -863,7 +864,7 @@ export function Popover({ anchor, ghost, onClose, children }: { anchor: Rect; gh
               animate={{ transform: `scale(${ghost.scale})` }}
               exit={{ transform: 'scale(1)', opacity: 0, transition: { transform: MENU_OUT, opacity: FADE } }}
               transition={{ transform: MENU_SPRING }}
-              className="pointer-events-none absolute z-[65] overflow-hidden will-change-transform"
+              className={`pointer-events-none absolute z-[65] will-change-transform ${ghost.overhang ? '' : 'overflow-hidden'}`}
               style={{
                 top: ghost.rect.y - pad,
                 left: ghost.rect.x - pad,

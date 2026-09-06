@@ -1,4 +1,5 @@
 import manifest from './stickers.json'
+import type { Course } from './types'
 
 /** [贴纸 id, 来源, ...关键词]；关键词以 `~` 开头的是泛词，只在没有更具体命中时兜底 */
 type Entry = [string, string, ...string[]]
@@ -44,8 +45,26 @@ export function stickerOf(name: string): string | null {
   return out
 }
 
+/** 课程最终显示的贴纸：手动选过的优先，否则按课名自动匹配 */
+export function stickerFor(course: Pick<Course, 'name' | 'sticker'>): string | null {
+  return course.sticker ?? stickerOf(course.name)
+}
+
+/** 某次上课的贴纸：能对到课程就用课程的设置，否则按名字匹配 */
+export function stickerOfOcc(occ: { courseId?: string; name: string }, courses: readonly Course[]): string | null {
+  const c = occ.courseId ? courses.find((x) => x.id === occ.courseId) : undefined
+  return c ? stickerFor(c) : stickerOf(occ.name)
+}
+
 export function stickerSrc(id: string): string {
   return `/stickers/${id}.svg`
 }
 
 export const STICKER_IDS: readonly string[] = ENTRIES.map((e) => e[0])
+
+/** 按关键词筛贴纸；空串返回全部 */
+export function searchStickers(query: string): string[] {
+  const q = query.toLowerCase().replace(/\s+/g, ' ').trim()
+  if (!q) return ENTRIES.map((e) => e[0])
+  return ENTRIES.filter(([id, , ...kws]) => id.includes(q) || kws.some((k) => (k.startsWith('~') ? k.slice(1) : k).includes(q))).map((e) => e[0])
+}

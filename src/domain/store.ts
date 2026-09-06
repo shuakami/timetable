@@ -214,6 +214,18 @@ export class Store {
     this.commit()
   }
 
+  setCourseSticker(courseId: string, sticker: string | undefined) {
+    this.state = {
+      ...this.state,
+      courses: this.state.courses.map((c) => {
+        if (c.id !== courseId) return c
+        const { sticker: _, ...rest } = c
+        return sticker === undefined ? rest : { ...rest, sticker }
+      }),
+    }
+    this.commit()
+  }
+
   editCourse(courseId: string, patch: Partial<Pick<Course, 'name' | 'teacher' | 'teacherPhone' | 'color' | 'credit' | 'category'>>) {
     const before = this.state.courses.find((c) => c.id === courseId)
     if (!before) return

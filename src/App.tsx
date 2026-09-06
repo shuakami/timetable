@@ -2889,7 +2889,7 @@ function LongPressScreen() {
                               <div className={`mt-0.5 text-[8.5px] leading-[1.3] font-semibold opacity-60 ${sticker ? 'pr-2.5' : ''}`}>{ev.loc}</div>
                             </div>
                             {sticker && (
-                              <Sticker id={sticker} size={20} tilt={stickerTilt(ev.name)} hidden={pressed} className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10" />
+                              <Sticker id={sticker} size={20} tilt={stickerTilt(ev.name)} className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10" />
                             )}
                           </div>
                         )

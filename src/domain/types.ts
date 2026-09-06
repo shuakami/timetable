@@ -34,6 +34,8 @@ export interface Course {
   credit?: number
   category?: string
   color: string
+  /** 手动选的贴纸 id；省略时按课名自动匹配 */
+  sticker?: string
   identityKey: string
   hidden: boolean
   source: 'import' | 'manual'

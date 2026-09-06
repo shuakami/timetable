@@ -7,6 +7,11 @@
     <meta name="description" content="嘎嘎课程表：轻量无广告的大学生课程表应用。支持教务系统、Excel、ICS、CSV 多源导入，AI 一键转换课表，时间冲突检测，四款桌面小组件，课表写入系统日历，手表平板同步提醒。数据只存本机，开源免费。" />
     <meta name="keywords" content="课程表,课程表app,大学生课程表,安卓课程表,wakeup课程表,超级课程表替代,免费课程表,无广告课程表,课表导入,桌面小组件课表,嘎嘎课程表" />
     <link rel="canonical" href="https://shuakami.github.io/timetable/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="shuakami" />
+    <meta name="application-name" content="嘎嘎课程表" />
+    <link rel="alternate" hreflang="zh-CN" href="https://shuakami.github.io/timetable/" />
+    <link rel="alternate" hreflang="x-default" href="https://shuakami.github.io/timetable/" />
     <meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)" />
     <meta property="og:type" content="website" />
@@ -17,11 +22,13 @@
     <meta property="og:image" content="https://shuakami.github.io/timetable/assets/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="嘎嘎课程表今天页与周视图截图" />
     <meta property="og:locale" content="zh_CN" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="嘎嘎课程表 — 你的课表，理应如此" />
     <meta name="twitter:description" content="轻量无广告的 Android 课程表。多源导入、AI 转换、冲突检测、桌面小组件，数据只存本机。" />
     <meta name="twitter:image" content="https://shuakami.github.io/timetable/assets/og.png" />
+    <meta name="twitter:image:alt" content="嘎嘎课程表今天页与周视图截图" />
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png" />
     <link rel="apple-touch-icon" href="assets/favicon-180.png" />
@@ -40,20 +47,61 @@
       "url": "https://shuakami.github.io/timetable/",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Android 8.0+",
-      "softwareVersion": "1.4.35",
+      "applicationSubCategory": "课程表",
+      "softwareVersion": "1.4.54",
+      "dateModified": "2026-09-06",
+      "inLanguage": "zh-CN",
       "isAccessibleForFree": true,
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY", "availability": "https://schema.org/InStock" },
+      "downloadUrl": "https://github.com/shuakami/timetable/releases/latest",
+      "installUrl": "https://github.com/shuakami/timetable/releases/latest",
+      "screenshot": [
+        "https://shuakami.github.io/timetable/assets/shots/today.png",
+        "https://shuakami.github.io/timetable/assets/shots/week.png",
+        "https://shuakami.github.io/timetable/assets/shots/detail.png"
+      ],
+      "image": "https://shuakami.github.io/timetable/assets/og.png",
       "featureList": [
         "多源导入（教务系统 / Excel / ICS / CSV / JSON）",
         "AI 一键转换课表",
         "时间冲突检测",
         "四款桌面小组件",
         "写入系统日历，手表平板同步提醒",
-        "待办与作业",
+        "学科贴纸自动匹配，可手动更换",
+        "待办与作业，拍板书随手记",
         "变更记录"
       ],
-      "author": { "@type": "Organization", "name": "shuakami", "url": "https://github.com/shuakami" },
-      "license": "https://www.gnu.org/licenses/gpl-3.0.html"
+      "author": { "@type": "Person", "name": "shuakami", "url": "https://github.com/shuakami" },
+      "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+      "sameAs": ["https://github.com/shuakami/timetable"]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "嘎嘎课程表支持哪些导入方式？",
+          "acceptedAnswer": { "@type": "Answer", "text": "支持教务系统页面、Excel、ICS 日历、CSV、JSON 直接导入，也可以把任意格式的课表交给 AI 一键转换，或者手动添加。"}
+        },
+        {
+          "@type": "Question",
+          "name": "嘎嘎课程表是否免费？有广告吗？",
+          "acceptedAnswer": { "@type": "Answer", "text": "完全免费开源（GPL-3.0），没有广告，也不需要注册账号。"}
+        },
+        {
+          "@type": "Question",
+          "name": "课表数据存在哪里？",
+          "acceptedAnswer": { "@type": "Answer", "text": "所有数据只保存在本机 SQLite，不上传服务器；可选写入系统日历，让手表、平板同步提醒。"}
+        },
+        {
+          "@type": "Question",
+          "name": "支持哪些系统？",
+          "acceptedAnswer": { "@type": "Answer", "text": "Android 8.0 及以上，在 GitHub Releases 下载 APK 安装。"}
+        }
+      ]
     }
     </script>
   </head>

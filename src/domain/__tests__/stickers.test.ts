@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { STICKER_IDS, stickerOf } from '../stickers'
+import { STICKER_IDS, searchStickers, stickerFor, stickerOf, stickerOfOcc } from '../stickers'
+import type { Course } from '../types'
 
 describe('stickerOf', () => {
   it('课表里常见课名都能落到合理的贴纸', () => {
@@ -39,6 +40,21 @@ describe('stickerOf', () => {
   it('匹配不到返回 null', () => {
     expect(stickerOf('')).toBeNull()
     expect(stickerOf('周三下午')).toBeNull()
+  })
+
+  it('手动选过的贴纸优先于自动匹配', () => {
+    expect(stickerFor({ name: '信息数学基础AI' })).toBe('math-calc')
+    expect(stickerFor({ name: '信息数学基础AI', sticker: 'ai' })).toBe('ai')
+    const course: Course = { id: 'c1', semesterId: 's1', name: '信息数学基础AI', sticker: 'ai', color: '#000', identityKey: 'k', hidden: false, source: 'manual' }
+    expect(stickerOfOcc({ courseId: 'c1', name: course.name }, [course])).toBe('ai')
+    expect(stickerOfOcc({ name: course.name }, [course])).toBe('math-calc')
+  })
+
+  it('按关键词搜贴纸', () => {
+    expect(searchStickers('')).toEqual(STICKER_IDS)
+    expect(searchStickers('python')).toContain('python')
+    expect(searchStickers('数学')).toContain('math-calc')
+    expect(searchStickers('zzzz-none')).toEqual([])
   })
 
   it('清单里每个 id 都有对应 SVG，且不重复', () => {

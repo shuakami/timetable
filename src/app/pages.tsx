@@ -6,14 +6,14 @@ import { occurrencesOn, type Snapshot } from '../domain/engine'
 import { maskHasWeek } from '../domain/weeks'
 import { COURSE_COLORS } from '../domain/palette'
 import { uid } from '../domain/store'
-import { stickerOf } from '../domain/stickers'
-import { Sticker, stickerTilt } from './Sticker'
+import { searchStickers, stickerFor, stickerOf } from '../domain/stickers'
+import { Sticker, stickerTilt, useStickersOn } from './Sticker'
 import { store, useStore } from './store'
 import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
 import {
   BottomVeil, Card, Chips, EmptyBlock, Field, ICON, MenuRow, Page, PrimaryButton,
   StickyHead, TextAction, TextInput, TopBar, WD, WD_SHORT, md, tint,
-  DateInput, TimeInput, SelectInput,
+  DateInput, TimeInput, SelectInput, Sheet, SheetClose, SheetHead,
 } from './ui'
 import { CourseTasks } from './todo'
 
@@ -177,7 +177,34 @@ export function CourseDetailPage({
   const absent = passed.filter((s) => ovOf(s.ruleId, s.date)?.kind === 'leave')
   const rate = passed.length > 0 ? Math.round((attended.length / passed.length) * 100) : 0
   const weeksSpan = sessions.length > 0 ? `${md(sessions[0].date)} – ${md(sessions[sessions.length - 1].date)}` : ''
-  const sticker = stickerOf(cur.name)
+  const stickersOn = useStickersOn()
+  const sticker = stickerFor(cur)
+  const [pickSticker, setPickSticker] = useState(false)
+  const hold = useRef<number | null>(null)
+  const holdProps = {
+    onPointerDown: () => {
+      if (hold.current != null) window.clearTimeout(hold.current)
+      hold.current = window.setTimeout(() => {
+        hold.current = null
+        setPickSticker(true)
+      }, 420)
+    },
+    onPointerUp: () => {
+      if (hold.current != null) window.clearTimeout(hold.current)
+      hold.current = null
+    },
+    onPointerCancel: () => {
+      if (hold.current != null) window.clearTimeout(hold.current)
+      hold.current = null
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (hold.current != null && e.buttons === 0) {
+        window.clearTimeout(hold.current)
+        hold.current = null
+      }
+    },
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  }
   const tasks = state.tasks.filter((t) => t.courseId === cur.id)
   const changes = state.changes.filter((c) => c.target === cur.id || rules.some((r) => r.id === c.target))
 
@@ -201,12 +228,16 @@ export function CourseDetailPage({
 
         <div className="mt-3 space-y-3">
         <Card className="relative">
-          {sticker && <Sticker id={sticker} size={74} tilt={stickerTilt(cur.name)} className="absolute -top-[18px] -right-1.5" />}
-          <div className={`flex items-start justify-between ${sticker ? 'pr-16' : ''}`}>
+          {sticker && stickersOn && (
+            <span {...holdProps} className="absolute -top-[18px] -right-1.5 select-none touch-manipulation" style={{ WebkitTouchCallout: 'none' }}>
+              <Sticker id={sticker} size={74} tilt={stickerTilt(cur.name)} />
+            </span>
+          )}
+          <div className={`flex items-start justify-between ${sticker && stickersOn ? 'pr-16' : ''}`}>
             <div className="text-[12.5px] font-medium text-(--c-ink3)">
               {[cur.source === 'import' ? '规则导入' : '手动添加', weeksSpan].filter(Boolean).join('，')}
             </div>
-            {!sticker && <i className="mt-1 ml-3 h-[10px] w-[10px] flex-none rounded-full" style={{ background: cur.color }} />}
+            {!(sticker && stickersOn) && <i {...holdProps} className="mt-1 ml-3 h-[10px] w-[10px] flex-none rounded-full" style={{ background: cur.color }} />}
           </div>
           <div className="mt-5">
             {([
@@ -305,7 +336,65 @@ export function CourseDetailPage({
         </div>
         </div>
       </div>
+      {pickSticker && (
+        <StickerPicker
+          course={cur}
+          onPick={(id) => {
+            store.setCourseSticker(cur.id, id)
+            setPickSticker(false)
+          }}
+          onClose={() => setPickSticker(false)}
+        />
+      )}
     </Page>
+  )
+}
+
+function StickerPicker({ course, onPick, onClose }: { course: Course; onPick: (id: string | undefined) => void; onClose: () => void }) {
+  const [q, setQ] = useState('')
+  const dismiss = useRef<(() => void) | null>(null)
+  const auto = stickerOf(course.name)
+  const cur = stickerFor(course)
+  const ids = useMemo(() => searchStickers(q).filter((id) => q || id !== auto), [q, auto])
+  return (
+    <Sheet
+      onClose={onClose}
+      dismissRef={dismiss}
+      className="px-4 pb-3"
+      header={
+        <>
+          <SheetHead title="课程贴纸" sub={course.name} trail={<SheetClose onClick={() => dismiss.current?.()} />} />
+          <div className="mx-4 mb-3 flex items-center rounded-[14px] bg-(--c-bg) px-3.5 py-2.5">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink4)" strokeWidth="2.2" strokeLinecap="round" className="mr-2.5 flex-none"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.5-3.5" /></svg>
+            <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索学科或语言" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+          </div>
+        </>
+      }
+    >
+      <div className="grid grid-cols-5 gap-2">
+        {!q && (
+          <button
+            onClick={() => onPick(undefined)}
+            aria-label="自动"
+            className={`flex aspect-square items-center justify-center rounded-[16px] bg-(--c-bg) transition-transform duration-150 active:scale-[.94] ${course.sticker === undefined ? 'ring-2 ring-(--c-accent)' : ''}`}
+          >
+            {auto ? <Sticker id={auto} size={38} /> : <span className="h-[38px] w-[38px] rounded-full border-[1.8px] border-dashed border-(--c-ink5)" />}
+          </button>
+        )}
+        {ids.map((id) => {
+          const on = cur === id && course.sticker !== undefined
+          return (
+            <button
+              key={id}
+              onClick={() => onPick(id)}
+              className={`flex aspect-square items-center justify-center rounded-[16px] bg-(--c-bg) transition-transform duration-150 active:scale-[.94] ${on ? 'ring-2 ring-(--c-accent)' : ''}`}
+            >
+              <Sticker id={id} size={38} />
+            </button>
+          )
+        })}
+      </div>
+    </Sheet>
   )
 }
 

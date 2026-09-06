@@ -22,7 +22,7 @@ import {
 import { CameraPage, ClassEndCard, ComposeOverlay, PickerPage, ReviewPage, TaskDetailPage, TodoView, cameraLeave, dueText, KIND_LABEL as TASK_KIND_LABEL } from './todo'
 import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type CapturedPhoto } from './camera'
 import { justEndedClass } from '../domain/next-class'
-import { stickerOf } from '../domain/stickers'
+import { stickerOfOcc } from '../domain/stickers'
 import { Sticker, setStickersOn, stickerTilt, useStickersOn } from './Sticker'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { calendarPermission, calendarSupported, clearCalendar, scheduleCalendarSync, syncCalendar } from './calendar'
@@ -72,7 +72,7 @@ function pressProps(onTap: () => void, onLong: (r: Rect, el: HTMLElement) => voi
       pressFired = false
       pressAt = { x: e.clientX, y: e.clientY }
       const target = e.currentTarget as HTMLElement
-      const el = target.querySelector<HTMLElement>('[data-lift]') ?? target
+      const el = target.querySelector<HTMLElement>('[data-lift]') ?? target.closest<HTMLElement>('[data-lift]') ?? target
       const shell = el.closest('[data-shell]')?.getBoundingClientRect()
       const box = el.getBoundingClientRect()
       const rect: Rect = {
@@ -546,7 +546,7 @@ function TodayView({
                   const past = (isToday && o.end <= now) || day.date < today
                   const nowOn = isToday && o.start <= now && now < o.end
                   const pct = ((now - o.start) / Math.max(1, o.end - o.start)) * 100
-                  const sticker = stickerOf(o.name)
+                  const sticker = stickerOfOcc(o, snap.courses)
                   return (
                     <Fragment key={o.key}>
                     <button
@@ -571,7 +571,7 @@ function TodayView({
                         </div>
                       </div>
                       <div className={`min-w-0 flex-1 pl-4 ${isLast ? 'pb-7' : ''} ${past || o.status === 'cancelled' ? 'opacity-50' : ''}`}>
-                      {/* 每节课一张卡；右侧竖列放学科贴纸和状态标签，右边缘对齐，长按抬起时贴纸先隐去 */}
+                      {/* 每节课一张卡；右侧竖列放学科贴纸和状态标签，右边缘对齐，贴纸随卡片一起抬起 */}
                       <div data-lift className="relative rounded-[16px] bg-(--c-surface) px-4 py-3.5">
                         <div className="flex items-start gap-2">
                           <div className="min-w-0 flex-1">
@@ -585,7 +585,7 @@ function TodayView({
                               {o.muted && o.status === 'normal' && !past && <span className="flex-none rounded-[7px] bg-(--c-surface2) px-2 py-[3px] text-[10.5px] font-bold text-(--c-ink3)">静音</span>}
                             </div>
                           </div>
-                          {sticker && <Sticker id={sticker} size={24} tilt={-4} hidden={liftKey === o.key} className="flex-none" />}
+                          {sticker && <Sticker id={sticker} size={24} tilt={-4} className="flex-none" />}
                         </div>
                         {nowOn && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 {fmtMinutes(now)}，还剩 {fmtDuration(o.end - now)}</div>}
                         {!nowOn && o.key === nextKey && (!inClass && o.start - now <= 60
@@ -714,10 +714,11 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                     const lift = liftKey === o.key
                     const ring = nowOn ? `inset 0 0 0 1.5px ${o.color}` : o.conflict ? 'inset 0 0 0 1.2px #D9A94B' : 'none'
                     const cellH = ((o.end - o.start) / 60) * hour - 2
-                    const sticker = !half && cellH >= 44 ? stickerOf(o.name) : null
+                    const sticker = !half && cellH >= 44 ? stickerOfOcc(o, snap.courses) : null
                     return (
                       <div
                         key={o.key}
+                        data-lift
                         className="absolute"
                         style={{
                           top: ((o.start - dayStart) / 60) * hour,
@@ -745,7 +746,6 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                           id={sticker}
                           size={20}
                           tilt={stickerTilt(o.name)}
-                          hidden={lift}
                           className="pointer-events-none absolute -right-1.5 -bottom-1.5 z-10"
                           style={done && !pastCol ? { opacity: 0.55 } : undefined}
                         />
@@ -1925,7 +1925,7 @@ function ThemePage({ onBack }: { onBack: () => void }) {
             </div>
           </>
         )}
-        <div className="mt-6 px-1 text-[12px] font-bold text-(--c-ink4)">课程贴纸 Beta</div>
+        <div className="mt-6 px-1 text-[12px] font-bold text-(--c-ink4)">课程贴纸</div>
         <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
           {([[true, '显示'], [false, '隐藏']] as const).map(([v, label], i) => {
             const on = stickers === v
@@ -1943,7 +1943,6 @@ function ThemePage({ onBack }: { onBack: () => void }) {
             )
           })}
         </div>
-        <div className="mt-2 px-1 text-[11.5px] font-medium text-(--c-ink4)">按课程名自动匹配学科图形。</div>
       </div>
     </Page>
   )
@@ -2522,7 +2521,7 @@ export default function RealApp() {
               anchor={weekAnchor}
               setAnchor={setWeekAnchor}
               onPick={openOccurrence}
-              onMenu={(o, a, el) => setMenu({ occ: o, anchor: a, ghost: { el, rect: a, color: o.color, radius: 9, scale: 1.06 } })}
+              onMenu={(o, a, el) => setMenu({ occ: o, anchor: a, ghost: { el, rect: a, color: o.color, radius: 9, scale: 1.06, overhang: true } })}
               liftKey={menu?.occ.key}
               onSearch={() => setSearching(true)}
             />
