@@ -525,6 +525,7 @@ function TodayView({
               const nextKey = day.date === today
                 ? day.occ.find((x) => x.start > now && x.status !== 'cancelled')?.key
                 : undefined
+              const inClass = day.date === today && day.occ.some((x) => x.start <= now && now < x.end && x.status !== 'cancelled')
               return (
               <div key={day.date} data-day={day.date}>
                 {day.occ.length > 0 && (
@@ -587,7 +588,7 @@ function TodayView({
                           {sticker && <Sticker id={sticker} size={24} tilt={-4} hidden={liftKey === o.key} className="flex-none" />}
                         </div>
                         {nowOn && <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">上课中，现在 {fmtMinutes(now)}，还剩 {fmtDuration(o.end - now)}</div>}
-                        {!nowOn && o.key === nextKey && (o.start - now <= 60
+                        {!nowOn && o.key === nextKey && (!inClass && o.start - now <= 60
                           ? <div className="mt-1.5 text-[12px] font-bold tabular-nums text-(--c-accent)">还有 {fmtDuration(o.start - now)}，{fmtMinutes(o.start)} 开始</div>
                           : <div className="mt-1.5 text-[12px] font-semibold tabular-nums text-(--c-ink3)">下一节，{fmtMinutes(o.start)} 开始</div>
                         )}
