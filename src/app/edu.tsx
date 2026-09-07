@@ -362,8 +362,9 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
 
   return (
     <Page keep>
-      <div className="relative flex flex-1 flex-col overflow-hidden pt-[max(52px,calc(env(safe-area-inset-top)+22px))]">
-        <div className="flex items-center gap-3 px-5">
+      <div className="relative flex flex-1 flex-col overflow-hidden">
+        {/* 顶栏自己铺底色：下面的学校页面多为白底，胶囊不能直接压在上面 */}
+        <div className="flex items-center gap-3 bg-(--c-bg) px-5 pt-[max(52px,calc(env(safe-area-inset-top)+22px))] pb-4">
           <BackButton onClick={() => void goBack()} />
           <div className="flex h-9 min-w-0 flex-1 items-center rounded-full bg-(--c-surface) px-4">
             {secure && (
@@ -378,7 +379,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
         </div>
 
         {/* 透明洞：原生 WebView 在下面显示学校页面 */}
-        <div ref={hole} className="mt-4 flex flex-1 items-center justify-center">
+        <div ref={hole} className="flex flex-1 items-center justify-center">
           {!native && (
             <div className="rounded-[14px] bg-(--c-surface) px-4 py-2.5 text-[12.5px] font-medium text-(--c-ink4)">内置浏览器仅在应用内可用</div>
           )}

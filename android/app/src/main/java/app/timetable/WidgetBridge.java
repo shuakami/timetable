@@ -13,6 +13,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.VibrationAttributes;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
@@ -253,7 +254,7 @@ public class WidgetBridge extends Plugin {
         });
     }
 
-    /* ---------------- 触感：滚轮刻度用系统时钟刻度，选定用确认 ---------------- */
+    /* ---------------- 触感：直接驱动马达，不走 WebView 的触摸反馈（用户关掉「触摸振动」后那条路是静音的） ---------------- */
 
     @PluginMethod
     public void haptic(PluginCall call) {
@@ -264,46 +265,72 @@ public class WidgetBridge extends Plugin {
             return;
         }
         act.runOnUiThread(() -> {
-            View v = getBridge().getWebView();
-            int c;
-            switch (kind) {
-                case "select":
-                    c = Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.KEYBOARD_TAP;
-                    break;
-                case "reject":
-                    c = Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.REJECT : HapticFeedbackConstants.LONG_PRESS;
-                    break;
-                case "press":
-                    c = HapticFeedbackConstants.KEYBOARD_TAP;
-                    break;
-                case "edge":
-                    c = Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
-                    break;
-                default:
-                    c = Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_FREQUENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
+            if (!vibrate(act, kind)) {
+                View v = getBridge().getWebView();
+                if (v != null) v.performHapticFeedback(feedbackConstant(kind), HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
             }
-            boolean done = v != null && v.performHapticFeedback(c, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-            if (!done) vibrateFallback(act, kind);
             call.resolve();
         });
     }
 
-    private static void vibrateFallback(Context ctx, String kind) {
-        Vibrator vib;
+    private static int feedbackConstant(String kind) {
+        switch (kind) {
+            case "select":
+                return Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.KEYBOARD_TAP;
+            case "reject":
+                return Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.REJECT : HapticFeedbackConstants.LONG_PRESS;
+            case "press":
+                return HapticFeedbackConstants.KEYBOARD_TAP;
+            case "edge":
+                return Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
+            default:
+                return Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_FREQUENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
+        }
+    }
+
+    private static Vibrator vibrator(Context ctx) {
         if (Build.VERSION.SDK_INT >= 31) {
             VibratorManager vm = (VibratorManager) ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
-            vib = vm == null ? null : vm.getDefaultVibrator();
-        } else {
-            vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
+            return vm == null ? null : vm.getDefaultVibrator();
         }
-        if (vib == null || !vib.hasVibrator()) return;
-        if (Build.VERSION.SDK_INT >= 29) {
-            int effect = "select".equals(kind) ? VibrationEffect.EFFECT_CLICK
-                    : "reject".equals(kind) ? VibrationEffect.EFFECT_DOUBLE_CLICK
-                    : VibrationEffect.EFFECT_TICK;
-            vib.vibrate(VibrationEffect.createPredefined(effect));
-        } else if (Build.VERSION.SDK_INT >= 26) {
-            vib.vibrate(VibrationEffect.createOneShot("select".equals(kind) ? 12 : 4, VibrationEffect.DEFAULT_AMPLITUDE));
+        return (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
+    }
+
+    /** 线性马达用系统预置波形：刻度 TICK、边界/确认 CLICK、拒绝双击；标为物理模拟类振动，不受「触摸反馈」开关影响 */
+    private static boolean vibrate(Context ctx, String kind) {
+        Vibrator vib = vibrator(ctx);
+        if (vib == null || !vib.hasVibrator()) return false;
+        try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                int effect;
+                switch (kind) {
+                    case "select":
+                        effect = VibrationEffect.EFFECT_CLICK;
+                        break;
+                    case "edge":
+                        effect = VibrationEffect.EFFECT_HEAVY_CLICK;
+                        break;
+                    case "reject":
+                        effect = VibrationEffect.EFFECT_DOUBLE_CLICK;
+                        break;
+                    default:
+                        effect = VibrationEffect.EFFECT_TICK;
+                }
+                VibrationEffect e = VibrationEffect.createPredefined(effect);
+                if (Build.VERSION.SDK_INT >= 33) {
+                    vib.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_PHYSICAL_EMULATION));
+                } else {
+                    vib.vibrate(e);
+                }
+            } else if (Build.VERSION.SDK_INT >= 26) {
+                long ms = "select".equals(kind) || "edge".equals(kind) ? 12 : "reject".equals(kind) ? 30 : 5;
+                vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                return false;
+            }
+            return true;
+        } catch (RuntimeException e) {
+            return false;
         }
     }
 
