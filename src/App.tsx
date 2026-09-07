@@ -897,38 +897,59 @@ function EduBrowserScreen({ ready = true, overlay }: { ready?: boolean; overlay?
 
         {/* 教务页面示意：按实际网页风格灰级展示，不用我们的主题色 */}
         {!ready ? (
-          <div className="mt-4 flex flex-1 flex-col items-center overflow-hidden bg-white pt-16">
-            <div className="text-[15px] font-bold text-[#1F2937]">教学管理信息服务平台</div>
-            <div className="mt-1 text-[10px] text-[#9CA3AF]">山东大学</div>
-            <div className="mt-8 w-[260px] space-y-2.5">
-              <div className="h-10 rounded-[4px] border border-[#D1D5DB] px-3 text-[11px] leading-10 text-[#9CA3AF]">学号</div>
-              <div className="h-10 rounded-[4px] border border-[#D1D5DB] px-3 text-[11px] leading-10 text-[#9CA3AF]">密码</div>
-              <div className="flex gap-2.5">
-                <div className="h-10 flex-1 rounded-[4px] border border-[#D1D5DB] px-3 text-[11px] leading-10 text-[#9CA3AF]">验证码</div>
-                <div className="h-10 w-[92px] rounded-[4px] bg-[#F3F4F6]" />
-              </div>
-              <div className="mt-1 h-10 rounded-[4px] bg-[#2563EB] text-center text-[12px] leading-10 font-semibold text-white">登录</div>
+          <div className="mt-4 flex flex-1 flex-col overflow-hidden bg-white px-7 pt-12 text-[#111]">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[15px] font-semibold tracking-[.06em]">山东大学</span>
+              <span className="text-[11.5px] text-[#9A9A9A]">教务系统</span>
             </div>
+            <div className="mt-14 text-[24px] font-semibold tracking-[-.02em]">登录</div>
+            <div className="mt-1.5 text-[12.5px] text-[#8A8A8A]">使用学号和统一身份认证密码</div>
+            <div className="mt-8 space-y-3">
+              <div>
+                <div className="text-[11.5px] font-medium text-[#6B6B6B]">学号</div>
+                <div className="mt-1.5 h-[44px] rounded-[10px] bg-[#F4F4F5] px-3.5 text-[13px] leading-[44px] text-[#B0B0B0]">2023 ···</div>
+              </div>
+              <div>
+                <div className="flex items-baseline justify-between text-[11.5px] font-medium text-[#6B6B6B]"><span>密码</span><span className="text-[#9A9A9A]">忘记密码</span></div>
+                <div className="mt-1.5 h-[44px] rounded-[10px] bg-[#F4F4F5] px-3.5 text-[13px] leading-[44px] text-[#B0B0B0]">••••••••</div>
+              </div>
+            </div>
+            <div className="mt-6 h-[46px] rounded-[10px] bg-[#111] text-center text-[13.5px] leading-[46px] font-semibold text-white">登录</div>
+            <div className="mt-4 text-center text-[11.5px] text-[#9A9A9A]">登录即同意《教务系统使用条款》</div>
+            <div className="mt-auto pb-3 text-center text-[10.5px] text-[#B8B8B8]">山东大学教务处　© 2026</div>
           </div>
         ) : (
-        <div className="mt-4 flex-1 overflow-hidden bg-white">
-          <div className="flex h-9 items-center border-b border-[#E5E7EB] bg-[#F5F6F8] px-4 text-[11px] font-semibold text-[#374151]">学生课表查询 · 2025-2026 学年 第 1 学期</div>
-          <div className="grid grid-cols-[28px_repeat(5,1fr)] text-[8px] text-[#4B5563]">
-            {['', '周一', '周二', '周三', '周四', '周五'].map((d, i) => (
-              <div key={i} className="border-r border-b border-[#E5E7EB] bg-[#FAFAFB] py-1.5 text-center font-semibold">{d}</div>
+        <div className="mt-4 flex flex-1 flex-col overflow-hidden bg-white text-[#111]">
+          <div className="flex items-center px-5 pt-4 pb-3">
+            <span className="text-[16px] font-semibold tracking-[-.01em]">我的课表</span>
+            <span className="ml-auto flex h-[26px] items-center gap-1.5 rounded-full bg-[#F4F4F5] px-3 text-[11px] font-medium text-[#444]">2025 秋季学期<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="3" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg></span>
+          </div>
+          <div className="grid grid-cols-[34px_repeat(5,1fr)] px-3 text-[9px]">
+            <div />
+            {[['一', 8], ['二', 9], ['三', 10], ['四', 11], ['五', 12]].map(([d, n]) => (
+              <div key={d as string} className="pb-2 text-center">
+                <div className="text-[9px] text-[#9A9A9A]">周{d}</div>
+                <div className={`mx-auto mt-0.5 w-6 rounded-full text-[11px] font-semibold ${n === 10 ? 'bg-[#111] text-white' : 'text-[#111]'}`}>{n}</div>
+              </div>
             ))}
-            {Array.from({ length: 5 }).map((_, r) => (
+            {Array.from({ length: 6 }).map((_, r) => (
               <React.Fragment key={r}>
-                <div className="flex h-[62px] items-center justify-center border-r border-b border-[#E5E7EB] bg-[#FAFAFB] font-semibold">{r * 2 + 1}-{r * 2 + 2}</div>
+                <div className="flex h-[74px] flex-col items-center pt-1 text-[8.5px] leading-[1.3] text-[#9A9A9A]">
+                  <span className="font-semibold text-[#444]">{r * 2 + 1}</span>
+                  <span>{['8:00', '10:05', '14:00', '15:55', '19:00', '20:45'][r]}</span>
+                </div>
                 {Array.from({ length: 5 }).map((_, c) => {
                   const k = (r * 5 + c) % 7
                   const on = k < 6 && (r + c) % 2 === 0
+                  const bg = ['#EEF1FF', '#E9F6EE', '#FFF1E6', '#F3ECFF', '#E6F4F9', '#FDEDF1'][k]
+                  const fg = ['#3E4A9E', '#2E7A4D', '#A45A1E', '#6A3EA6', '#1F6C8C', '#A8395A'][k]
+                  const room = ['教三 302', '外语楼 105', '教一 201', '理科楼 B204', '教三 410', '主楼 117'][k]
                   return (
-                    <div key={c} className="h-[62px] border-r border-b border-[#E5E7EB] p-[3px]">
+                    <div key={c} className="h-[74px] p-[2px]">
                       {on && (
-                        <div className="h-full rounded-[3px] bg-[#EEF2FF] px-1 py-[3px] leading-[1.35] text-[#3730A3]">
+                        <div className="h-full overflow-hidden rounded-[7px] px-1.5 py-1.5 text-[8px] leading-[1.3]" style={{ background: bg, color: fg }}>
                           <div className="font-semibold">{cells[k]}</div>
-                          <div className="mt-[1px] text-[7px] text-[#6366F1]">1-16周 教三302</div>
+                          <div className="mt-[3px] opacity-70">{room}</div>
                         </div>
                       )}
                     </div>

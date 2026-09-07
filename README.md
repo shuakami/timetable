@@ -20,6 +20,10 @@
 
 ![刚下课、拍板书、拍完、待办详情、待办](docs/screenshots/group8.png)
 
+### 教务系统导入
+
+![选择学校、学校登录页、课表页一键导入、选学期、预览](docs/screenshots/group9.png)
+
 ### 导入 / AI 转换 / 待办 / 我的
 
 ![导入课表、从链接添加、让 AI 生成规则、待办、我的](docs/screenshots/group2.png)
