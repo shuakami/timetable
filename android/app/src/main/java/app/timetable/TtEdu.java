@@ -1,13 +1,21 @@
 package app.timetable;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.http.SslError;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Base64;
 import android.view.MotionEvent;
+import android.view.PixelCopy;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -31,6 +39,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -58,6 +67,7 @@ public class TtEdu extends Plugin {
     private boolean interactive = true;
     private boolean routing = false;
     private boolean transparent = false;
+    private boolean painted = false;
     private Drawable hostBg, parentBg, windowBg;
     private float hostAlpha = 1f;
 
@@ -110,6 +120,63 @@ public class TtEdu extends Plugin {
             if (web != null) web.reload();
             call.resolve();
         });
+    }
+
+    @PluginMethod
+    public void stop(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            if (web != null) {
+                web.stopLoading();
+                emit(false, 100);
+            }
+            call.resolve();
+        });
+    }
+
+    /** 学校页面当前画面的定格（半分辨率 JPEG data URL）；页面退场时贴在透明洞里一起滑走 */
+    @PluginMethod
+    public void snapshot(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            if (web == null || web.getWidth() == 0 || web.getHeight() == 0) {
+                call.reject("closed");
+                return;
+            }
+            final WebView w = web;
+            int sw = w.getWidth(), sh = w.getHeight();
+            Bitmap bmp = Bitmap.createBitmap(Math.max(1, sw / 2), Math.max(1, sh / 2), Bitmap.Config.ARGB_8888);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                int[] loc = new int[2];
+                w.getLocationInWindow(loc);
+                Rect src = new Rect(loc[0], loc[1], loc[0] + sw, loc[1] + sh);
+                try {
+                    PixelCopy.request(getActivity().getWindow(), src, bmp, res -> {
+                        if (res != PixelCopy.SUCCESS) drawInto(w, bmp);
+                        encode(bmp, call);
+                    }, new Handler(Looper.getMainLooper()));
+                    return;
+                } catch (Exception ignored) {
+                }
+            }
+            drawInto(w, bmp);
+            encode(bmp, call);
+        });
+    }
+
+    private static void drawInto(View v, Bitmap bmp) {
+        Canvas c = new Canvas(bmp);
+        c.scale((float) bmp.getWidth() / Math.max(1, v.getWidth()), (float) bmp.getHeight() / Math.max(1, v.getHeight()));
+        v.draw(c);
+    }
+
+    private static void encode(Bitmap bmp, PluginCall call) {
+        new Thread(() -> {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            bmp.compress(Bitmap.CompressFormat.JPEG, 78, out);
+            bmp.recycle();
+            JSObject o = new JSObject();
+            o.put("src", "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP));
+            call.resolve(o);
+        }).start();
     }
 
     @PluginMethod
@@ -187,7 +254,10 @@ public class TtEdu extends Plugin {
         WebView host = bridge.getWebView();
         ViewGroup parent = (ViewGroup) host.getParent();
         container = new FrameLayout(getContext());
-        container.setBackgroundColor(Color.WHITE);
+        // 页面画出首帧前，洞里露的是应用底色而不是白块
+        SharedPreferences sp = getContext().getSharedPreferences("tt.theme", Context.MODE_PRIVATE);
+        container.setBackgroundColor(sp.getInt("bg", 0xFFF7F7F6));
+        painted = false;
         container.setVisibility(frameTop < 0 ? View.INVISIBLE : View.VISIBLE);
         container.setPadding(0, Math.max(0, frameTop), 0, Math.max(0, frameBottom));
         web = new WebView(getContext());
@@ -350,6 +420,7 @@ public class TtEdu extends Plugin {
         o.put("loading", loading);
         o.put("progress", progress);
         o.put("canGoBack", web != null && web.canGoBack());
+        o.put("painted", painted);
         return o;
     }
 
@@ -370,7 +441,15 @@ public class TtEdu extends Plugin {
         }
 
         @Override
+        public void onPageCommitVisible(WebView view, String url) {
+            if (painted) return;
+            painted = true;
+            emit(view.getProgress() < 100, view.getProgress());
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
+            painted = true;
             emit(false, 100);
         }
 
@@ -399,7 +478,7 @@ public class TtEdu extends Plugin {
 
         @Override
         public void onReceivedTitle(WebView view, String title) {
-            emit(false, 100);
+            emit(view.getProgress() < 100, view.getProgress());
         }
     }
 
