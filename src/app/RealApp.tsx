@@ -1570,7 +1570,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
   const groups: [string, [string, string, MePage][]][] = [
     ['课表', [
       ['学期', sem ? `${sem.name}，第 ${Math.max(0, Math.min(sem.totalWeeks, week))} / ${sem.totalWeeks} 周` : '未设置', 'semester'],
-      ['作息时间', sem ? `${sem.timeGrid.length} 节，${fmtMinutes(sem.timeGrid[0]?.start ?? 0)} 起` : '未设置', 'schedule'],
+      ['作息时间', '', 'schedule'],
       ['课程', `${live.length} 门`, 'courses'],
       ['导入课表', '', 'import'],
       ['分享课表', '', 'share'],
