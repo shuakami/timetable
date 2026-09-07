@@ -90,7 +90,7 @@ export function WeekAxis({ axis, nowTop, nowLabel }: { axis: TimeAxis; nowTop?: 
 }
 
 /**
- * 网格线：节与节之间一条横线，落在课间正中；长课间（午休/晚饭）的那条线从中间断开写上说明，
+ * 网格线：节与节之间一条横线，落在课间正中；午休 / 晚饭的那条线从中间断开写上名字，没名字的长课间只有线，
  * 仍是一条线，不另起一套带子。
  */
 export function WeekLines({ axis }: { axis: TimeAxis }) {
