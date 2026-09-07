@@ -2458,7 +2458,7 @@ export default function RealApp() {
     else setCompose({ courseId })
   }
   const pop = () => setStack((s) => s.slice(0, -1))
-  /* 浏览器会话已关，预览 / 未识别页直接顶替浏览器页，退回时回到选学校 */
+  /* 未识别页顶替浏览器页（会话已关）；预览页推在浏览器上方，退回时回到浏览器 */
   const replaceTop = (r: Route) => setStack((s) => [...s.slice(0, -1), r])
   const backToTimetable = () => { setStack([]); setTab(0) }
   /* 头像 / 背景：原生走相册页（单选），浏览器直接选文件；换掉的文件随手删 */
@@ -2657,8 +2657,9 @@ export default function RealApp() {
           <EduBrowserPage
             key={key}
             school={r.school}
+            active={i === stack.length - 1}
             onBack={pop}
-            onImport={(out) => replaceTop({ k: 'eduPreview', out })}
+            onImport={(out) => push({ k: 'eduPreview', out })}
             onFail={(info) => replaceTop({ k: 'eduFail', info })}
           />
         )
