@@ -531,6 +531,7 @@ export function CameraPage({
   const shoot = async () => {
     if (busy) return
     setBusy(true)
+    haptic('medium')
     try {
       const photo = await camera.capture()
       await leave()

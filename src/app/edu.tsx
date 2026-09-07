@@ -187,8 +187,10 @@ type Ready =
 
 const HTML_CLASS = 'tt-edu'
 
-export function EduBrowserPage({ school, onBack, onImport, onFail }: {
+export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   school: School
+  /** 预览页盖在上方时为 false：应用恢复不透明、触摸不再透给学校页面，会话保留以便退回 */
+  active: boolean
   onBack: () => void
   onImport: (out: RuleOutput) => void
   onFail: (info: EduFailInfo) => void
@@ -202,6 +204,11 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
   const hole = useRef<HTMLDivElement>(null)
   const pill = useRef<HTMLButtonElement>(null)
   const left = useRef(false)
+
+  useEffect(() => {
+    if (!opened || left.current) return
+    document.documentElement.classList.toggle(HTML_CLASS, active)
+  }, [opened, active])
 
   const sys = detectSystem(nav.url, school.system)
   const onPage = !nav.loading && !nav.error && isTimetablePage(sys, nav.url, nav.title)
@@ -237,7 +244,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
         top: a.top,
         bottom: Math.max(0, window.innerHeight - a.bottom),
         keep: b ? [{ x: b.left, y: b.top, w: b.width, h: b.height }] : [],
-        interactive: !sheet,
+        interactive: !sheet && active,
       })
     }
     send()
@@ -246,7 +253,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
     ro.observe(h)
     if (p) ro.observe(p)
     return () => ro.disconnect()
-  }, [opened, sheet, showPill])
+  }, [opened, sheet, showPill, active])
 
   /* 还没到课表页时不摆胶囊，首次加载完成后用一条 toast 提示去向 */
   const hinted = useRef(false)
@@ -322,7 +329,8 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
   const finish = async (out: RuleOutput) => {
     if (out.courses.length === 0) return fail()
     haptic('success')
-    await leave()
+    setSheet(false)
+    document.documentElement.classList.remove(HTML_CLASS)
     onImport(out)
   }
 

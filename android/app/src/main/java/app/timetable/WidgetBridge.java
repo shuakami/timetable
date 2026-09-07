@@ -111,6 +111,7 @@ public class WidgetBridge extends Plugin {
 
     /** 返回键只关对话框，不往 Activity 下传 */
     private static void eatBack(android.app.Dialog d) {
+        d.setCanceledOnTouchOutside(true);
         d.setOnKeyListener((dlg, keyCode, event) -> {
             if (keyCode != android.view.KeyEvent.KEYCODE_BACK) return false;
             if (event.getAction() == android.view.KeyEvent.ACTION_UP) dlg.cancel();
