@@ -73,6 +73,6 @@ describe('semester lifecycle', () => {
 
   it('ics description carries semester metadata', () => {
     expect(describeSemester({ name: sem.name, startDate: sem.startDate, totalWeeks: 20, timeGrid: sem.timeGrid }, 12))
-      .toBe('2025–2026 学年 第 1 学期 · 2025-09-01 开学 · 20 周 · 12 门课')
+      .toBe('2025–2026 学年 第 1 学期，2025-09-01 开学，20 周，12 门课')
   })
 })

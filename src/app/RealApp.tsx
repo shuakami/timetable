@@ -2093,39 +2093,32 @@ function SemesterPickSheet({ title, action, options, onPick, onClose }: {
   )
 }
 
-/* 往期学期：分享或删除，删除要再确认一次 */
-function ArchiveSheet({ a, onClose }: { a: SemesterArchive; onClose: () => void }) {
-  const [del, setDel] = useState(false)
-  const dismiss = useRef<(() => void) | null>(null)
+/* 往期学期：只读内页，课程列表、底部分享；删除走和规则页一样的红色行 */
+function ArchivePage({ a, onBack }: { a: SemesterArchive; onBack: () => void }) {
+  const courses = a.courses.filter((c) => !c.hidden && !c.removedByImport)
   return (
-    <Sheet
-      onClose={onClose}
-      dismissRef={dismiss}
-      className="px-5 pb-1"
-      header={<SheetHead title={del ? `删除「${a.semester.name}」？` : a.semester.name} sub={del ? `${liveCount(a)} 门课将一并删除，不可恢复` : `${md(a.semester.startDate)} 开学 · ${a.semester.totalWeeks} 周 · ${liveCount(a)} 门课`} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
-      footer={
-        <div className="px-5 pt-2">
-          {del
-            ? <PrimaryButton tone="danger" onClick={() => { store.removeArchive(a.semester.id); dismiss.current?.() }}>删除</PrimaryButton>
-            : <PrimaryButton onClick={() => { void shareIcs(a); dismiss.current?.() }}>分享课表</PrimaryButton>}
+    <Page>
+      <div className="flex-1 overflow-y-auto px-5 pb-6 [scrollbar-width:none]">
+        <TopBar title={a.semester.name} sub={`${md(a.semester.startDate)} 开学，${a.semester.totalWeeks} 周，${courses.length} 门课`} onBack={onBack} />
+        <div className="mt-6 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+          {courses.map((c) => <Row key={c.id} title={c.name} desc={c.teacher} right={<span />} />)}
         </div>
-      }
-    >
-      {!del && (
-        <div className="flex justify-center pt-1 pb-1">
-          <TextAction onClick={() => setDel(true)} tone="danger">删除这个学期</TextAction>
+        <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+          <Row title="删除学期" danger onClick={() => { store.removeArchive(a.semester.id); onBack() }} right={<span />} />
         </div>
-      )}
-    </Sheet>
+      </div>
+      <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">
+        <PrimaryButton onClick={() => void shareIcs(a)}>分享课表</PrimaryButton>
+      </div>
+    </Page>
   )
 }
 
-function SemesterSettings({ sem, onBack, onNew }: { sem: Semester; onBack: () => void; onNew: () => void }) {
+function SemesterSettings({ sem, onBack, onNew, onArchive }: { sem: Semester; onBack: () => void; onNew: () => void; onArchive: (id: string) => void }) {
   const state = useStore()
   const [name, setName] = useState(sem.name)
   const [date, setDate] = useState(sem.startDate)
   const [weeks, setWeeks] = useState(sem.totalWeeks)
-  const [pick, setPick] = useState<SemesterArchive | null>(null)
   const start = mondayOf(date)
   const ended = semesterEnded({ startDate: start, totalWeeks: weeks })
   const archives = [...state.archives].reverse()
@@ -2147,13 +2140,11 @@ function SemesterSettings({ sem, onBack, onNew }: { sem: Semester; onBack: () =>
           <div className="mt-7 mb-2 px-1 text-[12.5px] font-semibold text-(--c-ink4)">往期学期</div>
           <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
             {archives.map((a) => (
-              <Row key={a.semester.id} title={a.semester.name} desc={`${liveCount(a)} 门课 · ${md(a.semester.startDate)} 开学`} onClick={() => setPick(a)} />
+              <Row key={a.semester.id} title={a.semester.name} desc={`${md(a.semester.startDate)} 开学，${liveCount(a)} 门课`} onClick={() => onArchive(a.semester.id)} />
             ))}
           </div>
         </>
       )}
-
-      {pick && <ArchiveSheet a={pick} onClose={() => setPick(null)} />}
 
       <div className="mt-8">
         <PrimaryButton
@@ -2318,6 +2309,7 @@ type Route =
   | { k: 'rule'; rule: RuleManifest | null }
   | { k: 'semester' }
   | { k: 'newSemester' }
+  | { k: 'archive'; id: string }
   | { k: 'schedule' }
   | { k: 'history' }
   | { k: 'trash' }
@@ -2681,7 +2673,11 @@ export default function RealApp() {
       case 'rule':
         return <RuleEditorPage key={key} rule={r.rule} onBack={pop} />
       case 'semester':
-        return <SemesterSettings key={key} sem={snap.semester} onBack={pop} onNew={() => push({ k: 'newSemester' })} />
+        return <SemesterSettings key={key} sem={snap.semester} onBack={pop} onNew={() => push({ k: 'newSemester' })} onArchive={(id) => push({ k: 'archive', id })} />
+      case 'archive': {
+        const a = state.archives.find((x) => x.semester.id === r.id)
+        return a ? <ArchivePage key={key} a={a} onBack={pop} /> : null
+      }
       case 'newSemester':
         return <NewSemesterPage key={key} sem={snap.semester} onBack={pop} onDone={() => setStack([{ k: 'import' }])} />
       case 'schedule':

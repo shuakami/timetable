@@ -120,11 +120,11 @@ export function buildIcs(events: DesiredEvent[], opt: IcsOptions): string {
   return lines.map(fold).join('\r\n') + '\r\n'
 }
 
-/** 日历描述：「2025–2026 学年 第 1 学期 · 2025-09-01 开学 · 20 周 · 12 门课」 */
+/** 日历描述：「2025–2026 学年 第 1 学期，2025-09-01 开学，20 周，12 门课」 */
 export function describeSemester(sem: IcsSemester, courseCount?: number): string {
   const parts = [sem.name, `${sem.startDate} 开学`, `${sem.totalWeeks} 周`]
   if (courseCount != null) parts.push(`${courseCount} 门课`)
-  return parts.join(' · ')
+  return parts.join('，')
 }
 
 /** 文件名：学期名.ics，去掉文件系统不认的字符 */
