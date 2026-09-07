@@ -1226,7 +1226,9 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
 /* ---------------- 月历 / 时刻滚轮 / 日期与时刻选择卡 ---------------- */
 
 /** 同一区域内两层内容交叉淡入淡出的层：常驻合成层 + 200ms 透明度过渡 */
-export const SWAP_LAYER = 'absolute inset-0 transition-opacity duration-200 ease-out will-change-[opacity]'
+export const SWAP_LAYER = 'absolute inset-0 transition-[opacity,visibility] duration-200 ease-out will-change-[opacity]'
+/** 交叉层的显隐：隐藏层同时 visibility hidden，子元素自己写的 pointer-events 也拦不到触摸 */
+export const swapStyle = (on: boolean): React.CSSProperties => ({ opacity: on ? 1 : 0, visibility: on ? 'visible' : 'hidden', pointerEvents: on ? 'auto' : 'none' })
 
 export const CAL_ROW = 42
 /** 月历区域固定高度：月份行 + 星期行 + 六行日期；切成年月日滚轮时也用这个高度，不跳 */
@@ -1272,6 +1274,7 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
   const [dir, setDir] = useState(1)
   const goMonth = (n: number) => { setDir(n); setMonth((x) => shiftMonth(x, n)) }
   const pick = (x: string) => {
+    if (x !== d) haptic('selection')
     onChange(x)
     if (ymOf(x) !== month) { setDir(x > month ? 1 : -1); setMonth(ymOf(x)) }
   }
@@ -1293,7 +1296,7 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
   const cal = view === 'cal'
   return (
     <div className="relative" style={{ height: CAL_H }}>
-      <div className={SWAP_LAYER} style={{ opacity: cal ? 1 : 0, pointerEvents: cal ? 'auto' : 'none' }} aria-hidden={!cal}>
+      <div className={SWAP_LAYER} style={swapStyle(cal)} aria-hidden={!cal}>
         <div className="flex h-10 items-center justify-between">
           <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={-1} /></button>
           <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
@@ -1345,7 +1348,7 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
           </AnimatePresence>
         </div>
       </div>
-      <div className={`${SWAP_LAYER} flex flex-col`} style={{ opacity: cal ? 0 : 1, pointerEvents: cal ? 'none' : 'auto' }} aria-hidden={cal}>
+      <div className={`${SWAP_LAYER} flex flex-col`} style={swapStyle(!cal)} aria-hidden={cal}>
         <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
           {dy}年{dm}月
           <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
