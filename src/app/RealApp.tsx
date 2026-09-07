@@ -35,7 +35,7 @@ import { copyText, haptic, nativeToast, pasteText, syncWidgets } from './widgets
 import { onIncomingIcs, shareIcs } from './files'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
-  ActionSheet, BackPill, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, StickyHead, TopVeil, useVeilOpacity,
+  ActionSheet, BackPill, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, SheetClose, SheetHead, StickyHead, TopVeil, useVeilOpacity,
   TextAction, TextInput, TopBar, WD, WD_SHORT, dockStyle, md, tint, type Ghost, type Rect,
   DateInput, Switch,
 } from './ui'
@@ -542,7 +542,6 @@ function TodayView({
             <EmptyBlock
               kind="term"
               title="学期已结束"
-              desc={`${snap.semester.name}，共 ${snap.semester.totalWeeks} 周，止于 ${md(termEndDay)}。`}
               actions={[['开始新学期', onNewSemester], ['学期设置', onSemester]]}
             />
           </div>
@@ -2057,19 +2056,82 @@ function SubPage({ title, sub, onBack, children }: { title: string; sub?: string
 
 const liveCount = (s: Snapshot) => s.courses.filter((c) => !c.hidden && !c.removedByImport).length
 
+/* 选学期：和教务导入的「导入哪个学期？」同一套单选样式，第一项默认选中 */
+function SemesterPickSheet({ title, action, options, onPick, onClose }: {
+  title: string; action: string; options: Snapshot[]; onPick: (s: Snapshot) => void; onClose: () => void
+}) {
+  const [sel, setSel] = useState(0)
+  const dismiss = useRef<(() => void) | null>(null)
+  return (
+    <Sheet
+      onClose={onClose}
+      dismissRef={dismiss}
+      className="px-5 pb-1"
+      header={<SheetHead title={title} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
+      footer={<div className="px-5 pt-2"><PrimaryButton onClick={() => { onPick(options[sel]); dismiss.current?.() }}>{action}</PrimaryButton></div>}
+    >
+      <div className="space-y-2 pt-1">
+        {options.map((s, i) => {
+          const on = i === sel
+          return (
+            <button
+              key={s.semester.id}
+              onClick={() => { haptic('selection'); setSel(i) }}
+              className="flex w-full items-center rounded-[12px] px-3.5 py-3 text-left"
+              style={{ background: on ? 'var(--c-accent-soft)' : 'var(--c-row-muted)', boxShadow: on ? 'inset 0 0 0 1.5px var(--c-accent)' : undefined }}
+            >
+              <span className="mr-3 flex h-[17px] w-[17px] flex-none items-center justify-center rounded-full border-[1.8px]" style={{ borderColor: on ? 'var(--c-accent)' : 'var(--c-radio-border)', background: on ? 'var(--c-accent)' : 'transparent' }}>
+                {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.6"><path d="m6 12.5 4 4 8-9" /></svg>}
+              </span>
+              <span className={`min-w-0 flex-1 truncate text-[13.5px] font-bold text-(--c-ink) ${on ? '' : 'opacity-55'}`}>{s.semester.name}</span>
+              <span className={`ml-3 flex-none text-[12.5px] font-semibold tabular-nums text-(--c-ink4) ${on ? '' : 'opacity-55'}`}>{i === 0 ? '当前' : `${liveCount(s)} 门课`}</span>
+            </button>
+          )
+        })}
+      </div>
+    </Sheet>
+  )
+}
+
+/* 往期学期：分享或删除，删除要再确认一次 */
+function ArchiveSheet({ a, onClose }: { a: SemesterArchive; onClose: () => void }) {
+  const [del, setDel] = useState(false)
+  const dismiss = useRef<(() => void) | null>(null)
+  return (
+    <Sheet
+      onClose={onClose}
+      dismissRef={dismiss}
+      className="px-5 pb-1"
+      header={<SheetHead title={del ? `删除「${a.semester.name}」？` : a.semester.name} sub={del ? `${liveCount(a)} 门课将一并删除，不可恢复` : `${md(a.semester.startDate)} 开学 · ${a.semester.totalWeeks} 周 · ${liveCount(a)} 门课`} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
+      footer={
+        <div className="px-5 pt-2">
+          {del
+            ? <PrimaryButton tone="danger" onClick={() => { store.removeArchive(a.semester.id); dismiss.current?.() }}>删除</PrimaryButton>
+            : <PrimaryButton onClick={() => { void shareIcs(a); dismiss.current?.() }}>分享课表</PrimaryButton>}
+        </div>
+      }
+    >
+      {!del && (
+        <div className="flex justify-center pt-1 pb-1">
+          <TextAction onClick={() => setDel(true)} tone="danger">删除这个学期</TextAction>
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
 function SemesterSettings({ sem, onBack, onNew }: { sem: Semester; onBack: () => void; onNew: () => void }) {
   const state = useStore()
   const [name, setName] = useState(sem.name)
   const [date, setDate] = useState(sem.startDate)
   const [weeks, setWeeks] = useState(sem.totalWeeks)
   const [pick, setPick] = useState<SemesterArchive | null>(null)
-  const [confirmDel, setConfirmDel] = useState<SemesterArchive | null>(null)
   const start = mondayOf(date)
   const ended = semesterEnded({ startDate: start, totalWeeks: weeks })
   const archives = [...state.archives].reverse()
 
   return (
-    <SubPage title="学期" sub={ended ? `已结束，止于 ${md(termEnd({ startDate: start, totalWeeks: weeks }))}` : `第 ${Math.max(1, currentWeek(start))} 周，共 ${weeks} 周`} onBack={onBack}>
+    <SubPage title="学期" sub={ended ? `已结束，共 ${weeks} 周` : `第 ${Math.max(1, currentWeek(start))} 周，共 ${weeks} 周`} onBack={onBack}>
       <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
         <Field k="名称"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field k="开学" sub={`第 1 周 ${md(start)} 周一`}><DateInput value={date} onChange={setDate} /></Field>
@@ -2091,23 +2153,7 @@ function SemesterSettings({ sem, onBack, onNew }: { sem: Semester; onBack: () =>
         </>
       )}
 
-      {pick && (
-        <ActionSheet
-          title={pick.semester.name}
-          groups={[
-            [{ title: '分享课表', icon: ICON.calendar, onClick: () => void shareIcs(pick) }],
-            [{ title: '删除', icon: ICON.trash, danger: true, onClick: () => setConfirmDel(pick) }],
-          ]}
-          onClose={() => setPick(null)}
-        />
-      )}
-      {confirmDel && (
-        <ActionSheet
-          title={`删除「${confirmDel.semester.name}」及 ${liveCount(confirmDel)} 门课，不可恢复`}
-          groups={[[{ title: '删除', icon: ICON.trash, danger: true, onClick: () => store.removeArchive(confirmDel.semester.id) }]]}
-          onClose={() => setConfirmDel(null)}
-        />
-      )}
+      {pick && <ArchiveSheet a={pick} onClose={() => setPick(null)} />}
 
       <div className="mt-8">
         <PrimaryButton
@@ -2139,14 +2185,11 @@ function NewSemesterPage({ sem, onBack, onDone }: { sem: Semester; onBack: () =>
   const live = liveCount({ ...state, semester: sem })
 
   return (
-    <SubPage title="新学期" sub={keep ? `${sem.name} 封存至往期，${live} 门课` : undefined} onBack={onBack}>
+    <SubPage title="新学期" sub={keep ? `${sem.name} 封存至往期，${live} 门课；作息与待办将会保留` : '作息与待办将会保留'} onBack={onBack}>
       <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
         <Field k="名称"><TextInput value={shown} onChange={(e) => { setNamed(true); setName(e.target.value) }} /></Field>
         <Field k="开学" sub={`第 1 周 ${md(start)} 周一`}><DateInput value={date} onChange={setDate} /></Field>
         <Field k="总周数"><TextInput type="number" min={1} max={64} value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} /></Field>
-      </div>
-      <div className="mt-2.5 rounded-[16px] bg-(--c-surface) px-4 py-3.5 text-[12.5px] font-medium text-(--c-ink3)">
-        {keep ? '往期学期仍可在「学期」中查看与分享；作息时间与待办保留。' : '作息时间与待办保留。'}
       </div>
 
       <div className="mt-8">
@@ -2747,15 +2790,12 @@ export default function RealApp() {
         </motion.div>
       </AnimatePresence>
 
-      {sharing && (
-        <ActionSheet
-          title="分享哪个学期"
-          groups={[
-            snap ? [{ title: snap.semester.name, value: '当前', icon: ICON.calendar, onClick: () => void shareIcs(snap) }] : [],
-            [...store.state.archives].reverse().map((a) => ({
-              title: a.semester.name, value: `${liveCount(a)} 门课`, icon: ICON.book, onClick: () => void shareIcs(a),
-            })),
-          ]}
+      {sharing && snap && (
+        <SemesterPickSheet
+          title="分享哪个学期？"
+          action="分享"
+          options={[snap, ...[...store.state.archives].reverse()]}
+          onPick={(s) => void shareIcs(s)}
           onClose={() => setSharing(false)}
         />
       )}
