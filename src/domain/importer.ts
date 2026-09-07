@@ -23,7 +23,7 @@ export interface RuleOutput {
   diagnostics: Diagnostic[]
   timeGrid?: TimeSlot[] // 课表自带节次表时覆盖学期设置
   /** 来源自带学期信息（开学日、周数）时覆盖学期设置 */
-  semester?: Pick<Semester, 'startDate'> & Partial<Pick<Semester, 'name' | 'totalWeeks'>>
+  semester?: Partial<Pick<Semester, 'name' | 'startDate' | 'totalWeeks'>>
 }
 
 const PHONE_RE = /(?:\+?86[- ]?)?1[3-9]\d(?:[ \-]?\d){8}/

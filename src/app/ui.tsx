@@ -1092,10 +1092,10 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
     if (row !== s.row) {
       s.row = row
       setCur(row)
-      haptic('tick')
+      haptic('selection')
     }
     const out = y < 0 || y > max
-    if (out && !s.edged) haptic('edge')
+    if (out && !s.edged) haptic('light')
     s.edged = out
     paint()
   }, [items.length, max, paint])
@@ -1414,10 +1414,10 @@ export function Stepper({ value, unit, min, max, step = 1, onChange }: { value: 
   const go = (dir: -1 | 1) => {
     const next = value + dir * step
     if (next < min || next > max) {
-      haptic('edge')
+      haptic('light')
       return
     }
-    haptic('tick')
+    haptic('selection')
     onChange(next)
   }
   const btn = (dir: -1 | 1, path: string) => (
@@ -1444,7 +1444,7 @@ export function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) =
     <button
       role="switch"
       aria-checked={on}
-      onClick={() => { haptic('select'); onChange(!on) }}
+      onClick={() => { haptic('light'); onChange(!on) }}
       className={`relative h-[26px] w-[44px] flex-none rounded-full transition-colors duration-200 ${on ? 'bg-(--c-accent)' : 'bg-(--c-line)'}`}
     >
       <i className={`absolute top-[3px] h-[20px] w-[20px] rounded-full bg-white transition-[left] duration-200 ${on ? 'left-[21px]' : 'left-[3px]'}`} />

@@ -70,6 +70,8 @@ export interface IcsOptions {
   /** 日历名，进对方日历后的显示名 */
   name: string
   semester: IcsSemester
+  /** 写进日历描述的课程门数 */
+  courseCount?: number
   /** 课程 id → 颜色，随事件带走 */
   colors?: Map<string, string>
   now?: Date
@@ -86,6 +88,7 @@ export function buildIcs(events: DesiredEvent[], opt: IcsOptions): string {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeText(opt.name)}`,
+    `X-WR-CALDESC:${escapeText(describeSemester(opt.semester, opt.courseCount))}`,
     `X-WR-TIMEZONE:${tz}`,
     `X-TT-SEMESTER:${escapeText(JSON.stringify(opt.semester))}`,
   ]
@@ -115,6 +118,13 @@ export function buildIcs(events: DesiredEvent[], opt: IcsOptions): string {
   }
   lines.push('END:VCALENDAR')
   return lines.map(fold).join('\r\n') + '\r\n'
+}
+
+/** 日历描述：「2025–2026 学年 第 1 学期 · 2025-09-01 开学 · 20 周 · 12 门课」 */
+export function describeSemester(sem: IcsSemester, courseCount?: number): string {
+  const parts = [sem.name, `${sem.startDate} 开学`, `${sem.totalWeeks} 周`]
+  if (courseCount != null) parts.push(`${courseCount} 门课`)
+  return parts.join(' · ')
 }
 
 /** 文件名：学期名.ics，去掉文件系统不认的字符 */

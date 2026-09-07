@@ -258,7 +258,7 @@ public class WidgetBridge extends Plugin {
 
     @PluginMethod
     public void haptic(PluginCall call) {
-        String kind = call.getString("kind", "tick");
+        String kind = call.getString("kind", "selection");
         Activity act = getActivity();
         if (act == null) {
             call.resolve();
@@ -275,14 +275,16 @@ public class WidgetBridge extends Plugin {
 
     private static int feedbackConstant(String kind) {
         switch (kind) {
-            case "select":
+            case "success":
                 return Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.KEYBOARD_TAP;
-            case "reject":
+            case "warning":
+            case "error":
                 return Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.REJECT : HapticFeedbackConstants.LONG_PRESS;
-            case "press":
+            case "medium":
+            case "heavy":
+                return HapticFeedbackConstants.LONG_PRESS;
+            case "light":
                 return HapticFeedbackConstants.KEYBOARD_TAP;
-            case "edge":
-                return Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
             default:
                 return Build.VERSION.SDK_INT >= 34 ? HapticFeedbackConstants.SEGMENT_FREQUENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
         }
@@ -296,41 +298,92 @@ public class WidgetBridge extends Plugin {
         return (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
     }
 
-    /** 线性马达用系统预置波形：刻度 TICK、边界/确认 CLICK、拒绝双击；标为物理模拟类振动，不受「触摸反馈」开关影响 */
+    /** 触感分级对齐 iOS UIFeedbackGenerator：
+        selection 最轻刻度；light / medium / heavy 三档冲击；success / warning / error 是多段组合。
+        优先用 Composition 原语按幅度合成（线性马达），不支持时退到预置波形；标为物理模拟类振动，不受「触摸反馈」开关影响 */
     private static boolean vibrate(Context ctx, String kind) {
         Vibrator vib = vibrator(ctx);
         if (vib == null || !vib.hasVibrator()) return false;
         try {
-            if (Build.VERSION.SDK_INT >= 29) {
-                int effect;
-                switch (kind) {
-                    case "select":
-                        effect = VibrationEffect.EFFECT_CLICK;
-                        break;
-                    case "edge":
-                        effect = VibrationEffect.EFFECT_HEAVY_CLICK;
-                        break;
-                    case "reject":
-                        effect = VibrationEffect.EFFECT_DOUBLE_CLICK;
-                        break;
-                    default:
-                        effect = VibrationEffect.EFFECT_TICK;
-                }
-                VibrationEffect e = VibrationEffect.createPredefined(effect);
-                if (Build.VERSION.SDK_INT >= 33) {
-                    vib.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_PHYSICAL_EMULATION));
-                } else {
-                    vib.vibrate(e);
-                }
-            } else if (Build.VERSION.SDK_INT >= 26) {
-                long ms = "select".equals(kind) || "edge".equals(kind) ? 12 : "reject".equals(kind) ? 30 : 5;
-                vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            VibrationEffect e = null;
+            if (Build.VERSION.SDK_INT >= 30) e = composed(vib, kind);
+            if (e == null && Build.VERSION.SDK_INT >= 29) e = predefined(kind);
+            if (e == null && Build.VERSION.SDK_INT >= 26) e = oneShot(kind);
+            if (e == null) return false;
+            if (Build.VERSION.SDK_INT >= 33) {
+                vib.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_PHYSICAL_EMULATION));
             } else {
-                return false;
+                vib.vibrate(e);
             }
             return true;
         } catch (RuntimeException e) {
             return false;
+        }
+    }
+
+    private static VibrationEffect composed(Vibrator vib, String kind) {
+        int tick = VibrationEffect.Composition.PRIMITIVE_TICK;
+        int click = VibrationEffect.Composition.PRIMITIVE_CLICK;
+        if (!vib.areAllPrimitivesSupported(tick, click)) return null;
+        int low = Build.VERSION.SDK_INT >= 31 && vib.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK)
+                ? VibrationEffect.Composition.PRIMITIVE_LOW_TICK : tick;
+        VibrationEffect.Composition c = VibrationEffect.startComposition();
+        switch (kind) {
+            case "light":
+                c.addPrimitive(tick, 0.55f);
+                break;
+            case "medium":
+                c.addPrimitive(click, 0.6f);
+                break;
+            case "heavy":
+                c.addPrimitive(click, 1f);
+                break;
+            case "success":
+                c.addPrimitive(tick, 0.5f).addPrimitive(click, 0.8f, 90);
+                break;
+            case "warning":
+                c.addPrimitive(click, 0.7f).addPrimitive(tick, 0.45f, 110);
+                break;
+            case "error":
+                c.addPrimitive(click, 0.6f).addPrimitive(click, 0.6f, 80).addPrimitive(tick, 0.4f, 100);
+                break;
+            default:
+                c.addPrimitive(low, low == tick ? 0.35f : 0.7f);
+        }
+        return c.compose();
+    }
+
+    private static VibrationEffect predefined(String kind) {
+        switch (kind) {
+            case "light":
+                return VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK);
+            case "medium":
+            case "success":
+            case "warning":
+                return VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK);
+            case "heavy":
+                return VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK);
+            case "error":
+                return VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK);
+            default:
+                return VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK);
+        }
+    }
+
+    private static VibrationEffect oneShot(String kind) {
+        switch (kind) {
+            case "light":
+                return VibrationEffect.createOneShot(8, 120);
+            case "medium":
+            case "success":
+            case "warning":
+                return VibrationEffect.createOneShot(14, 180);
+            case "heavy":
+                return VibrationEffect.createOneShot(20, 255);
+            case "error":
+                return VibrationEffect.createWaveform(new long[]{0, 14, 70, 14}, new int[]{0, 180, 0, 180}, -1);
+            default:
+                return VibrationEffect.createOneShot(5, 80);
         }
     }
 

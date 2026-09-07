@@ -9,7 +9,7 @@ import { zfTermOptions, type ProbeResult } from '../domain/edu/scripts'
 import { parseZfKbList, termLabel, type ZfTerm } from '../domain/edu/zhengfang'
 import { LATEST_RELEASE_API, RELEASES_URL, isNewer, issueUrl } from '../domain/edu/release'
 import { edu, nativeEdu, type EduNav } from './edu-browser'
-import { haptic } from './widgets'
+import { haptic, nativeToast } from './widgets'
 import { BackButton, Loader, Page, PrimaryButton, Row, SLIDE, Sheet, SheetClose, SheetHead, TopBar, dockStyle, tint } from './ui'
 
 /* 教务导入：选学校 → 内置浏览器里自己登录、打开课表页 → 读当前页 → 预览（复用 ImportRunPage）。
@@ -90,7 +90,6 @@ export function EduSchoolPage({ onBack, onOpen }: { onBack: () => void; onOpen: 
   const list = typing ? [...(direct ? [direct] : []), ...results.filter((s) => s.url !== direct?.url)] : recent
 
   const pick = (s: School) => {
-    haptic('select')
     rememberSchool(s)
     onOpen(s)
   }
@@ -150,7 +149,7 @@ function EduTermSheet({ zf, onClose, onPick }: { zf: NonNullable<ProbeResult['zf
       header={<SheetHead title="导入哪个学期？" trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
       footer={
         <div className="px-5 pt-2">
-          <PrimaryButton onClick={() => { haptic('select'); onPick(sel); dismiss.current?.() }}>继续</PrimaryButton>
+          <PrimaryButton onClick={() => { onPick(sel); dismiss.current?.() }}>继续</PrimaryButton>
         </div>
       }
     >
@@ -160,7 +159,7 @@ function EduTermSheet({ zf, onClose, onPick }: { zf: NonNullable<ProbeResult['zf
           return (
             <button
               key={`${t.xnm}-${t.xqm}`}
-              onClick={() => { haptic('tick'); setSel(t) }}
+              onClick={() => { haptic('selection'); setSel(t) }}
               className="flex w-full items-center rounded-[12px] px-3.5 py-3 text-left"
               style={{ background: on ? 'var(--c-accent-soft)' : 'var(--c-row-muted)', boxShadow: on ? 'inset 0 0 0 1.5px var(--c-accent)' : undefined }}
             >
@@ -206,6 +205,8 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
 
   const sys = detectSystem(nav.url, school.system)
   const onPage = !nav.loading && !nav.error && isTimetablePage(sys, nav.url, nav.title)
+  const can = !nav.error && ready.kind !== 'none'
+  const showPill = can || !!nav.error
 
   /* 推入动画结束后再打开原生页面并把应用切透明，避免动画过程露底 */
   useEffect(() => {
@@ -228,14 +229,14 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
     if (!opened) return
     const h = hole.current
     const p = pill.current
-    if (!h || !p) return
+    if (!h) return
     const send = () => {
       const a = h.getBoundingClientRect()
-      const b = p.getBoundingClientRect()
+      const b = p?.getBoundingClientRect()
       void edu.frame({
         top: a.top,
         bottom: Math.max(0, window.innerHeight - a.bottom),
-        keep: [{ x: b.left, y: b.top, w: b.width, h: b.height }],
+        keep: b ? [{ x: b.left, y: b.top, w: b.width, h: b.height }] : [],
         interactive: !sheet,
       })
     }
@@ -243,9 +244,17 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
     if (typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(send)
     ro.observe(h)
-    ro.observe(p)
+    if (p) ro.observe(p)
     return () => ro.disconnect()
-  }, [opened, sheet])
+  }, [opened, sheet, showPill])
+
+  /* 还没到课表页时不摆胶囊，首次加载完成后用一条 toast 提示去向 */
+  const hinted = useRef(false)
+  useEffect(() => {
+    if (hinted.current || !opened || nav.loading || nav.error || onPage) return
+    hinted.current = true
+    nativeToast('登录后打开课表页')
+  }, [opened, nav.loading, nav.error, onPage])
 
   /* 到了课表页：探测页面结构；正方再按当前学期取一次课程数给胶囊 */
   const probed = useRef('')
@@ -312,7 +321,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
 
   const finish = async (out: RuleOutput) => {
     if (out.courses.length === 0) return fail()
-    haptic('select')
+    haptic('success')
     await leave()
     onImport(out)
   }
@@ -333,7 +342,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
     setBusy(true)
     try {
       const list = await edu.zfFetch(t.xnm, t.xqm)
-      await finish(parseZfKbList(list))
+      await finish({ ...parseZfKbList(list), semester: { name: termLabel(t) } })
     } catch {
       await fail()
     } finally {
@@ -343,21 +352,17 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
 
   const onImportTap = () => {
     if (busy || ready.kind === 'none') return
-    haptic('press')
     if (ready.kind === 'zf') setSheet(true)
     else void importGeneric()
   }
 
-  const can = !nav.error && ready.kind !== 'none'
   const label = nav.error === 'ssl'
     ? '证书错误，无法打开'
     : nav.error
       ? '页面打不开'
-      : ready.kind === 'none'
-        ? '登录后打开课表页'
-        : ready.kind === 'zf' && ready.count !== null
-          ? `导入 ${ready.count} 门课`
-          : '导入课表'
+      : ready.kind === 'zf' && ready.count !== null
+        ? `导入 ${ready.count} 门课`
+        : '导入课表'
   const secure = /^https:/i.test(nav.url)
 
   return (
@@ -373,7 +378,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
             <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-(--c-ink2)">{hostOf(nav.url)}</span>
             {nav.loading && <Loader size={12} className="ml-2 flex-none text-(--c-ink4)" />}
           </div>
-          <button onClick={() => { haptic('tick'); void edu.reload() }} className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]">
+          <button onClick={() => void edu.reload()} className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.4" strokeLinecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
           </button>
         </div>
@@ -385,6 +390,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
           )}
         </div>
 
+        {showPill && (
         <div className="pointer-events-none absolute inset-x-0 bottom-[max(36px,calc(env(safe-area-inset-bottom)+20px))] z-[9] flex justify-center">
           <button
             ref={pill}
@@ -397,6 +403,7 @@ export function EduBrowserPage({ school, onBack, onImport, onFail }: {
             {label}
           </button>
         </div>
+        )}
 
         {sheet && ready.kind === 'zf' && (
           <EduTermSheet zf={ready.zf} onClose={() => setSheet(false)} onPick={(t) => void importZf(t)} />

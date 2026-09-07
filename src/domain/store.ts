@@ -10,8 +10,14 @@ import { BUILTIN_RULES, type RuleManifest } from './rules'
 /* 本地权威存储。真相全部在内存 State，持久化通过 Persistence 适配器：
    Web 用 localStorage，Capacitor 换 SQLite 适配器，接口不变。 */
 
+/** 往期学期：整份快照原样封存，只用于查看与导出 */
+export interface SemesterArchive extends Snapshot {
+  archivedAt: number
+}
+
 export interface State {
   semester: Semester | null
+  archives: SemesterArchive[]
   courses: Course[]
   rules: SessionRule[]
   overrides: Override[]
@@ -26,7 +32,7 @@ export interface State {
 
 export function emptyState(): State {
   return {
-    semester: null, courses: [], rules: [], overrides: [], entries: [],
+    semester: null, archives: [], courses: [], rules: [], overrides: [], entries: [],
     batches: [], changes: [], userEditedCourseIds: [], savedRules: [...BUILTIN_RULES], tasks: [],
     prefs: defaultPrefs(),
   }
@@ -52,6 +58,8 @@ function hydratePrefs(raw: unknown): Prefs {
 /** 从持久化读回的原始对象补齐类型：周次位掩码转 bigint，新字段补默认值 */
 export function hydrate(s: State): State {
   for (const r of s.rules) r.weeksMask = BigInt(r.weeksMask as unknown as string)
+  if (!s.archives) s.archives = []
+  for (const a of s.archives) for (const r of a.rules) r.weeksMask = BigInt(r.weeksMask as unknown as string)
   if (!s.savedRules || s.savedRules.length === 0) s.savedRules = [...BUILTIN_RULES]
   if (!s.tasks) s.tasks = []
   for (const t of s.tasks) if (!t.photos) t.photos = []
@@ -132,6 +140,26 @@ export class Store {
 
   setSemester(sem: Semester) {
     this.state = { ...this.state, semester: sem }
+    this.commit()
+  }
+
+  /** 开始新学期：当前学期连课程一起封存进往期，课表清空；作息、待办、规则与偏好保留 */
+  startSemester(next: Semester) {
+    const cur = this.snapshot()
+    const archives = cur && (cur.courses.length > 0 || cur.entries.length > 0)
+      ? [...this.state.archives.filter((a) => a.semester.id !== cur.semester.id), { ...cur, archivedAt: Date.now() }]
+      : this.state.archives
+    this.state = {
+      ...this.state,
+      semester: next,
+      archives,
+      courses: [], rules: [], overrides: [], entries: [], changes: [], userEditedCourseIds: [],
+    }
+    this.commit()
+  }
+
+  removeArchive(semesterId: string) {
+    this.state = { ...this.state, archives: this.state.archives.filter((a) => a.semester.id !== semesterId) }
     this.commit()
   }
 
