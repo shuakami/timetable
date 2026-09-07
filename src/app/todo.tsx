@@ -13,7 +13,7 @@ import { PhotoViewer, TaskPhotoImg } from './photo'
 import { useImeY } from './ime'
 import {
   ActionSheet, ArrowUpIcon, BottomVeil, CAL_H, COMPOSE_RADIUS, Calendar, CameraIcon, Chip, EmptyBlock, FADE, ICON, Page, PrimaryButton,
-  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, SWAP_LAYER, swapStyle, TimeWheels, WD, addDaysStr, clipText, composeLayoutId, dockStyle, md, type ActionItem,
+  QuickBar, SHEET, SLIDE, Sheet, SheetClose, SheetHead, SheetRow, StickyHead, SwapLayer, TimeWheels, WD, addDaysStr, clipText, composeLayoutId, dockStyle, md, type ActionItem,
 } from './ui'
 
 const KINDS: Task['kind'][] = ['homework', 'exam', 'memo']
@@ -882,12 +882,15 @@ function DueSheet({
         ))}
       </div>
       <div className="relative border-t border-(--c-line)" style={{ height: CAL_H }}>
-        <div className={`${SWAP_LAYER} flex items-center`} style={swapStyle(timeView)} aria-hidden={!timeView}>
-          <TimeWheels minutes={m} onChange={setM} className="flex-1" />
-        </div>
-        <div className={SWAP_LAYER} style={swapStyle(!timeView)} aria-hidden={timeView}>
-          <Calendar value={d} onChange={setD} today={today} />
-        </div>
+        {timeView ? (
+          <SwapLayer id="time" className="flex items-center">
+            <TimeWheels minutes={m} onChange={setM} className="flex-1" />
+          </SwapLayer>
+        ) : (
+          <SwapLayer id="date">
+            <Calendar value={d} onChange={setD} today={today} />
+          </SwapLayer>
+        )}
       </div>
     </Sheet>
   )

@@ -1225,11 +1225,14 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
 
 /* ---------------- 月历 / 时刻滚轮 / 日期与时刻选择卡 ---------------- */
 
-/** 同一区域内两层内容交叉淡入淡出的层：常驻合成层 + 200ms 透明度过渡 */
-export const SWAP_LAYER = 'absolute inset-0 transition-[opacity,visibility] duration-200 ease-out will-change-[opacity]'
-/** 交叉层的显隐：显示层不写 visibility / pointer-events（继承外层），隐藏层写 hidden / none；嵌套时外层隐藏能压住内层 */
-export const swapStyle = (on: boolean): React.CSSProperties =>
-  on ? { opacity: 1 } : { opacity: 0, visibility: 'hidden', pointerEvents: 'none' }
+/** 同一区域内互斥的两层内容：只挂载当前层（不存在的层不可能接到触摸），进入时 200ms 淡入 */
+export function SwapLayer({ id, className = '', children }: { id: string; className?: string; children: React.ReactNode }) {
+  return (
+    <motion.div key={id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={FADE} className={`absolute inset-0 ${className}`}>
+      {children}
+    </motion.div>
+  )
+}
 
 export const CAL_ROW = 42
 /** 月历区域固定高度：月份行 + 星期行 + 六行日期；切成年月日滚轮时也用这个高度，不跳 */
@@ -1292,12 +1295,11 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
   /* 选中日的主题色圆按行列定位、在格子间滑动；不用 layoutId，卡片推入时不会被量到半路的位置 */
   const selIdx = ymOf(d) === month ? cells.indexOf(d) : -1
 
-  /* 月历与年月日滚轮两层常驻且常驻合成层（will-change），切换只走 CSS 透明度过渡；
-     不挂载/卸载子树、不在动画起止建/拆层，Android WebView 不会在起止各闪一帧 */
   const cal = view === 'cal'
   return (
     <div className="relative" style={{ height: CAL_H }}>
-      <div className={SWAP_LAYER} style={swapStyle(cal)} aria-hidden={!cal}>
+      {cal ? (
+      <SwapLayer id="cal">
         <div className="flex h-10 items-center justify-between">
           <button onClick={() => goMonth(-1)} className="flex h-10 w-10 items-center justify-center transition-opacity active:opacity-50"><Chevron dir={-1} /></button>
           <button onClick={() => setView('ym')} className="flex items-center gap-1 text-[15px] font-bold text-(--c-ink) transition-opacity active:opacity-50">
@@ -1348,8 +1350,9 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
             </motion.div>
           </AnimatePresence>
         </div>
-      </div>
-      <div className={`${SWAP_LAYER} flex flex-col`} style={swapStyle(!cal)} aria-hidden={cal}>
+      </SwapLayer>
+      ) : (
+      <SwapLayer id="ym" className="flex flex-col">
         <button onClick={() => setView('cal')} className="flex h-10 flex-none items-center justify-center gap-1 text-[15px] font-bold text-(--c-accent) transition-opacity active:opacity-50">
           {dy}年{dm}月
           <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--c-accent)"><path d="M6 15h12l-6-7z" /></svg>
@@ -1359,7 +1362,8 @@ export function Calendar({ value, onChange, today = todayYmd() }: { value: strin
           <Wheel items={months} index={dm - 1} onChange={(i) => setYmd(dy, i + 1, dd)} className="flex-1" />
           <Wheel items={mdays} index={Math.min(dd, mdays.length) - 1} onChange={(i) => setYmd(dy, dm, i + 1)} className="flex-1" />
         </div>
-      </div>
+      </SwapLayer>
+      )}
     </div>
   )
 }
