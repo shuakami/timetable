@@ -27,15 +27,17 @@ import { CARD_INSET, buildAxis, rowHeights } from '../domain/time-axis'
 import { WeekAxis, WeekCard, WeekLines } from './week-axis'
 import { SchedulePage } from './schedule'
 import { EDU_RULE, EduBrowserPage, EduFailPage, EduSchoolPage, PreviewGrid, eduBack, type EduFailInfo } from './edu'
+import { edu } from './edu-browser'
+import { enableEduSync, eduSyncing, logoutEduSync, outcomeText, resumeSync, setEduSyncEnabled, statusText, syncNow, useEduSync, type EduSyncSource } from './edu-sync'
 import type { School } from '../domain/edu/schools'
 import { Sticker, setStickersOn, stickerTilt, useStickersOn } from './Sticker'
 import { CalendarIntroPage, NotifPrefPage, PrefPickPage, WidgetPage, taskLeadsText, type PrefKey } from './reminder'
 import { calendarPermission, calendarSupported, clearCalendar, scheduleCalendarSync, syncCalendar } from './calendar'
-import { copyText, haptic, nativeToast, pasteText, syncWidgets } from './widgets'
+import { copyText, haptic, nativeConfirm, nativeToast, pasteText, syncWidgets } from './widgets'
 import { onIncomingIcs, shareIcs } from './files'
 import { THEME_LABEL, resolve, setDynamic, setTheme, useDynamic, useTheme, type ThemePref } from './theme'
 import {
-  ActionSheet, BackPill, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, SheetClose, SheetHead, StickyHead, TopVeil, useVeilOpacity,
+  ActionSheet, BackPill, BottomVeil, Chips, EmptyBlock, closeTopSheet, Field, FADE, ICON, Loader, Nav, Page, PopHead, PopItem, Popover, PrimaryButton, Row, SHEET, SLIDE, SPRING, Sheet, SheetClose, SheetHead, StickyHead, TopVeil, useVeilOpacity,
   TextAction, TextInput, TopBar, WD, WD_SHORT, dockStyle, md, tint, type Ghost, type Rect,
   DateInput, Switch,
 } from './ui'
@@ -1291,8 +1293,20 @@ function ParsedRow({ nc, sem }: { nc: NormalizedCourse; sem: Semester }) {
 }
 
 /* 导入流程（内页）：输入 → 解析结果 → 回到课表 */
-function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, onBack, onDone }: { rule: RuleManifest; initialText?: string; initialOut?: RuleOutput; autoRun?: boolean; /** 盖在内置浏览器上：透明模式下仍保持可见且不透明，退回时从学校页面上滑走 */ overBrowser?: boolean; onBack: () => void; onDone: () => void }) {
+function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, syncSource, onBack, onDone }: { rule: RuleManifest; initialText?: string; initialOut?: RuleOutput; autoRun?: boolean; /** 盖在内置浏览器上：透明模式下仍保持可见且不透明，退回时从学校页面上滑走 */ overBrowser?: boolean; /** 教务导入：可选保持登录自动更新 */ syncSource?: EduSyncSource; onBack: () => void; onDone: () => void }) {
   const [stage, setStage] = useState<ImportStage>(initialOut ? 'preview' : 'input')
+  const eduSync = useEduSync()
+  const [keepLogin, setKeepLogin] = useState(!!eduSync?.enabled)
+  /* 保持登录需要系统 WebView 支持多 Profile，不支持就不显示 */
+  const [canKeep, setCanKeep] = useState(false)
+  useEffect(() => {
+    if (!syncSource) return
+    let alive = true
+    void edu.profiles().then((ok) => alive && setCanKeep(ok))
+    return () => {
+      alive = false
+    }
+  }, [syncSource])
   const [text, setText] = useState(initialText ?? '')
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
   const [fileName, setFileName] = useState('')
@@ -1366,6 +1380,10 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, on
       at: Date.now(), durationMs: Math.max(1, Math.round(performance.now() - t0)),
       failed, diagnostics: pending.diagnostics,
     })
+    if (syncSource && canKeep) {
+      if (keepLogin) enableEduSync(syncSource)
+      else if (eduSync) setEduSyncEnabled(false)
+    }
     onDone()
   }
 
@@ -1470,6 +1488,13 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, on
                       </div>
                     </div>
                     <Switch on={useFileGrid} onChange={setUseFileGrid} />
+                  </div>
+                )}
+
+                {syncSource && canKeep && (
+                  <div className="mt-2.5 flex items-center rounded-[16px] bg-(--c-surface) px-4 py-3">
+                    <div className="min-w-0 flex-1 text-[14px] font-bold">保持登录，自动更新课表</div>
+                    <Switch on={keepLogin} onChange={setKeepLogin} />
                   </div>
                 )}
 
@@ -2096,6 +2121,14 @@ function SemesterPickSheet({ title, action, options, onPick, onClose }: {
 /* 往期学期：只读内页，课程列表、底部分享；删除走和规则页一样的红色行 */
 function ArchivePage({ a, onBack }: { a: SemesterArchive; onBack: () => void }) {
   const courses = a.courses.filter((c) => !c.hidden && !c.removedByImport)
+  const remove = async () => {
+    const ok = await nativeConfirm({ title: `删除「${a.semester.name}」`, message: `${courses.length} 门课一起删除，不可恢复`, ok: '删除' })
+    if (!ok) return
+    store.removeArchive(a.semester.id)
+    haptic('warning')
+    nativeToast('已删除')
+    onBack()
+  }
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-6 [scrollbar-width:none]">
@@ -2104,7 +2137,7 @@ function ArchivePage({ a, onBack }: { a: SemesterArchive; onBack: () => void }) 
           {courses.map((c) => <Row key={c.id} title={c.name} desc={c.teacher} right={<span />} />)}
         </div>
         <div className="mt-5 overflow-hidden rounded-[16px] bg-(--c-surface)">
-          <Row title="删除学期" danger onClick={() => { store.removeArchive(a.semester.id); onBack() }} right={<span />} />
+          <Row title="删除学期" danger onClick={() => void remove()} right={<span />} />
         </div>
       </div>
       <div className="flex-none px-5 pt-2 pb-[max(22px,env(safe-area-inset-bottom))]">
@@ -2114,7 +2147,53 @@ function ArchivePage({ a, onBack }: { a: SemesterArchive; onBack: () => void }) 
   )
 }
 
-function SemesterSettings({ sem, onBack, onNew, onArchive }: { sem: Semester; onBack: () => void; onNew: () => void; onArchive: (id: string) => void }) {
+/** 学期页的自动更新组：开关与状态、立即更新、退出登录；没开过不显示 */
+function EduSyncGroup({ onLogin }: { onLogin: (school: School) => void }) {
+  const s = useEduSync()
+  const [busy, setBusy] = useState(eduSyncing)
+  if (!s) return null
+  const status = statusText(s)
+  const update = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const o = await syncNow()
+      haptic(o.result === 'ok' || o.result === 'nochange' ? 'success' : 'error')
+      nativeToast(outcomeText(o))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const logout = async () => {
+    const ok = await nativeConfirm({ title: '退出登录', message: `清除${s.school.name}的登录会话，关闭自动更新`, ok: '退出' })
+    if (!ok) return
+    await logoutEduSync()
+    haptic('warning')
+    nativeToast('已退出登录')
+  }
+  return (
+    <>
+      <div className="mt-7 mb-2 px-1 text-[12.5px] font-semibold text-(--c-ink4)">自动更新</div>
+      <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+        <div className="flex items-center px-4 py-3.5">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[14px] font-bold">{s.school.name}</div>
+            <div className={`mt-0.5 text-[12px] font-medium ${status.danger ? 'text-(--c-danger)' : 'text-(--c-ink4)'}`}>{status.text}</div>
+          </div>
+          <Switch on={s.enabled} onChange={setEduSyncEnabled} />
+        </div>
+        {s.lastResult === 'expired' ? (
+          <Row title="重新登录" onClick={() => onLogin(s.school)} />
+        ) : (
+          <Row title="立即更新" onClick={() => void update()} right={busy ? <Loader className="ml-3 text-(--c-ink4)" /> : <span />} />
+        )}
+        <Row title="退出登录" danger onClick={() => void logout()} right={<span />} />
+      </div>
+    </>
+  )
+}
+
+function SemesterSettings({ sem, onBack, onNew, onArchive, onLogin }: { sem: Semester; onBack: () => void; onNew: () => void; onArchive: (id: string) => void; onLogin: (school: School) => void }) {
   const state = useStore()
   const [name, setName] = useState(sem.name)
   const [date, setDate] = useState(sem.startDate)
@@ -2134,6 +2213,8 @@ function SemesterSettings({ sem, onBack, onNew, onArchive }: { sem: Semester; on
       <div className="mt-2.5 overflow-hidden rounded-[16px] bg-(--c-surface)">
         <Row title="开始新学期" desc={ended ? "当前学期移入往期" : undefined} onClick={onNew} />
       </div>
+
+      <EduSyncGroup onLogin={onLogin} />
 
       {archives.length > 0 && (
         <>
@@ -2304,7 +2385,7 @@ type Route =
   | { k: 'aiImport'; attach?: string }
   | { k: 'eduSchool' }
   | { k: 'eduBrowser'; school: School }
-  | { k: 'eduPreview'; out: RuleOutput }
+  | { k: 'eduPreview'; out: RuleOutput; src: EduSyncSource }
   | { k: 'eduFail'; info: EduFailInfo }
   | { k: 'rule'; rule: RuleManifest | null }
   | { k: 'semester' }
@@ -2398,6 +2479,9 @@ export default function RealApp() {
     const onResume = CapApp.addListener('resume', () => {
       void syncCalendar()
       void syncWidgets()
+      void resumeSync()?.then((o) => {
+        if (o.result === 'ok' || o.note) nativeToast(outcomeText(o))
+      })
     })
     /* 日历事件里的「在应用中打开」 */
     const onUrl = CapApp.addListener('appUrlOpen', ({ url }) => {
@@ -2665,12 +2749,12 @@ export default function RealApp() {
             school={r.school}
             active={i === stack.length - 1}
             onBack={pop}
-            onImport={(out) => push({ k: 'eduPreview', out })}
+            onImport={(out, src) => push({ k: 'eduPreview', out, src })}
             onFail={(info) => replaceTop({ k: 'eduFail', info })}
           />
         )
       case 'eduPreview':
-        return <ImportRunPage key={key} rule={EDU_RULE} initialOut={r.out} overBrowser onBack={pop} onDone={backToTimetable} />
+        return <ImportRunPage key={key} rule={EDU_RULE} initialOut={r.out} overBrowser syncSource={r.src} onBack={pop} onDone={backToTimetable} />
       case 'eduFail':
         return <EduFailPage key={key} info={r.info} onBack={pop} onAi={(attach) => replaceTop({ k: 'aiImport', attach })} />
       case 'importRun': {
@@ -2680,7 +2764,7 @@ export default function RealApp() {
       case 'rule':
         return <RuleEditorPage key={key} rule={r.rule} onBack={pop} />
       case 'semester':
-        return <SemesterSettings key={key} sem={snap.semester} onBack={pop} onNew={() => push({ k: 'newSemester' })} onArchive={(id) => push({ k: 'archive', id })} />
+        return <SemesterSettings key={key} sem={snap.semester} onBack={pop} onNew={() => push({ k: 'newSemester' })} onArchive={(id) => push({ k: 'archive', id })} onLogin={(school) => push({ k: 'eduBrowser', school })} />
       case 'archive': {
         const a = state.archives.find((x) => x.semester.id === r.id)
         return a ? <ArchivePage key={key} a={a} onBack={pop} /> : null

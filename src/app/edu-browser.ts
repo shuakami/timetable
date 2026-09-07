@@ -36,9 +36,21 @@ export interface EduFrame {
   interactive: boolean
 }
 
+/** 不可见 WebView 的主文档结果 */
+export interface EduBgNav {
+  url: string
+  title: string
+  error?: string
+}
+
 interface TtEduPlugin {
-  open(o: { url: string }): Promise<void>
-  close(): Promise<void>
+  open(o: { url: string; profile?: string; keep?: boolean }): Promise<{ persistent: boolean }>
+  close(o: { keep?: boolean }): Promise<void>
+  profiles(): Promise<{ supported: boolean }>
+  clearProfile(o: { profile: string }): Promise<{ ok: boolean }>
+  bgOpen(o: { url: string; profile?: string }): Promise<void>
+  bgEval(o: { js: string }): Promise<{ value: string }>
+  bgClose(): Promise<void>
   navigate(o: { url: string }): Promise<void>
   reload(): Promise<void>
   stop(): Promise<void>
@@ -49,6 +61,7 @@ interface TtEduPlugin {
   state(): Promise<EduNav>
   addListener(event: 'nav', fn: (e: EduNav) => void): Promise<PluginListenerHandle>
   addListener(event: 'message', fn: (e: { data: string }) => void): Promise<PluginListenerHandle>
+  addListener(event: 'bgNav', fn: (e: EduBgNav) => void): Promise<PluginListenerHandle>
 }
 
 const TtEdu = registerPlugin<TtEduPlugin>('TtEdu')
@@ -99,8 +112,8 @@ function rejectAll(reason: string) {
   pending.clear()
 }
 
-/** 在学校页面里跑一段 async 函数体，等它经 TtBridge.post 回传的结果 */
-export function run<T>(body: string, timeout = RUN_TIMEOUT): Promise<T> {
+/** 在学校页面里跑一段 async 函数体，等它经 TtBridge.post 回传的结果；bg 为自动更新的不可见页面 */
+export function run<T>(body: string, timeout = RUN_TIMEOUT, bg = false): Promise<T> {
   if (!nativeEdu()) return Promise.reject(new Error('内置浏览器仅在应用内可用'))
   ensureMessageListener()
   const id = uid()
@@ -110,7 +123,8 @@ export function run<T>(body: string, timeout = RUN_TIMEOUT): Promise<T> {
       reject(new Error('页面没有响应'))
     }, timeout)
     pending.set(id, { resolve: (v) => resolve(v as T), reject, timer })
-    TtEdu.eval({ js: wrapRun(id, body) }).catch((e: unknown) => {
+    const js = wrapRun(id, body)
+    ;(bg ? TtEdu.bgEval({ js }) : TtEdu.eval({ js })).catch((e: unknown) => {
       if (!pending.has(id)) return
       pending.delete(id)
       window.clearTimeout(timer)
@@ -119,12 +133,38 @@ export function run<T>(body: string, timeout = RUN_TIMEOUT): Promise<T> {
   })
 }
 
+/** 每所学校一个 WebView Profile，按教务站的主机名区分 */
+export function eduProfile(url: string): string {
+  let host = url
+  try {
+    host = new URL(url).host
+  } catch {
+    host = url.replace(/^https?:\/\//, '').split('/')[0]
+  }
+  return `edu-${host.toLowerCase().replace(/[^a-z0-9.-]/g, '_')}`
+}
+
 export const edu = {
-  open: (url: string) => (nativeEdu() ? TtEdu.open({ url }) : Promise.resolve()),
-  close: () => {
+  /** keep：保留上次会话（用户开了保持登录）；返回本次会话是否落在独立 Profile 里 */
+  open: (url: string, keep = false): Promise<boolean> =>
+    nativeEdu() ? TtEdu.open({ url, profile: eduProfile(url), keep }).then((r) => r.persistent, () => false) : Promise.resolve(false),
+  close: (keep = false) => {
     rejectAll('浏览器已关闭')
-    return nativeEdu() ? TtEdu.close() : Promise.resolve()
+    return nativeEdu() ? TtEdu.close({ keep }) : Promise.resolve()
   },
+  /** 系统 WebView 是否支持多 Profile（保持登录的前提） */
+  profiles: (): Promise<boolean> => (nativeEdu() ? TtEdu.profiles().then((r) => r.supported, () => false) : Promise.resolve(false)),
+  clearProfile: (url: string): Promise<boolean> =>
+    nativeEdu() ? TtEdu.clearProfile({ profile: eduProfile(url) }).then((r) => r.ok, () => false) : Promise.resolve(false),
+  bgOpen: (url: string) => (nativeEdu() ? TtEdu.bgOpen({ url, profile: eduProfile(url) }) : Promise.reject(new Error('仅在应用内可用'))),
+  bgClose: () => (nativeEdu() ? TtEdu.bgClose() : Promise.resolve()),
+  onBgNav: (fn: (e: EduBgNav) => void): (() => void) => {
+    if (!nativeEdu()) return () => {}
+    const h = TtEdu.addListener('bgNav', fn)
+    return () => void h.then((x) => x.remove())
+  },
+  bgZfFetch: (xnm: string, xqm: string) => run<ZfKb[]>(zfFetchJs(xnm, xqm), RUN_TIMEOUT, true),
+  bgPageHtml: () => run<string>(PAGE_HTML_JS, RUN_TIMEOUT, true),
   navigate: (url: string) => (nativeEdu() ? TtEdu.navigate({ url }) : Promise.resolve()),
   reload: () => (nativeEdu() ? TtEdu.reload() : Promise.resolve()),
   stop: () => (nativeEdu() ? TtEdu.stop() : Promise.resolve()),

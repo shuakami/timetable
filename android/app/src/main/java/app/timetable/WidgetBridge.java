@@ -193,6 +193,28 @@ public class WidgetBridge extends Plugin {
         });
     }
 
+    /** 系统确认框：确定为 true，取消 / 点外部 / 返回为 false */
+    @PluginMethod
+    public void confirm(PluginCall call) {
+        Activity act = getActivity();
+        if (act == null) { call.reject("no activity"); return; }
+        String title = call.getString("title");
+        String message = call.getString("message");
+        String ok = call.getString("ok", "确定");
+        String cancel = call.getString("cancel", "取消");
+        act.runOnUiThread(() -> {
+            AlertDialog.Builder b = new AlertDialog.Builder(act, dialogTheme(act));
+            if (title != null) b.setTitle(title);
+            if (message != null) b.setMessage(message);
+            b.setPositiveButton(ok, (dlg, w) -> call.resolve(new JSObject().put("ok", true)));
+            b.setNegativeButton(cancel, (dlg, w) -> call.resolve(new JSObject().put("ok", false)));
+            b.setOnCancelListener(x -> call.resolve(new JSObject().put("ok", false)));
+            AlertDialog d = b.create();
+            eatBack(d);
+            d.show();
+        });
+    }
+
     @PluginMethod
     public void toast(PluginCall call) {
         String text = call.getString("text");

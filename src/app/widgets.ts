@@ -12,6 +12,7 @@ interface WidgetBridgePlugin {
   systemDark(): Promise<{ dark: boolean }>
   dynamicColors(): Promise<DynamicColors>
   toast(o: { text: string }): Promise<void>
+  confirm(o: { title?: string; message?: string; ok?: string; cancel?: string }): Promise<{ ok: boolean }>
   copy(o: { text: string }): Promise<void>
   paste(): Promise<{ text: string }>
   haptic(o: { kind: HapticKind }): Promise<void>
@@ -45,6 +46,16 @@ export function syncNativeTheme(bg: string, light: boolean, system: boolean): vo
 export function nativeToast(text: string): void {
   if (!native()) return
   WidgetBridge.toast({ text }).catch(() => undefined)
+}
+
+/** 系统确认框；浏览器里退到 window.confirm */
+export async function nativeConfirm(o: { title?: string; message?: string; ok?: string; cancel?: string }): Promise<boolean> {
+  if (!native()) return window.confirm([o.title, o.message].filter(Boolean).join('\n'))
+  try {
+    return (await WidgetBridge.confirm(o)).ok
+  } catch {
+    return false
+  }
 }
 
 /** 写剪贴板：原生走 ClipboardManager，浏览器走 navigator.clipboard，都不行时回退到隐藏 textarea + execCommand */

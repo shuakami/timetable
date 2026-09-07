@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
+import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.PixelCopy;
 import android.view.View;
@@ -29,6 +30,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+
+import androidx.webkit.ProfileStore;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -51,9 +56,12 @@ import java.util.Locale;
  * 页面自己在中间留出一块透明区域（frame），地址栏、悬浮胶囊、选学期抽屉照常由页面画在上面。
  * 落在透明区域里的触摸（除去 keep 列出的胶囊等区域）原样转发给下面的 WebView。
  * <p>
- * 会话隔离：打开与关闭都清 Cookie，关闭时顺带清掉该站的 localStorage / sessionStorage 与缓存，
- * 账号信息不落盘；应用自己的 WebView 用 localStorage / SQLite，不走 Cookie，不受影响。
+ * 会话隔离：支持多 Profile 的系统 WebView 上每所学校一个 Profile（Cookie / 存储与应用及其他学校互不相通），
+ * 默认打开与关闭都清 Cookie 与本地存储；用户开了「保持登录」才保留该 Profile（只有 Cookie，不存账号密码），
+ * 「退出登录」整个删掉。不支持多 Profile 的老 WebView 退回全局 CookieManager 全清，不提供保持登录。
  * 页面里的脚本只在用户点「导入」等操作时通过 eval 注入，结果经 TtBridge.post 回传。
+ * <p>
+ * 自动更新用另一个不可见的 WebView（bg*）：同一 Profile 打开课表页，页面完成后由 JS 侧决定是否还在登录态并注入同一套脚本。
  */
 @CapacitorPlugin(name = "TtEdu")
 public class TtEdu extends Plugin {
@@ -70,6 +78,18 @@ public class TtEdu extends Plugin {
     private boolean painted = false;
     private Drawable hostBg, parentBg, windowBg;
     private float hostAlpha = 1f;
+    /** 当前页面用的 Profile；null 为默认 Profile（老 WebView） */
+    private String profileName;
+    /** 自动更新用的不可见 WebView */
+    private WebView bg;
+
+    private static boolean multiProfile() {
+        try {
+            return WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
 
     @Override
     public void load() {
@@ -78,18 +98,91 @@ public class TtEdu extends Plugin {
 
     /* ---------------- 页面接口 ---------------- */
 
+    /** profile：每所学校一个；keep=true 时不清上次会话（仅多 Profile 可用时生效） */
     @PluginMethod
     public void open(PluginCall call) {
         String url = call.getString("url", "");
+        String profile = call.getString("profile");
+        boolean keep = Boolean.TRUE.equals(call.getBoolean("keep", false));
         if (url == null || url.isEmpty()) {
             call.reject("url required");
             return;
         }
         getActivity().runOnUiThread(() -> {
             try {
-                ensureView();
-                clearSession(null);
+                ensureView(profile);
+                if (!(keep && profileName != null)) clearSession(null);
                 web.loadUrl(url);
+                JSObject o = new JSObject();
+                o.put("persistent", profileName != null);
+                call.resolve(o);
+            } catch (Exception e) {
+                call.reject(String.valueOf(e.getMessage()));
+            }
+        });
+    }
+
+    /** keep=true 时保留该 Profile 的 Cookie / 存储（用户开了保持登录） */
+    @PluginMethod
+    public void close(PluginCall call) {
+        boolean keep = Boolean.TRUE.equals(call.getBoolean("keep", false));
+        getActivity().runOnUiThread(() -> {
+            teardown(keep && profileName != null);
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void profiles(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("supported", multiProfile());
+        call.resolve(o);
+    }
+
+    /** 退出登录：整个删掉该学校的 Profile；正在使用中则删不掉，ok=false */
+    @PluginMethod
+    public void clearProfile(PluginCall call) {
+        String profile = call.getString("profile", "");
+        getActivity().runOnUiThread(() -> {
+            boolean ok = false;
+            if (profile != null && !profile.isEmpty() && multiProfile()) {
+                try {
+                    ok = ProfileStore.getInstance().deleteProfile(profile);
+                } catch (Exception ignored) {
+                }
+            }
+            JSObject o = new JSObject();
+            o.put("ok", ok);
+            call.resolve(o);
+        });
+    }
+
+    /* ---------------- 自动更新：不可见 WebView ---------------- */
+
+    @PluginMethod
+    public void bgOpen(PluginCall call) {
+        String url = call.getString("url", "");
+        String profile = call.getString("profile");
+        if (url == null || url.isEmpty()) {
+            call.reject("url required");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            try {
+                bgTeardown();
+                WebView host = bridge.getWebView();
+                ViewGroup parent = (ViewGroup) host.getParent();
+                WebView w = new WebView(getContext());
+                if (profile != null && !profile.isEmpty() && multiProfile()) WebViewCompat.setProfile(w, profile);
+                configure(w);
+                w.addJavascriptInterface(new Bridge(), "TtBridge");
+                w.setWebViewClient(new BgClient());
+                w.setWebChromeClient(new WebChromeClient());
+                w.setVisibility(View.INVISIBLE);
+                DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
+                parent.addView(w, 0, new ViewGroup.LayoutParams(dm.widthPixels, dm.heightPixels));
+                bg = w;
+                w.loadUrl(url);
                 call.resolve();
             } catch (Exception e) {
                 call.reject(String.valueOf(e.getMessage()));
@@ -98,11 +191,38 @@ public class TtEdu extends Plugin {
     }
 
     @PluginMethod
-    public void close(PluginCall call) {
+    public void bgEval(PluginCall call) {
+        String js = call.getString("js", "");
         getActivity().runOnUiThread(() -> {
-            teardown();
+            if (bg == null || js == null) {
+                call.reject("closed");
+                return;
+            }
+            bg.evaluateJavascript(js, v -> {
+                JSObject o = new JSObject();
+                o.put("value", v == null ? "null" : v);
+                call.resolve(o);
+            });
+        });
+    }
+
+    @PluginMethod
+    public void bgClose(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            bgTeardown();
             call.resolve();
         });
+    }
+
+    private void bgTeardown() {
+        if (bg == null) return;
+        WebView w = bg;
+        bg = null;
+        w.stopLoading();
+        w.loadUrl("about:blank");
+        w.removeJavascriptInterface("TtBridge");
+        if (w.getParent() instanceof ViewGroup) ((ViewGroup) w.getParent()).removeView(w);
+        w.destroy();
     }
 
     @PluginMethod
@@ -249,21 +369,8 @@ public class TtEdu extends Plugin {
     /* ---------------- 视图 ---------------- */
 
     @SuppressLint("SetJavaScriptEnabled")
-    private void ensureView() {
-        if (web != null) return;
-        WebView host = bridge.getWebView();
-        ViewGroup parent = (ViewGroup) host.getParent();
-        container = new FrameLayout(getContext());
-        // 页面画出首帧前，洞里露的是应用底色而不是白块
-        SharedPreferences sp = getContext().getSharedPreferences("tt.theme", Context.MODE_PRIVATE);
-        container.setBackgroundColor(sp.getInt("bg", 0xFFF7F7F6));
-        painted = false;
-        container.setVisibility(frameTop < 0 ? View.INVISIBLE : View.VISIBLE);
-        container.setPadding(0, Math.max(0, frameTop), 0, Math.max(0, frameBottom));
-        web = new WebView(getContext());
-        web.setFocusable(true);
-        web.setFocusableInTouchMode(true);
-        WebSettings s = web.getSettings();
+    private void configure(WebView w) {
+        WebSettings s = w.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setUseWideViewPort(true);
@@ -278,8 +385,46 @@ public class TtEdu extends Plugin {
         s.setSaveFormData(false);
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-        CookieManager.getInstance().setAcceptCookie(true);
-        CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
+        CookieManager cm = cookies(w);
+        cm.setAcceptCookie(true);
+        cm.setAcceptThirdPartyCookies(w, true);
+    }
+
+    /** 该 WebView 所属 Profile 的 CookieManager；老 WebView 为全局单例 */
+    private static CookieManager cookies(WebView w) {
+        if (multiProfile()) {
+            try {
+                return WebViewCompat.getProfile(w).getCookieManager();
+            } catch (Exception ignored) {
+            }
+        }
+        return CookieManager.getInstance();
+    }
+
+    private void ensureView(String profile) {
+        if (web != null) return;
+        WebView host = bridge.getWebView();
+        ViewGroup parent = (ViewGroup) host.getParent();
+        container = new FrameLayout(getContext());
+        // 页面画出首帧前，洞里露的是应用底色而不是白块
+        SharedPreferences sp = getContext().getSharedPreferences("tt.theme", Context.MODE_PRIVATE);
+        container.setBackgroundColor(sp.getInt("bg", 0xFFF7F7F6));
+        painted = false;
+        container.setVisibility(frameTop < 0 ? View.INVISIBLE : View.VISIBLE);
+        container.setPadding(0, Math.max(0, frameTop), 0, Math.max(0, frameBottom));
+        web = new WebView(getContext());
+        profileName = null;
+        // Profile 必须在首次导航前指定
+        if (profile != null && !profile.isEmpty() && multiProfile()) {
+            try {
+                WebViewCompat.setProfile(web, profile);
+                profileName = profile;
+            } catch (Exception ignored) {
+            }
+        }
+        web.setFocusable(true);
+        web.setFocusableInTouchMode(true);
+        configure(web);
         web.addJavascriptInterface(new Bridge(), "TtBridge");
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
@@ -292,25 +437,32 @@ public class TtEdu extends Plugin {
         applyTransparency();
     }
 
-    private void teardown() {
+    private void teardown(boolean keepSession) {
         WebView host = bridge.getWebView();
         host.setOnTouchListener(null);
         routing = false;
         restoreTransparency();
         if (web != null) {
             final WebView w = web;
-            clearSession(() -> {
+            final FrameLayout c = container;
+            Runnable fin = () -> {
                 w.stopLoading();
                 w.loadUrl("about:blank");
                 w.clearHistory();
                 w.clearCache(true);
                 w.clearFormData();
                 w.removeJavascriptInterface("TtBridge");
-                if (container != null && container.getParent() instanceof ViewGroup) {
-                    ((ViewGroup) container.getParent()).removeView(container);
+                if (c != null && c.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) c.getParent()).removeView(c);
                 }
                 w.destroy();
-            });
+            };
+            if (keepSession) {
+                cookies(w).flush();
+                fin.run();
+            } else {
+                clearSession(fin);
+            }
             web = null;
             container = null;
         }
@@ -318,11 +470,11 @@ public class TtEdu extends Plugin {
         keep.clear();
     }
 
-    /** Cookie 全清（应用自身不用 Cookie）；有页面在时先清它的本地存储 */
+    /** 清当前 Profile 的 Cookie（老 WebView 为全局，应用自身不用 Cookie）；有页面在时先清它的本地存储 */
     private void clearSession(Runnable then) {
         if (web != null) {
+            final CookieManager cm = cookies(web);
             web.evaluateJavascript("try{localStorage.clear();sessionStorage.clear()}catch(e){}", v -> {
-                CookieManager cm = CookieManager.getInstance();
                 cm.removeAllCookies(x -> cm.flush());
                 if (then != null) then.run();
             });
@@ -467,6 +619,42 @@ public class TtEdu extends Plugin {
             JSObject o = snapshot(false, 100);
             o.put("error", "ssl");
             notifyListeners("nav", o);
+        }
+    }
+
+    /** 不可见 WebView 的导航：只报主文档完成 / 失败，登录态由 JS 侧按地址与标题判断 */
+    private final class BgClient extends WebViewClient {
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+            String scheme = req.getUrl().getScheme();
+            return !("http".equals(scheme) || "https".equals(scheme));
+        }
+
+        private void report(WebView view, String error) {
+            if (view != bg) return;
+            JSObject o = new JSObject();
+            String url = view.getUrl();
+            String title = view.getTitle();
+            o.put("url", url == null ? "" : url);
+            o.put("title", title == null ? "" : title);
+            if (error != null) o.put("error", error);
+            notifyListeners("bgNav", o);
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            report(view, null);
+        }
+
+        @Override
+        public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
+            if (req.isForMainFrame()) report(view, String.valueOf(err.getDescription()));
+        }
+
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            handler.cancel();
+            report(view, "ssl");
         }
     }
 

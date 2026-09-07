@@ -10,14 +10,15 @@ import { zfTermOptions, type ProbeResult } from '../domain/edu/scripts'
 import { parseZfKbList, termLabel, type ZfTerm } from '../domain/edu/zhengfang'
 import { LATEST_RELEASE_API, RELEASES_URL, isNewer, issueUrl } from '../domain/edu/release'
 import { edu, nativeEdu, type EduNav } from './edu-browser'
+import { EDU_RULE, keepEduSession, setEduBrowserOpen, type EduSyncSource } from './edu-sync'
 import { haptic, nativeToast } from './widgets'
 import { BackButton, FADE, Loader, Page, PrimaryButton, Row, SLIDE, Sheet, SheetClose, SheetHead, TopBar, dockStyle, tint } from './ui'
 
 /* 教务导入：选学校 → 内置浏览器里自己登录、打开课表页 → 读当前页 → 预览（复用 ImportRunPage）。
-   浏览器会话独立，离开时清掉；只在用户点「导入」后读取当前页面 / 同源课表接口。 */
+   浏览器会话按学校独立，默认离开时清掉，开了保持登录的学校才保留；只在用户点「导入」后读取当前页面 / 同源课表接口。 */
 
 /** 预览页用的规则对象；不进 BUILTIN_RULES，规则列表里不出现 */
-export const EDU_RULE: RuleManifest = { id: 'builtin-edu', name: '教务系统', version: '1.0', input: 'json', createdAt: 0, updatedAt: 0 }
+export { EDU_RULE }
 
 export interface EduFailInfo {
   url: string
@@ -240,7 +241,8 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   /** 预览页盖在上方时为 false：应用恢复不透明、触摸不再透给学校页面，会话保留以便退回 */
   active: boolean
   onBack: () => void
-  onImport: (out: RuleOutput) => void
+  /** src：保持登录自动更新时的抓取来源 */
+  onImport: (out: RuleOutput, src: EduSyncSource) => void
   onFail: (info: EduFailInfo) => void
 }) {
   const native = nativeEdu()
@@ -263,11 +265,13 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
 
   /*
    * 原生页面在推入动画期间就开始加载（此时应用仍不透明，看不到它）；
-   * 动画结束后再把应用切透明，洞里的幕布等页面画出首帧才淡去。原生会话在页面卸载（退场动画结束）时才关。
+   * 动画结束后再把应用切透明，洞里的幕布等页面画出首帧才淡去。原生会话在页面卸载（退场动画结束）时才关；
+   * 开了保持登录的学校保留会话，否则打开和关闭都清。
    */
   useEffect(() => {
     const off = edu.onNav(setNav)
-    void edu.open(school.url)
+    setEduBrowserOpen(true)
+    void edu.open(school.url, keepEduSession(school.url))
     const t = window.setTimeout(() => {
       if (left.current) return
       document.documentElement.classList.add(HTML_CLASS)
@@ -277,7 +281,8 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
       window.clearTimeout(t)
       off()
       document.documentElement.classList.remove(HTML_CLASS)
-      void edu.close()
+      setEduBrowserOpen(false)
+      void edu.close(keepEduSession(school.url))
     }
   }, [school.url])
 
@@ -399,11 +404,11 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   }
 
   /* 预览页自带底色盖在上方，学校页面继续留在下面：预览页退回时从它上面滑开 */
-  const finish = async (out: RuleOutput) => {
+  const finish = async (out: RuleOutput, term?: ZfTerm) => {
     if (out.courses.length === 0) return fail()
     haptic('success')
     setSheet(false)
-    onImport(out)
+    onImport(out, { school, pageUrl: nav.url, term })
   }
 
   const importGeneric = async () => {
@@ -422,7 +427,7 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     setBusy(true)
     try {
       const list = await edu.zfFetch(t.xnm, t.xqm)
-      await finish({ ...parseZfKbList(list), semester: { name: termLabel(t) } })
+      await finish({ ...parseZfKbList(list), semester: { name: termLabel(t) } }, t)
     } catch {
       await fail()
     } finally {
