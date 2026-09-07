@@ -357,6 +357,40 @@ function CalendarSheet({ snap, mode, anchor, onPick, onClose }: { snap: Snapshot
 
 /* ---------------- 今天（跨日连续时间线） ---------------- */
 
+/** 当前日期：定时、回前台、页面可见时重算，跨零点后自动变化 */
+function useToday(): string {
+  const [today, setToday] = useState(todayStr)
+  useEffect(() => {
+    const check = () => setToday((t) => { const n = todayStr(); return n === t ? t : n })
+    const timer = setInterval(check, 30_000)
+    document.addEventListener('visibilitychange', check)
+    const onResume = CapApp.addListener('resume', check)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+      void onResume.then((h) => h.remove())
+    }
+  }, [])
+  return today
+}
+
+/** 当前时刻（分）：每 30s 一次，回前台立即对时 */
+function useNowMinutes(): number {
+  const [now, setNow] = useState(nowMinutes)
+  useEffect(() => {
+    const check = () => setNow(nowMinutes())
+    const timer = setInterval(check, 30_000)
+    document.addEventListener('visibilitychange', check)
+    const onResume = CapApp.addListener('resume', check)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+      void onResume.then((h) => h.remove())
+    }
+  }, [])
+  return now
+}
+
 function TodayView({
   snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, onSemester, onCapture, liftKey,
 }: {
@@ -372,12 +406,8 @@ function TodayView({
   onCapture: (kind: 'camera' | 'text', courseId?: string) => void
   liftKey?: string
 }) {
-  const today = todayStr()
-  const [now, setNow] = useState(nowMinutes)
-  useEffect(() => {
-    const t = setInterval(() => setNow(nowMinutes()), 30_000)
-    return () => clearInterval(t)
-  }, [])
+  const today = useToday()
+  const now = useNowMinutes()
   const [cal, setCal] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   /* 底部日期条跟随滚动位置：滚到「明天」那段时选中项切到明天 */
@@ -619,7 +649,7 @@ function TodayView({
       </div>
 
       <BottomVeil height={210} />
-      <BackPill show={!cal && view !== today} label="回到今天" bottom="calc(152px + max(24px, env(safe-area-inset-bottom)))" onClick={() => pickDay(today)} />
+      <BackPill show={!cal && view !== today} label="回到今天" bottom="calc(152px + max(24px, env(safe-area-inset-bottom)))" onClick={() => (anchor === today ? pickDay(today) : setAnchor(today))} />
       <AnimatePresence initial={false}>
         {!cal && <DateStrip snap={snap} anchor={view} onPick={pickDay} onCalendar={() => setCal(true)} />}
       </AnimatePresence>
@@ -804,15 +834,11 @@ const SWIPE_EASE = [0.25, 1, 0.5, 1] as const
 
 function WeekView({ snap, anchor, setAnchor, onPick, onMenu, onSearch, liftKey }: { snap: Snapshot; anchor: string; setAnchor: (d: string) => void; onPick: (o: Occurrence) => void; onMenu: (o: Occurrence, r: Rect, el: HTMLElement) => void; onSearch: () => void; liftKey?: string }) {
   const sem = snap.semester
-  const today = todayStr()
+  const today = useToday()
   const [cal, setCal] = useState(false)
   const week = Math.min(Math.max(weekOf(sem, anchor), 1), sem.totalWeeks)
   const thisWeek = Math.min(Math.max(weekOf(sem, today), 1), sem.totalWeeks)
-  const [now, setNow] = useState(nowMinutes)
-  useEffect(() => {
-    const t = setInterval(() => setNow(nowMinutes()), 30_000)
-    return () => clearInterval(t)
-  }, [])
+  const now = useNowMinutes()
   const monday = dateOf(sem, week, 1)
 
   /* 首次进入且本周含今天：滚到当前时刻附近 */
@@ -2181,8 +2207,18 @@ export default function RealApp() {
     }
   })
   const [tab, setTab] = useState(0)
-  const [anchor, setAnchor] = useState(todayStr)
-  const [weekAnchor, setWeekAnchor] = useState(todayStr)
+  const today = useToday()
+  const [anchor, setAnchor] = useState(today)
+  const [weekAnchor, setWeekAnchor] = useState(today)
+  /* 还锁在“今天”的视图跨零点后跟着日期走；用户自己翻到别的日子则不动 */
+  const lastToday = useRef(today)
+  useEffect(() => {
+    const prev = lastToday.current
+    if (prev === today) return
+    lastToday.current = today
+    setAnchor((a) => (a === prev ? today : a))
+    setWeekAnchor((a) => (mondayOf(a) === mondayOf(prev) ? today : a))
+  }, [today])
   const [stack, setStack] = useState<Route[]>([])
   const [menu, setMenu] = useState<{ occ: Occurrence; anchor: Rect; ghost: Ghost } | null>(null)
   const [searching, setSearching] = useState(false)

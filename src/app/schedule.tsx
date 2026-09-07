@@ -39,7 +39,7 @@ export function SchedulePage({ sem, onBack }: { sem: Semester; onBack: () => voi
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-5 pb-[130px] [scrollbar-width:none]">
-        <TopBar title="作息时间" sub={`${n} 节 · 每节 ${d.duration} 分钟 · ${fmtMinutes(d.starts[0])} – ${fmtMinutes(endOf(d, n - 1))}`} onBack={onBack} />
+        <TopBar title="作息时间" onBack={onBack} />
 
         <div className="mt-6 rounded-[18px] bg-(--c-surface) px-4">
           <div className="flex items-center py-3">
@@ -54,7 +54,6 @@ export function SchedulePage({ sem, onBack }: { sem: Semester; onBack: () => voi
 
         <div className="mt-5 flex items-baseline px-0.5">
           <span className="flex-1 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">节次</span>
-          <span className="text-[12px] font-bold tracking-[-.01em] text-(--c-accent)">按间隔排布</span>
         </div>
         <div className="mt-2 rounded-[18px] bg-(--c-surface) px-4">
           <div className="flex items-center pt-3 pb-1 text-[11px] font-semibold text-(--c-ink5)">
@@ -142,7 +141,7 @@ function ScheduleTimeSheet({ draft, pick, onApply, onClose }: { draft: ScheduleD
   const custom = draft.ends[i] != null
   const sub = isStart
     ? `${fmtMinutes(preview.starts[i])} – ${fmtMinutes(endOf(preview, i))}`
-    : `${fmtMinutes(draft.starts[i])} – ${fmtMinutes(endOf(preview, i))} · ${endOf(preview, i) - draft.starts[i]} 分`
+    : `${fmtMinutes(draft.starts[i])} – ${fmtMinutes(endOf(preview, i))}`
   return (
     <Sheet
       onClose={onClose}
