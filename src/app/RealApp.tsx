@@ -1451,7 +1451,7 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone 
                 )}
                 {rollover && (
                   <div className="mt-2.5 rounded-[16px] bg-(--c-surface) px-4 py-3 text-[12.5px] font-medium text-(--c-ink3)">
-                    <span className="font-bold text-(--c-ink)">开始新学期</span>　{sem.name}已结束，封存至往期学期，仍可导出
+                    <span className="font-bold text-(--c-ink)">开始新学期</span>　{sem.name}已结束，将移入往期学期
                   </div>
                 )}
 
@@ -2132,7 +2132,7 @@ function SemesterSettings({ sem, onBack, onNew, onArchive }: { sem: Semester; on
       </div>
 
       <div className="mt-2.5 overflow-hidden rounded-[16px] bg-(--c-surface)">
-        <Row title="开始新学期" desc={ended ? "当前学期封存至往期" : undefined} onClick={onNew} />
+        <Row title="开始新学期" desc={ended ? "当前学期移入往期" : undefined} onClick={onNew} />
       </div>
 
       {archives.length > 0 && (
@@ -2176,7 +2176,7 @@ function NewSemesterPage({ sem, onBack, onDone }: { sem: Semester; onBack: () =>
   const live = liveCount({ ...state, semester: sem })
 
   return (
-    <SubPage title="新学期" sub={keep ? `${sem.name} 封存至往期，${live} 门课；作息与待办将会保留` : '作息与待办将会保留'} onBack={onBack}>
+    <SubPage title="新学期" sub={keep ? `${sem.name} 移入往期，${live} 门课；作息与待办将会保留` : '作息与待办将会保留'} onBack={onBack}>
       <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
         <Field k="名称"><TextInput value={shown} onChange={(e) => { setNamed(true); setName(e.target.value) }} /></Field>
         <Field k="开学" sub={`第 1 周 ${md(start)} 周一`}><DateInput value={date} onChange={setDate} /></Field>
