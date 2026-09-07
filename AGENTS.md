@@ -39,7 +39,7 @@
 
 ### 安全
 
-不收集账号密码，不在后台登录或抓取教务系统。教务导入走内置浏览器（`TtEdu`）：用户自己在学校页面登录；只在用户点「导入」时读当前页或调同源接口（教务页后自动读一次课程数量用于胶囊文案，不落库）；先预览再应用；浏览器 Cookie/存储与应用隔离，打开和离开时清空；只注入随应用打包的脚本，不下载执行远程脚本。其余导入只处理用户主动粘贴或选择的内容。
+不收集账号密码，不自动登录。教务导入走内置浏览器（`TtEdu`）：用户自己在学校页面登录；只在用户点「导入」时读当前页或调同源接口（教务页后自动读一次课程数量用于胶囊文案，不落库）；先预览再应用；只注入随应用打包的脚本，不下载执行远程脚本。浏览器 Cookie/存储按学校放在独立 WebView Profile（`edu-<host>`），与应用隔离，默认打开和离开时清空；用户开了「保持登录，自动更新课表」才保留该学校的会话（仅 Cookie/存储，不含账号密码），学期页「退出登录」一键删 Profile。自动更新（`src/app/edu-sync.ts`）只在不可见 WebView 里打开导入时的课表页、跑导入同一套脚本；不在登录页就标「需要重新登录」，不重试，连续三次失效自动关闭。不支持多 Profile 的老 WebView 不提供保持登录。其余导入只处理用户主动粘贴或选择的内容。
 
 ---
 
@@ -57,6 +57,7 @@
 | 周次/节次/冲突算法 | `src/domain/engine.ts`、`weeks.ts`、`dates.ts` |
 | 导入解析、诊断、normalize | `src/domain/importer.ts`、`importers/*`、`rules.ts` |
 | 教务导入（选学校/内置浏览器/未识别页） | `src/app/edu.tsx`、`src/app/edu-browser.ts`、`src/domain/edu/*`、`android/.../TtEdu.java` |
+| 教务保持登录 / 自动更新 | `src/app/edu-sync.ts`（状态、立即更新、回前台检查），`TtEdu.java` 的 profile / bg* 接口 |
 | AI Prompt 文本 | `src/domain/ai-prompt.ts` |
 | Store、持久化、导入合并 | `src/domain/store.ts`、`persistence/` |
 | 桌面小组件 | `android/.../widget/`、`src/domain/widget-data.ts`、`tools/` |
