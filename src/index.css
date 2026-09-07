@@ -279,6 +279,6 @@ html.tt-edu [data-shell] > *:not([data-edu-keep]),
 html.tt-edu #root > div > *:not([data-shell]) {
   visibility: hidden;
 }
-html.tt-edu [data-edu-keep] [data-veil-host] {
+html.tt-edu [data-edu-keep=''] [data-veil-host] {
   background: transparent !important;
 }

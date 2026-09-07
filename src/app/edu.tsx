@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { animate, motion, useIsPresent, useMotionValue, useTransform } from 'motion/react'
 import { App as CapApp } from '@capacitor/app'
 import type { NormalizedCourse, RuleOutput } from '../domain/importer'
 import type { RuleManifest } from '../domain/rules'
@@ -10,7 +11,7 @@ import { parseZfKbList, termLabel, type ZfTerm } from '../domain/edu/zhengfang'
 import { LATEST_RELEASE_API, RELEASES_URL, isNewer, issueUrl } from '../domain/edu/release'
 import { edu, nativeEdu, type EduNav } from './edu-browser'
 import { haptic, nativeToast } from './widgets'
-import { BackButton, Loader, Page, PrimaryButton, Row, SLIDE, Sheet, SheetClose, SheetHead, TopBar, dockStyle, tint } from './ui'
+import { BackButton, FADE, Loader, Page, PrimaryButton, Row, SLIDE, Sheet, SheetClose, SheetHead, TopBar, dockStyle, tint } from './ui'
 
 /* 教务导入：选学校 → 内置浏览器里自己登录、打开课表页 → 读当前页 → 预览（复用 ImportRunPage）。
    浏览器会话独立，离开时清掉；只在用户点「导入」后读取当前页面 / 同源课表接口。 */
@@ -187,6 +188,53 @@ type Ready =
 
 const HTML_CLASS = 'tt-edu'
 
+/*
+ * 地址栏里的加载进度：一层淡色填充从左往右铺满胶囊（Safari 的做法）。
+ * 不直接跟真实进度跳：只往前走，很快走到上报的位置，等网络时继续慢慢蠕动到 9 成，
+ * 加载完成直接拉满再淡出，不倒退不闪。
+ */
+function LoadFill({ loading, progress }: { loading: boolean; progress: number }) {
+  const x = useMotionValue(0)
+  const op = useMotionValue(0)
+  const width = useTransform(x, (v) => `${v * 100}%`)
+  const started = useRef(false)
+  useEffect(() => {
+    if (loading) {
+      started.current = true
+      if (x.get() >= 1) x.set(0)
+      const target = Math.max(x.get(), 0.12 + (progress / 100) * 0.78)
+      const fade = animate(op, 1, { duration: 0.15 })
+      const step = animate(x, target, { type: 'tween', ease: [0.25, 1, 0.5, 1], duration: 0.35 })
+      let creep: ReturnType<typeof animate> | null = null
+      void step.then(() => {
+        creep = animate(x, 0.9, { type: 'tween', ease: 'linear', duration: 14 })
+      })
+      return () => {
+        fade.stop()
+        step.stop()
+        creep?.stop()
+      }
+    }
+    if (!started.current) return
+    let done = false
+    const fill = animate(x, 1, { type: 'tween', ease: [0.25, 1, 0.5, 1], duration: 0.2 })
+    let fade: ReturnType<typeof animate> | null = null
+    void fill.then(() => {
+      if (done) return
+      fade = animate(op, 0, { duration: 0.25 })
+      void fade.then(() => {
+        if (!done) x.set(0)
+      })
+    })
+    return () => {
+      done = true
+      fill.stop()
+      fade?.stop()
+    }
+  }, [loading, progress, x, op])
+  return <motion.div aria-hidden style={{ width, opacity: op, background: 'color-mix(in oklab, var(--c-accent) 14%, transparent)' }} className="pointer-events-none absolute inset-y-0 left-0" />
+}
+
 export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   school: School
   /** 预览页盖在上方时为 false：应用恢复不透明、触摸不再透给学校页面，会话保留以便退回 */
@@ -196,31 +244,33 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   onFail: (info: EduFailInfo) => void
 }) {
   const native = nativeEdu()
-  const [nav, setNav] = useState<EduNav>({ url: school.url, title: '', loading: native, progress: 0, canGoBack: false })
+  const [nav, setNav] = useState<EduNav>({ url: school.url, title: '', loading: native, progress: 0, canGoBack: false, painted: false })
   const [ready, setReady] = useState<Ready>({ kind: 'none' })
   const [opened, setOpened] = useState(false)
   const [busy, setBusy] = useState(false)
   const [sheet, setSheet] = useState(false)
+  /** 离场时学校页面的定格图；'' 表示已离场但没拿到图 */
+  const [shot, setShot] = useState<string | null>(null)
   const hole = useRef<HTMLDivElement>(null)
   const pill = useRef<HTMLButtonElement>(null)
   const left = useRef(false)
-
-  useEffect(() => {
-    if (!opened || left.current) return
-    document.documentElement.classList.toggle(HTML_CLASS, active)
-  }, [opened, active])
+  const present = useIsPresent()
 
   const sys = detectSystem(nav.url, school.system)
   const onPage = !nav.loading && !nav.error && isTimetablePage(sys, nav.url, nav.title)
   const can = !nav.error && ready.kind !== 'none'
   const showPill = can || !!nav.error
 
-  /* 推入动画结束后再打开原生页面并把应用切透明，避免动画过程露底 */
+  /*
+   * 原生页面在推入动画期间就开始加载（此时应用仍不透明，看不到它）；
+   * 动画结束后再把应用切透明，洞里的幕布等页面画出首帧才淡去。原生会话在页面卸载（退场动画结束）时才关。
+   */
   useEffect(() => {
     const off = edu.onNav(setNav)
+    void edu.open(school.url)
     const t = window.setTimeout(() => {
+      if (left.current) return
       document.documentElement.classList.add(HTML_CLASS)
-      void edu.open(school.url)
       setOpened(true)
     }, SLIDE.duration * 1000 + 40)
     return () => {
@@ -231,9 +281,21 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     }
   }, [school.url])
 
-  /* 透明洞与悬浮胶囊的矩形交给原生：洞里触摸给学校页面，胶囊留给自己；抽屉打开时整页不透传 */
+  /* 被上层直接出栈（导入完成回课表、深链接）：退场一开始就恢复不透明 */
   useEffect(() => {
-    if (!opened) return
+    if (present || left.current) return
+    left.current = true
+    document.documentElement.classList.remove(HTML_CLASS)
+  }, [present])
+
+  /* 定格图上屏的同一帧恢复不透明，洞里由图接替真页面，随后的退场动画看不出接缝 */
+  useLayoutEffect(() => {
+    if (shot !== null) document.documentElement.classList.remove(HTML_CLASS)
+  }, [shot])
+
+  /* 透明洞与悬浮胶囊的矩形交给原生：洞里触摸给学校页面，胶囊留给自己；抽屉打开、预览页盖住、离场中整页不透传 */
+  const departed = shot !== null
+  useEffect(() => {
     const h = hole.current
     const p = pill.current
     if (!h) return
@@ -244,7 +306,7 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
         top: a.top,
         bottom: Math.max(0, window.innerHeight - a.bottom),
         keep: b ? [{ x: b.left, y: b.top, w: b.width, h: b.height }] : [],
-        interactive: !sheet && active,
+        interactive: opened && !sheet && active && !departed,
       })
     }
     send()
@@ -253,7 +315,7 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     ro.observe(h)
     if (p) ro.observe(p)
     return () => ro.disconnect()
-  }, [opened, sheet, showPill, active])
+  }, [opened, sheet, showPill, active, departed])
 
   /* 还没到课表页时不摆胶囊，首次加载完成后用一条 toast 提示去向 */
   const hinted = useRef(false)
@@ -294,12 +356,22 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     }
   }, [onPage, nav.url, sys])
 
+  /* 离场：先把学校页面定格贴进洞里，再交给调用方出栈；图解码好了才上屏，避免露一帧底色 */
   const leave = useCallback(async () => {
     if (left.current) return
     left.current = true
-    document.documentElement.classList.remove(HTML_CLASS)
-    await edu.close()
-  }, [])
+    let src = opened ? await edu.snapshot() : null
+    if (src) {
+      try {
+        const img = new Image()
+        img.src = src
+        await img.decode()
+      } catch {
+        src = null
+      }
+    }
+    setShot(src ?? '')
+  }, [opened])
   const goBack = useCallback(async () => {
     await leave()
     onBack()
@@ -326,11 +398,11 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     onFail({ url: nav.url, system: sys, text })
   }
 
+  /* 预览页自带底色盖在上方，学校页面继续留在下面：预览页退回时从它上面滑开 */
   const finish = async (out: RuleOutput) => {
     if (out.courses.length === 0) return fail()
     haptic('success')
     setSheet(false)
-    document.documentElement.classList.remove(HTML_CLASS)
     onImport(out)
   }
 
@@ -372,6 +444,8 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
         ? `导入 ${ready.count} 门课`
         : '导入课表'
   const secure = /^https:/i.test(nav.url)
+  /* 洞上的幕布：应用底色，等学校页面画出首帧才淡去，不露白块 */
+  const veil = native && !(opened && (nav.painted || !!nav.error))
 
   return (
     <Page keep>
@@ -379,23 +453,34 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
         {/* 顶栏自己铺底色：下面的学校页面多为白底，胶囊不能直接压在上面 */}
         <div className="flex items-center gap-3 bg-(--c-bg) px-5 pt-[max(52px,calc(env(safe-area-inset-top)+22px))] pb-4">
           <BackButton onClick={() => void goBack()} />
-          <div className="flex h-9 min-w-0 flex-1 items-center rounded-full bg-(--c-surface) px-4">
+          <div className="relative flex h-9 min-w-0 flex-1 items-center overflow-hidden rounded-full bg-(--c-surface) px-4">
+            <LoadFill loading={nav.loading} progress={nav.progress} />
             {secure && (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink4)' }} strokeWidth="2.4" className="mr-2 flex-none"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink4)' }} strokeWidth="2.4" className="relative mr-2 flex-none"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
             )}
-            <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-(--c-ink2)">{hostOf(nav.url)}</span>
-            {nav.loading && <Loader size={12} className="ml-2 flex-none text-(--c-ink4)" />}
+            <span className="relative min-w-0 flex-1 truncate text-[12.5px] font-semibold text-(--c-ink2)">{hostOf(nav.url)}</span>
           </div>
-          <button onClick={() => void edu.reload()} className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.4" strokeLinecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+          {/* 加载中是“停止”，加载完是“刷新” */}
+          <button
+            onClick={() => void (nav.loading ? edu.stop() : edu.reload())}
+            aria-label={nav.loading ? '停止' : '刷新'}
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-(--c-surface) transition-transform duration-150 active:scale-[.92]"
+          >
+            {nav.loading ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink)' }} strokeWidth="2.4" strokeLinecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+            )}
           </button>
         </div>
 
-        {/* 透明洞：原生 WebView 在下面显示学校页面 */}
-        <div ref={hole} className="flex flex-1 items-center justify-center">
+        {/* 透明洞：原生 WebView 在下面显示学校页面；离场时换成它的定格图 */}
+        <div ref={hole} className="relative flex flex-1 items-center justify-center">
           {!native && (
             <div className="rounded-[14px] bg-(--c-surface) px-4 py-2.5 text-[12.5px] font-medium text-(--c-ink4)">内置浏览器仅在应用内可用</div>
           )}
+          <motion.div aria-hidden initial={false} animate={{ opacity: veil ? 1 : 0 }} transition={FADE} className="pointer-events-none absolute inset-0 bg-(--c-bg)" />
+          {shot && <img src={shot} alt="" className="pointer-events-none absolute inset-0 h-full w-full" />}
         </div>
 
         {showPill && (

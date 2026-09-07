@@ -782,15 +782,15 @@ export function Sheet({
   )
 }
 
-/* 全屏内页：从右侧推入，盖住底栏；keep 的页在内置浏览器透明模式下仍可见 */
-export function Page({ children, className = '', root, keep }: { children: React.ReactNode; className?: string; onBack?: () => void; root?: boolean; keep?: boolean }) {
+/* 全屏内页：从右侧推入，盖住底栏；keep 的页在内置浏览器透明模式下仍可见（'opaque' 保留自己的底色，盖在浏览器上方） */
+export function Page({ children, className = '', root, keep }: { children: React.ReactNode; className?: string; onBack?: () => void; root?: boolean; keep?: boolean | 'opaque' }) {
   return (
     <motion.div
       initial={root ? false : { transform: 'translateX(100%)' }}
       animate={{ transform: 'translateX(0%)' }}
       exit={{ transform: 'translateX(100%)' }}
       transition={SLIDE}
-      data-edu-keep={keep ? '' : undefined}
+      data-edu-keep={keep === 'opaque' ? 'opaque' : keep ? '' : undefined}
       className="absolute inset-0 z-[40] will-change-transform"
     >
       <div data-veil-host className={`absolute inset-0 flex flex-col overflow-hidden bg-(--c-bg) ${className}`}>
@@ -820,10 +820,12 @@ export interface Ghost {
 const MENU_SPRING = { type: 'spring', bounce: 0.28, duration: 0.42 } as const
 const MENU_OUT = { type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.18 } as const
 
-/* 长按后的浮层菜单：卡片副本抬到遮罩上，菜单从卡片一侧弹出 */
-export function Popover({ anchor, ghost, onClose, children }: { anchor: Rect; ghost?: Ghost; onClose: () => void; children: React.ReactNode }) {
+/* 长按后的浮层菜单：卡片副本抬到遮罩上，菜单从卡片一侧弹出；dismissRef 给外部走同一条退场后再 onClose */
+export function Popover({ anchor, ghost, onClose, dismissRef, children }: { anchor: Rect; ghost?: Ghost; onClose: () => void; dismissRef?: React.MutableRefObject<(() => void) | null>; children: React.ReactNode }) {
   const [open, setOpen] = useState(true)
-  const close = () => setOpen(false)
+  const close = useCallback(() => setOpen(false), [])
+  if (dismissRef) dismissRef.current = close
+  useEffect(() => () => { if (dismissRef && dismissRef.current === close) dismissRef.current = null }, [dismissRef, close])
   const shellW = Math.min(window.innerWidth, 430)
   const shellH = window.innerHeight
   const below = anchor.y + anchor.h + 10

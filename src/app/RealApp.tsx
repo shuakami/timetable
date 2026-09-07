@@ -1291,7 +1291,7 @@ function ParsedRow({ nc, sem }: { nc: NormalizedCourse; sem: Semester }) {
 }
 
 /* 导入流程（内页）：输入 → 解析结果 → 回到课表 */
-function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone }: { rule: RuleManifest; initialText?: string; initialOut?: RuleOutput; autoRun?: boolean; onBack: () => void; onDone: () => void }) {
+function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, onBack, onDone }: { rule: RuleManifest; initialText?: string; initialOut?: RuleOutput; autoRun?: boolean; /** 盖在内置浏览器上：透明模式下仍保持可见且不透明，退回时从学校页面上滑走 */ overBrowser?: boolean; onBack: () => void; onDone: () => void }) {
   const [stage, setStage] = useState<ImportStage>(initialOut ? 'preview' : 'input')
   const [text, setText] = useState(initialText ?? '')
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
@@ -1393,7 +1393,7 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone 
   }, [])
 
   return (
-    <Page>
+    <Page keep={overBrowser ? 'opaque' : undefined}>
       <div className="flex-1 overflow-y-auto px-5 pb-6 [scrollbar-width:none]">
         <TopBar
           title={stage === 'input' ? rule.name : `${pending?.courses.length ?? 0} 门课`}
@@ -2363,6 +2363,12 @@ export default function RealApp() {
   }, [today])
   const [stack, setStack] = useState<Route[]>([])
   const [menu, setMenu] = useState<{ occ: Occurrence; anchor: Rect; ghost: Ghost } | null>(null)
+  /* 关菜单走浮层自己的退场，退完再清状态；直接 setMenu(null) 会让它瞬间消失 */
+  const menuDismiss = useRef<(() => void) | null>(null)
+  const closeMenu = () => {
+    if (menuDismiss.current) menuDismiss.current()
+    else setMenu(null)
+  }
   const [searching, setSearching] = useState(false)
   const [sharing, setSharing] = useState(false)
   /* 导出：有往期学期时先选学期，否则直接分享当前 */
@@ -2439,7 +2445,7 @@ export default function RealApp() {
     [snap],
   )
 
-  const push = (r: Route) => { setMenu(null); setStack((s) => [...s, r]) }
+  const push = (r: Route) => { closeMenu(); setStack((s) => [...s, r]) }
   /*
    * 拍完/选完：给已有待办直接加照片并退回；新待办把确认页推在相机上方。
    * 相机留在栈里：确认页从右侧盖上去，底下是定格的取景框；重拍就是退回去，不会出现一页退一页进交叉。
@@ -2534,7 +2540,7 @@ export default function RealApp() {
   const backRef = useRef<() => boolean>(() => false)
   const onboardBack = useRef<() => boolean>(() => false)
   backRef.current = () => {
-    if (menu) { setMenu(null); return true }
+    if (menu) { closeMenu(); return true }
     if (compose) { setCompose(null); return true }
     if (closeTopSheet()) return true
     if (stack.length > 0) {
@@ -2664,7 +2670,7 @@ export default function RealApp() {
           />
         )
       case 'eduPreview':
-        return <ImportRunPage key={key} rule={EDU_RULE} initialOut={r.out} onBack={pop} onDone={backToTimetable} />
+        return <ImportRunPage key={key} rule={EDU_RULE} initialOut={r.out} overBrowser onBack={pop} onDone={backToTimetable} />
       case 'eduFail':
         return <EduFailPage key={key} info={r.info} onBack={pop} onAi={(attach) => replaceTop({ k: 'aiImport', attach })} />
       case 'importRun': {
@@ -2721,14 +2727,14 @@ export default function RealApp() {
   const ovr = (kind: OverrideKind) => {
     if (!mo?.ruleId) return
     store.addOverride({ id: uid(), kind, date: mo.date, ruleId: mo.ruleId, createdAt: Date.now() })
-    setMenu(null)
+    closeMenu()
     haptic(kind === 'cancelled' ? 'warning' : 'light')
     nativeToast(kind === 'cancelled' ? '本节已停课' : kind === 'leave' ? '已请假' : '本节已静音')
   }
   const restore = () => {
     if (!mo?.ruleId) return
     store.removeOverride(mo.ruleId, mo.date)
-    setMenu(null)
+    closeMenu()
     haptic('light')
     nativeToast('已恢复')
   }
@@ -2838,26 +2844,26 @@ export default function RealApp() {
 
       <AnimatePresence>
         {menu && mo && (
-          <Popover key="quick" anchor={menu.anchor} ghost={menu.ghost} onClose={() => setMenu(null)}>
+          <Popover key={menu.occ.key} anchor={menu.anchor} ghost={menu.ghost} dismissRef={menuDismiss} onClose={() => setMenu(null)}>
             <PopHead title={mo.name} sub={fmtMinutes(mo.start)} />
             {mo.ruleId && undoTitle && <PopItem icon={ICON.undo} title={undoTitle} onClick={restore} />}
             {mo.ruleId && mo.status === 'normal' && <PopItem icon={ICON.leave} title="请假一次" onClick={() => ovr('leave')} />}
             {mo.ruleId && mo.status === 'normal' && <PopItem icon={ICON.bell} title={mo.muted ? '取消静音' : '静音本节'} onClick={() => (mo.muted ? restore() : ovr('muted'))} />}
-            {mo.ruleId && mo.status !== 'cancelled' && <PopItem icon={ICON.clock} title="调整时间" onClick={() => { setMenu(null); push({ k: 'session', occ: mo }) }} />}
-            {mo.conflict && <PopItem icon={ICON.info} title="查看冲突" onClick={() => { setMenu(null); push({ k: 'conflict', occ: mo }) }} />}
+            {mo.ruleId && mo.status !== 'cancelled' && <PopItem icon={ICON.clock} title="调整时间" onClick={() => push({ k: 'session', occ: mo })} />}
+            {mo.conflict && <PopItem icon={ICON.info} title="查看冲突" onClick={() => push({ k: 'conflict', occ: mo })} />}
             {mo.courseId && (
               <PopItem
                 icon={ICON.edit}
                 title="编辑课程"
                 onClick={() => {
                   const c = store.state.courses.find((x) => x.id === mo.courseId)
-                  setMenu(null)
                   if (c) push({ k: 'courseEdit', course: c })
+                  else closeMenu()
                 }}
               />
             )}
             {mo.ruleId && mo.status === 'normal' && <PopItem icon={ICON.ban} title="本节停课" danger onClick={() => ovr('cancelled')} />}
-            {mo.entryId && <PopItem icon={ICON.trash} title="删除这条安排" danger onClick={() => { store.removeEntry(mo.entryId!); setMenu(null); haptic('warning'); nativeToast('已删除') }} />}
+            {mo.entryId && <PopItem icon={ICON.trash} title="删除这条安排" danger onClick={() => { store.removeEntry(mo.entryId!); closeMenu(); haptic('warning'); nativeToast('已删除') }} />}
           </Popover>
         )}
       </AnimatePresence>

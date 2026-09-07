@@ -15,6 +15,8 @@ export interface EduNav {
   loading: boolean
   progress: number
   canGoBack: boolean
+  /** 本次会话里学校页面已画出首帧 */
+  painted: boolean
   /** 主文档加载失败；'ssl' 为证书错误 */
   error?: string
 }
@@ -39,8 +41,10 @@ interface TtEduPlugin {
   close(): Promise<void>
   navigate(o: { url: string }): Promise<void>
   reload(): Promise<void>
+  stop(): Promise<void>
   back(): Promise<{ went: boolean }>
   frame(o: EduFrame): Promise<void>
+  snapshot(): Promise<{ src: string }>
   eval(o: { js: string }): Promise<{ value: string }>
   state(): Promise<EduNav>
   addListener(event: 'nav', fn: (e: EduNav) => void): Promise<PluginListenerHandle>
@@ -123,6 +127,9 @@ export const edu = {
   },
   navigate: (url: string) => (nativeEdu() ? TtEdu.navigate({ url }) : Promise.resolve()),
   reload: () => (nativeEdu() ? TtEdu.reload() : Promise.resolve()),
+  stop: () => (nativeEdu() ? TtEdu.stop() : Promise.resolve()),
+  /** 当前学校页面的定格图（data URL）；退场时贴在透明洞里随页一起滑走 */
+  snapshot: (): Promise<string | null> => (nativeEdu() ? TtEdu.snapshot().then((r) => r.src || null, () => null) : Promise.resolve(null)),
   back: () => (nativeEdu() ? TtEdu.back() : Promise.resolve({ went: false })),
   frame: (f: EduFrame) => (nativeEdu() ? TtEdu.frame(f) : Promise.resolve()),
   state: (): Promise<EduNav | null> => (nativeEdu() ? TtEdu.state() : Promise.resolve(null)),
