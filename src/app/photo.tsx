@@ -90,6 +90,7 @@ export function PhotoViewer({ path, onClose, onDelete }: { path: string; onClose
 
   const save = async () => {
     const ok = await camera.save(path)
+    haptic(ok ? 'success' : 'error')
     nativeToast(ok ? '已保存到相册' : '保存失败')
   }
 
@@ -120,7 +121,7 @@ export function PhotoViewer({ path, onClose, onDelete }: { path: string; onClose
           title="照片"
           groups={[
             [{ title: '保存到相册', icon: ICON.download, onClick: () => void save() }],
-            onDelete ? [{ title: '删除这张', icon: ICON.trash, danger: true, onClick: () => { onDelete(); close() } }] : [],
+            onDelete ? [{ title: '删除这张', icon: ICON.trash, danger: true, onClick: () => { onDelete(); haptic('warning'); nativeToast('已删除'); close() } }] : [],
           ]}
           onClose={() => setMenu(false)}
         />

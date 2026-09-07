@@ -10,6 +10,7 @@ import { searchStickers, stickerFor, stickerOf } from '../domain/stickers'
 import { Sticker, stickerTilt, useStickersOn } from './Sticker'
 import { store, useStore } from './store'
 import { defaultSemester, mondayOf, nowMinutes, todayStr } from './semester'
+import { haptic, nativeToast } from './widgets'
 import {
   BottomVeil, Card, Chips, EmptyBlock, Field, ICON, MenuRow, Page, PrimaryButton,
   StickyHead, TextAction, TextInput, TopBar, WD, WD_SHORT, md, tint,
@@ -332,7 +333,7 @@ export function CourseDetailPage({
 
         <div className="overflow-hidden rounded-[20px] bg-(--c-surface)">
           <MenuRow icon={ICON.undo} title="变更记录" desc={changes.length > 0 ? `${changes.length} 条` : '还没有变更'} onClick={onChanges} />
-          <MenuRow icon={ICON.ban} title={cur.hidden ? '取消隐藏' : '隐藏这门课'} desc="隐藏后不出现在课表里，可恢复" onClick={() => store.setCourseHidden(cur.id, !cur.hidden)} />
+          <MenuRow icon={ICON.ban} title={cur.hidden ? '取消隐藏' : '隐藏这门课'} desc="隐藏后不出现在课表里，可恢复" onClick={() => { store.setCourseHidden(cur.id, !cur.hidden); haptic('light'); nativeToast(cur.hidden ? '已取消隐藏' : '已隐藏') }} />
         </div>
         </div>
       </div>
