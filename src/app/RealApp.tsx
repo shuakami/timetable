@@ -2751,9 +2751,9 @@ export default function RealApp() {
         <ActionSheet
           title="分享哪个学期"
           groups={[
-            snap ? [{ title: snap.semester.name, value: `${liveCount(snap)} 门课 · 当前`, icon: ICON.calendar, onClick: () => void shareIcs(snap) }] : [],
+            snap ? [{ title: snap.semester.name, value: '当前', icon: ICON.calendar, onClick: () => void shareIcs(snap) }] : [],
             [...store.state.archives].reverse().map((a) => ({
-              title: a.semester.name, value: `${liveCount(a)} 门课 · ${md(a.semester.startDate)} 开学`, icon: ICON.book, onClick: () => void shareIcs(a),
+              title: a.semester.name, value: `${liveCount(a)} 门课`, icon: ICON.book, onClick: () => void shareIcs(a),
             })),
           ]}
           onClose={() => setSharing(false)}
