@@ -1772,7 +1772,7 @@ function ProfilePage({ onBack, onPick }: { onBack: () => void; onPick: (t: Photo
           title={menu === 'avatar' ? '头像' : '背景'}
           groups={[[
             { title: '从相册选择', icon: ICON.image, onClick: () => onPick(menu) },
-            { title: '恢复默认', icon: ICON.undo, onClick: () => reset(menu) },
+            { title: '恢复默认', icon: ICON.undo, onClick: () => { reset(menu); haptic('light') } },
           ]]}
           onClose={() => setMenu(null)}
         />
@@ -2722,11 +2722,15 @@ export default function RealApp() {
     if (!mo?.ruleId) return
     store.addOverride({ id: uid(), kind, date: mo.date, ruleId: mo.ruleId, createdAt: Date.now() })
     setMenu(null)
+    haptic(kind === 'cancelled' ? 'warning' : 'light')
+    nativeToast(kind === 'cancelled' ? '本节已停课' : kind === 'leave' ? '已请假' : '本节已静音')
   }
   const restore = () => {
     if (!mo?.ruleId) return
     store.removeOverride(mo.ruleId, mo.date)
     setMenu(null)
+    haptic('light')
+    nativeToast('已恢复')
   }
   const undoTitle = mo
     ? mo.status === 'leave' ? '取消请假'
@@ -2853,7 +2857,7 @@ export default function RealApp() {
               />
             )}
             {mo.ruleId && mo.status === 'normal' && <PopItem icon={ICON.ban} title="本节停课" danger onClick={() => ovr('cancelled')} />}
-            {mo.entryId && <PopItem icon={ICON.trash} title="删除这条安排" danger onClick={() => { store.removeEntry(mo.entryId!); setMenu(null) }} />}
+            {mo.entryId && <PopItem icon={ICON.trash} title="删除这条安排" danger onClick={() => { store.removeEntry(mo.entryId!); setMenu(null); haptic('warning'); nativeToast('已删除') }} />}
           </Popover>
         )}
       </AnimatePresence>

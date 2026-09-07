@@ -8,7 +8,7 @@ import { uid } from '../domain/store'
 import { store, useStore } from './store'
 import { nowMinutes, todayStr } from './semester'
 import { camera, nativeCamera, type CapturedPhoto, type GalleryItem, type PermissionStatus } from './camera'
-import { haptic, openAppSettings } from './widgets'
+import { haptic, nativeToast, openAppSettings } from './widgets'
 import { PhotoViewer, TaskPhotoImg } from './photo'
 import { useImeY } from './ime'
 import {
@@ -1062,6 +1062,8 @@ export function TaskDetailPage({
   const removeTask = async () => {
     await camera.remove((cur.photos ?? []).map((p) => p.path))
     store.removeTask(cur.id)
+    haptic('warning')
+    nativeToast('已删除待办')
     onBack()
   }
   const removePhoto = async (id: string, path: string) => {
