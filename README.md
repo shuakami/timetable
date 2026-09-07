@@ -6,7 +6,7 @@
 
 今天 / 周视图 / 待办 / 冲突处理 / 变更记录 / 多源导入 / AI 转换 / 课程贴纸 / 桌面小组件
 
-<a href="https://github.com/shuakami/timetable/releases/latest/download/app-release.apk"><img src="docs/download-android.svg" alt="Download for Android" /></a>
+<a href="https://github.com/shuakami/timetable/releases/latest/download/Timetable-android.apk"><img src="docs/download-android.svg" alt="Download for Android" /></a>
 
 </div>
 
