@@ -13,8 +13,10 @@ export interface AxisSeg {
   y1: number
   /** period：节次序号 */
   index?: number
-  /** gap：长课间的说明，如「午休 2 小时 20 分」 */
+  /** gap：长课间的名字（午休 / 晚饭）；不在饭点的长课间没名字，只留带 */
   label?: string
+  /** gap：是否长课间（单独成带） */
+  wide?: boolean
 }
 
 export interface TimeAxis {
@@ -35,12 +37,12 @@ export const AXIS_PAD_PER_HOUR = 42
 /** 达到这个长度的课间单独成带并标注 */
 export const AXIS_WIDE_MIN = 45
 
-export function gapLabel(prevEnd: Minutes, gap: Minutes): string {
-  const who = prevEnd < 15 * 60 ? '午休' : prevEnd < 20 * 60 ? '晚饭' : '休息'
-  const h = Math.floor(gap / 60)
-  const m = gap % 60
-  const dur = h > 0 ? `${h} 小时${m ? ` ${m} 分` : ''}` : `${m} 分`
-  return `${who} ${dur}`
+/** 长课间的名字按它的中点落在哪个饭点：11:00–14:30 午休，16:30–19:30 晚饭；上午晚开、晚自习前的空档不起名 */
+export function gapLabel(prevEnd: Minutes, gap: Minutes): string | undefined {
+  const mid = prevEnd + gap / 2
+  if (mid >= 11 * 60 && mid <= 14 * 60 + 30) return '午休'
+  if (mid >= 16 * 60 + 30 && mid <= 19 * 60 + 30) return '晚饭'
+  return undefined
 }
 
 function linear(t0: Minutes, t1: Minutes, y0: number, kind: AxisSeg['kind']): AxisSeg {
@@ -68,7 +70,7 @@ export function buildAxis(grid: TimeSlot[], span?: { start: Minutes; end: Minute
       const t0 = Math.max(s.start, cursor)
       if (i > 0) {
         const gap = t0 - cursor
-        if (gap >= AXIS_WIDE_MIN) push({ kind: 'gap', t0: cursor, t1: t0, y0: y, y1: y + AXIS_WIDE_GAP, label: gapLabel(cursor, gap) })
+        if (gap >= AXIS_WIDE_MIN) push({ kind: 'gap', t0: cursor, t1: t0, y0: y, y1: y + AXIS_WIDE_GAP, wide: true, label: gapLabel(cursor, gap) })
         else if (gap > 0) push({ kind: 'gap', t0: cursor, t1: t0, y0: y, y1: y + AXIS_GAP })
       }
       if (s.end > t0) {

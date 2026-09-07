@@ -12,8 +12,8 @@ describe('buildAxis', () => {
     for (const p of periods) expect(p.y1 - p.y0).toBe(AXIS_ROW)
     const gaps = axis.segs.filter((s) => s.kind === 'gap')
     expect(gaps.filter((g) => g.label)).toHaveLength(2)
-    expect(gaps.find((g) => g.t0 === 700)).toMatchObject({ label: '午休 2 小时 20 分' })
-    expect(gaps.find((g) => g.t0 === 1060)).toMatchObject({ label: '晚饭 1 小时 20 分' })
+    expect(gaps.find((g) => g.t0 === 700)).toMatchObject({ wide: true, label: '午休' })
+    expect(gaps.find((g) => g.t0 === 1060)).toMatchObject({ wide: true, label: '晚饭' })
     expect(gaps.find((g) => g.t0 === 525)!.y1 - gaps.find((g) => g.t0 === 525)!.y0).toBe(AXIS_GAP)
     expect(axis.height).toBe(10 * AXIS_ROW + 7 * AXIS_GAP + 2 * AXIS_WIDE_GAP)
   })
@@ -87,11 +87,13 @@ describe('rowHeights', () => {
 })
 
 describe('gapLabel', () => {
-  it('按时段取名', () => {
-    expect(gapLabel(700, 140)).toBe('午休 2 小时 20 分')
-    expect(gapLabel(1060, 80)).toBe('晚饭 1 小时 20 分')
-    expect(gapLabel(1230, 60)).toBe('休息 1 小时')
-    expect(gapLabel(1230, 50)).toBe('休息 50 分')
+  it('按中点所在饭点取名，不带时长', () => {
+    expect(gapLabel(700, 140)).toBe('午休')
+    expect(gapLabel(1060, 80)).toBe('晚饭')
+    /* 上午 9:40 下课隔 50 分不是午休 */
+    expect(gapLabel(580, 50)).toBeUndefined()
+    /* 晚自习前 20:30 的空档不起名 */
+    expect(gapLabel(1230, 60)).toBeUndefined()
   })
 })
 
