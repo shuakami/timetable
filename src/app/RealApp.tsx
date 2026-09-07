@@ -1139,8 +1139,8 @@ function ImportPage({ onBack, onManual, onEditRule, onRun, onAi, onEdu }: { onBa
         <TopBar title="导入课表" onBack={onBack} />
 
         <div className="mt-6 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
-          <Row title="从教务系统导入" desc="内置浏览器登录教务，打开课表页后导入" onClick={onEdu} />
-          <Row title="导入课表文件" desc="别人分享的 .ics 课表，学期与作息一起带进来" onClick={() => onRun('builtin-ics')} />
+          <Row title="从教务系统导入" badge="推荐" onClick={onEdu} />
+          <Row title="导入课表文件" onClick={() => onRun('builtin-ics')} />
         </div>
 
         <div className="mt-6 text-[12.5px] font-semibold text-(--c-ink3)">规则</div>
@@ -1154,7 +1154,7 @@ function ImportPage({ onBack, onManual, onEditRule, onRun, onAi, onEdu }: { onBa
 
         <div className="mt-6 text-[12.5px] font-semibold text-(--c-ink3)">更多</div>
         <div className="mt-2.5 overflow-hidden rounded-[16px] bg-(--c-surface)">
-          <Row title="让 AI 转换课表" desc="复制 Prompt，AI 输出后粘贴即可" onClick={onAi} />
+          <Row title="让 AI 转换课表" onClick={onAi} />
           <div className="border-t border-(--c-surface2)" />
           <Row title="自定义规则" onClick={() => onEditRule('new')} />
           <div className="border-t border-(--c-surface2)" />

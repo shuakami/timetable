@@ -375,11 +375,14 @@ export function SelectInput({ value, options, onChange, title, className }: { va
   )
 }
 
-export function Row({ title, desc, right, onClick, danger, active }: { title: string; desc?: string; right?: React.ReactNode; onClick?: () => void; danger?: boolean; active?: boolean }) {
+export function Row({ title, desc, badge, right, onClick, danger, active }: { title: string; desc?: string; badge?: string; right?: React.ReactNode; onClick?: () => void; danger?: boolean; active?: boolean }) {
   return (
     <button onClick={onClick} className={`flex w-full items-center px-4 py-3.5 text-left transition-colors active:bg-(--c-bg) ${active ? 'bg-(--c-accent-soft)' : ''}`}>
       <div className="min-w-0 flex-1">
-        <div className={`text-[14px] font-bold ${danger ? 'text-(--c-danger)' : active ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>{title}</div>
+        <div className={`flex items-center gap-2 text-[14px] font-bold ${danger ? 'text-(--c-danger)' : active ? 'text-(--c-accent)' : 'text-(--c-ink)'}`}>
+          <span className="truncate">{title}</span>
+          {badge && <span className="flex-none rounded-[7px] bg-(--c-accent-soft) px-2 py-[3px] text-[10.5px] font-bold text-(--c-accent)">{badge}</span>}
+        </div>
         {desc && <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{desc}</div>}
       </div>
       {right ?? (

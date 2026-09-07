@@ -160,7 +160,7 @@ export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDon
           >
             <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
               {SOURCES.map(([id, t]) => (
-                <Row key={id} title={t} onClick={() => finish(id)} />
+                <Row key={id} title={t} badge={id === 'edu' ? '推荐' : undefined} onClick={() => finish(id)} />
               ))}
             </div>
             <div className="mt-5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">

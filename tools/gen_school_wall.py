@@ -40,7 +40,7 @@ html = f"""      <!-- schools -->
         <ul class="grid" aria-label="支持的学校，节选">
 {grid}
         </ul>
-        <p class="credit">* 教务系统功能脚本鸣谢 <a href="https://github.com/baoozak/timetable" target="_blank" rel="noopener">baoozak/timetable</a> 项目。</p>
+        <p class="credit">* 学校教务索引整理自 <a href="https://github.com/baoozak/timetable" target="_blank" rel="noopener">baoozak/timetable</a> 项目。</p>
       </section>
       <!-- /schools -->
 """
