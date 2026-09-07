@@ -792,7 +792,8 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
                           done={done}
                           progress={nowOn ? axis.y(now) - top : undefined}
                           sticker={sticker}
-                          lineThrough={o.status === 'cancelled'}
+                          status={o.status}
+                          muted={o.muted && !done}
                           ring={ring}
                           textTop={Math.min(covered, cellH)}
                           tone={stacked && !nowOn ? 14 : undefined}
@@ -1115,7 +1116,7 @@ function SearchPalette({ state, onClose, onPickCourse, onPickTask }: { state: St
 
 /* ---------------- 导入 ---------------- */
 
-const KIND_LABEL: Record<RuleInputKind, string> = { csv: 'CSV', json: 'JSON', html: 'HTML', xlsx: 'Excel', ics: 'ICS 日历', script: '脚本' }
+const KIND_LABEL: Record<RuleInputKind, string> = { csv: 'CSV', json: 'JSON', html: 'HTML', xlsx: 'Excel', ics: '.ics 文件', script: '脚本' }
 const KIND_HINT: Record<RuleInputKind, string> = {
   csv: '课程,教师,地点,星期,节次,周次',
   json: '{"courses":[{"name":"高等数学","day":1,"startNode":1,"step":2,"weeks":"1-16"}]}',
@@ -1137,8 +1138,9 @@ function ImportPage({ onBack, onManual, onEditRule, onRun, onAi, onEdu }: { onBa
       <div className="flex-1 overflow-y-auto px-5 pb-10 [scrollbar-width:none]">
         <TopBar title="导入课表" onBack={onBack} />
 
-        <div className="mt-6 overflow-hidden rounded-[16px] bg-(--c-surface)">
+        <div className="mt-6 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
           <Row title="从教务系统导入" desc="内置浏览器登录教务，打开课表页后导入" onClick={onEdu} />
+          <Row title="导入课表文件" desc="别人分享的 .ics 课表，学期与作息一起带进来" onClick={() => onRun('builtin-ics')} />
         </div>
 
         <div className="mt-6 text-[12.5px] font-semibold text-(--c-ink3)">规则</div>
@@ -1402,13 +1404,14 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, sy
 
   const errors = pending?.diagnostics.filter((d) => d.level === 'error') ?? []
 
-  /* 文件是用课程表直接打开的：不经过粘贴页，直接给预览 */
+  /* 文件是用课程表直接打开的（或在页内选了文件）：不经过粘贴页，直接给预览 */
   const auto = useRef(autoRun && !!initialText)
+  const [tick, setTick] = useState(0)
   useEffect(() => {
     if (!auto.current) return
     auto.current = false
     void parse()
-  }, [])
+  }, [tick])
 
   return (
     <Page keep={overBrowser ? 'opaque' : undefined}>
@@ -1440,6 +1443,24 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, sy
                   </label>
                 ) : (
                   <>
+                    {rule.input === 'ics' && (
+                      <label className="mb-2.5 flex w-full cursor-pointer items-center justify-center rounded-[16px] bg-(--c-surface) py-10 text-[13.5px] font-semibold text-(--c-ink2)">
+                        {fileName || '选择 .ics 文件'}
+                        <input
+                          type="file"
+                          accept=".ics,text/calendar"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0]
+                            if (!f) return
+                            setFileName(f.name)
+                            setText(await f.text())
+                            auto.current = true
+                            setTick((n) => n + 1)
+                          }}
+                        />
+                      </label>
+                    )}
                     <div className="flex items-center gap-3 rounded-[16px] bg-(--c-surface) px-4 py-2.5">
                       <TextInput value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https:// 链接" className="min-w-0 flex-1 text-[13px]" />
                       <TextAction disabled={!url.trim() || busy !== ''} busy={busy === 'fetch'} onClick={grab}>抓取</TextAction>

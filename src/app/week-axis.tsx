@@ -7,11 +7,21 @@ function clampStyle(lines: number): React.CSSProperties | undefined {
   return lines > 1 ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: lines } : undefined
 }
 
+export type WeekCardStatus = 'normal' | 'moved' | 'cancelled' | 'leave' | 'done'
+
+/** 卡片右上角的状态标：调课用主题色，请假用玫红，静音用灰 */
+const STATUS_TAG: Partial<Record<WeekCardStatus | 'muted', { text: string; bg: string; fg: string }>> = {
+  moved: { text: '调', bg: 'var(--c-accent)', fg: '#fff' },
+  leave: { text: '假', bg: 'var(--c-rose)', fg: '#fff' },
+  muted: { text: '静', bg: 'var(--c-ink4)', fg: 'var(--c-bg)' },
+}
+
 /**
  * 周视图卡片：按自身高宽决定课名、地点各排几行。
  * 冲突时后一张卡叠在前一张下面右移 5px 露出一条边（原型做法）；textTop 是它被盖住的高度，文字从露出的部分开始排。
+ * 状态（同日历应用的惯例）：停课 = 空心虚线框 + 划掉；请假 = 斜纹底；调课 / 请假 / 静音右上角一个字的角标。
  */
-export function WeekCard({ name, loc, color, h, w, now, done, progress, sticker, lineThrough, ring, textTop = 0, tone }: {
+export function WeekCard({ name, loc, color, h, w, now, done, progress, sticker, status = 'normal', muted, ring, textTop = 0, tone }: {
   name: string
   loc?: string
   color: string
@@ -21,25 +31,45 @@ export function WeekCard({ name, loc, color, h, w, now, done, progress, sticker,
   done?: boolean
   progress?: number
   sticker?: string | null
-  lineThrough?: boolean
+  status?: WeekCardStatus
+  muted?: boolean
   ring?: string
   textTop?: number
   tone?: number
 }) {
   const fit = cardFit(h - textTop, w, name, loc)
   const lineCls = (n: number) => (n > 1 ? 'overflow-hidden wrap-anywhere' : 'truncate')
+  const cancelled = status === 'cancelled'
+  const leave = status === 'leave'
+  const tag = cancelled ? undefined : STATUS_TAG[status] ?? (muted ? STATUS_TAG.muted : undefined)
+  const fill = tint(color, tone ?? (now ? 22 : done ? 7 : 10))
+  const background = cancelled
+    ? 'transparent'
+    : leave
+      ? `repeating-linear-gradient(135deg, ${fill} 0 4px, transparent 4px 8px)`
+      : fill
   return (
     <div
-      className={`relative h-full w-full overflow-hidden rounded-[9px] text-left font-bold ${fit?.dense ? 'px-1 py-0.5' : 'px-1 py-1'} ${lineThrough ? 'line-through' : ''}`}
+      className={`relative h-full w-full overflow-hidden rounded-[9px] text-left font-bold ${fit?.dense ? 'px-1 py-0.5' : 'px-1 py-1'} ${cancelled ? 'line-through' : ''}`}
       style={{
-        background: tint(color, tone ?? (now ? 22 : done ? 7 : 10)),
-        color: `color-mix(in srgb, ${color} 85%, var(--c-ink-mix))`,
+        background,
+        color: `color-mix(in srgb, ${color} ${cancelled ? 60 : 85}%, var(--c-ink-mix))`,
         boxShadow: ring ?? (now ? `inset 0 0 0 1.5px ${color}` : undefined),
+        outline: cancelled ? `1.5px dashed color-mix(in srgb, ${color} 55%, transparent)` : undefined,
+        outlineOffset: cancelled ? -1.5 : undefined,
         paddingTop: textTop > 0 ? textTop + (fit?.dense ? 2 : 4) : undefined,
       }}
     >
+      {tag && h - textTop >= 26 && (
+        <span
+          className="pointer-events-none absolute right-[3px] z-10 flex h-[13px] w-[13px] items-center justify-center rounded-[4px] text-[8px] leading-none font-bold no-underline"
+          style={{ top: textTop + 3, background: tag.bg, color: tag.fg }}
+        >
+          {tag.text}
+        </span>
+      )}
       {fit && (
-        <div className={`relative text-[9.5px] leading-[1.3] ${lineCls(fit.nameLines)}`} style={clampStyle(fit.nameLines)}>
+        <div className={`relative text-[9.5px] leading-[1.3] ${lineCls(fit.nameLines)} ${tag && fit.nameLines === 1 ? 'pr-3' : ''}`} style={clampStyle(fit.nameLines)}>
           {name}
         </div>
       )}

@@ -38,7 +38,7 @@ export const BUILTIN_RULES: RuleManifest[] = [
   { id: 'builtin-json', name: 'JSON 课表', version: '1.0', input: 'json', createdAt: 2, updatedAt: 2 },
   { id: 'builtin-html', name: '教务 HTML 课表网格', version: '1.0', input: 'html', html: { mode: 'grid' }, createdAt: 3, updatedAt: 3 },
   { id: 'builtin-xlsx', name: 'Excel 表格', version: '1.0', input: 'xlsx', csv: DEFAULT_CSV_MAPPING, createdAt: 4, updatedAt: 4 },
-  { id: 'builtin-ics', name: 'ICS 日历订阅', version: '1.0', input: 'ics', createdAt: 5, updatedAt: 5 },
+  { id: 'builtin-ics', name: '课表文件', version: '1.0', input: 'ics', createdAt: 5, updatedAt: 5 },
 ]
 
 export interface RuleInput {
