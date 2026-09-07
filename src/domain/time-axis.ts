@@ -28,7 +28,7 @@ export const AXIS_ROW = 60
 /** 行高下限：空行、连堂课的后半节；左侧序号 + 时刻刚好放下 */
 export const AXIS_ROW_MIN = 32
 export const AXIS_GAP = 6
-export const AXIS_WIDE_GAP = 22
+export const AXIS_WIDE_GAP = 30
 /** 卡片相对节次边界的内缩：相邻两节连排时上下各留这么多 */
 export const CARD_INSET = 1.5
 export const AXIS_PAD_PER_HOUR = 42
