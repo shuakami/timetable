@@ -96,8 +96,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir -p dist-apk
-          cp android/app/build/outputs/apk/release/app-release.apk "dist-apk/Timetable-$VERSION.apk"
-          cp android/app/build/outputs/apk/release/app-release.apk dist-apk/Timetable-android.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "dist-apk/GagaTimetable-$VERSION.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk dist-apk/GagaTimetable-android.apk
 
       - name: Write release notes
         if: startsWith(github.ref, 'refs/tags/')
@@ -106,18 +106,18 @@ jobs:
           CODE: ${{ steps.version.outputs.versionCode }}
           REPO: ${{ github.repository }}
         run: |
-          APK=dist-apk/Timetable-${TAG#v}.apk
+          APK=dist-apk/GagaTimetable-${TAG#v}.apk
           SIZE=$(stat -c%s "$APK" | awk '{printf "%.1f", $1/1048576}')
           SHA=$(sha256sum "$APK" | cut -d' ' -f1)
           PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
           {
-            echo "<a href=\"https://github.com/$REPO/releases/download/$TAG/Timetable-${TAG#v}.apk\"><img src=\"https://raw.githubusercontent.com/$REPO/main/docs/download-android.svg\" alt=\"Download for Android\" /></a>"
+            echo "<a href=\"https://github.com/$REPO/releases/download/$TAG/GagaTimetable-${TAG#v}.apk\"><img src=\"https://raw.githubusercontent.com/$REPO/main/docs/download-android.svg\" alt=\"Download for Android\" /></a>"
             echo
             echo "<details>"
             echo "<summary>APK 信息</summary>"
             echo
             echo "<table>"
-            echo "<tr><td>文件</td><td>Timetable-${TAG#v}.apk</td></tr>"
+            echo "<tr><td>文件</td><td>GagaTimetable-${TAG#v}.apk</td></tr>"
             echo "<tr><td>大小</td><td>${SIZE} MB</td></tr>"
             echo "<tr><td>系统</td><td>Android 7.0+</td></tr>"
             echo "<tr><td>versionCode</td><td>${CODE}</td></tr>"
@@ -141,8 +141,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist-apk/Timetable-${{ steps.version.outputs.version }}.apk
-            dist-apk/Timetable-android.apk
+            dist-apk/GagaTimetable-${{ steps.version.outputs.version }}.apk
+            dist-apk/GagaTimetable-android.apk
           name: v${{ steps.version.outputs.version }}
           body_path: release-notes.md
           draft: false

@@ -1227,8 +1227,9 @@ export function Wheel({ items, index, onChange, className = '' }: { items: strin
 
 /** 同一区域内两层内容交叉淡入淡出的层：常驻合成层 + 200ms 透明度过渡 */
 export const SWAP_LAYER = 'absolute inset-0 transition-[opacity,visibility] duration-200 ease-out will-change-[opacity]'
-/** 交叉层的显隐：隐藏层同时 visibility hidden，子元素自己写的 pointer-events 也拦不到触摸 */
-export const swapStyle = (on: boolean): React.CSSProperties => ({ opacity: on ? 1 : 0, visibility: on ? 'visible' : 'hidden', pointerEvents: on ? 'auto' : 'none' })
+/** 交叉层的显隐：显示层不写 visibility / pointer-events（继承外层），隐藏层写 hidden / none；嵌套时外层隐藏能压住内层 */
+export const swapStyle = (on: boolean): React.CSSProperties =>
+  on ? { opacity: 1 } : { opacity: 0, visibility: 'hidden', pointerEvents: 'none' }
 
 export const CAL_ROW = 42
 /** 月历区域固定高度：月份行 + 星期行 + 六行日期；切成年月日滚轮时也用这个高度，不跳 */
