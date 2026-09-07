@@ -3,7 +3,6 @@ import { AnimatePresence } from 'motion/react'
 import { diffDays, fmtMinutes } from '../domain/dates'
 import { DEFAULT_DURATION, DURATION_STEP, MAX_DURATION, MAX_PERIODS, MIN_DURATION, MIN_PERIODS, generateGrid } from '../domain/schedule'
 import { store } from './store'
-import { haptic } from './widgets'
 import { defaultSemester, mondayOf, todayStr } from './semester'
 import { DateInput, Field, Page, PrimaryButton, Row, Stepper, TextAction, TimeSheet, TopBar, md } from './ui'
 
@@ -120,7 +119,7 @@ export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDon
               <div className="flex items-center border-t border-(--c-line2) py-3">
                 <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">第 1 节开始</span>
                 <button
-                  onClick={() => { haptic('press'); setPickFirst(true) }}
+                  onClick={() => setPickFirst(true)}
                   className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[15px] font-bold tabular-nums text-(--c-ink) transition-transform duration-150 active:scale-[.96]"
                 >
                   {fmtMinutes(first)}

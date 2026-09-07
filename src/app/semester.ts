@@ -8,10 +8,29 @@ const SLOTS = [
   [1140, 1185], [1195, 1240],
 ]
 
+/** 按开学月份给学期起名：8 月起上学期，2 月起下学期 */
+export function guessSemesterName(startDate: string): string {
+  const y = Number(startDate.slice(0, 4))
+  const m = Number(startDate.slice(5, 7))
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return '当前学期'
+  if (m >= 8) return `${y}–${y + 1} 学年 第 1 学期`
+  if (m >= 2) return `${y - 1}–${y} 学年 第 2 学期`
+  return `${y - 1}–${y} 学年 第 1 学期`
+}
+
+/** 学期最后一天（最后一周周日） */
+export function termEnd(sem: Pick<Semester, 'startDate' | 'totalWeeks'>): string {
+  return addDays(sem.startDate, sem.totalWeeks * 7 - 1)
+}
+
+export function semesterEnded(sem: Pick<Semester, 'startDate' | 'totalWeeks'>, today = todayStr()): boolean {
+  return today > termEnd(sem)
+}
+
 export function defaultSemester(startDate: string): Semester {
   return {
     id: uid(),
-    name: '当前学期',
+    name: guessSemesterName(startDate),
     startDate,
     totalWeeks: 20,
     timeGrid: SLOTS.map(([s, e], i) => ({ index: i + 1, start: s, end: e })),
@@ -38,7 +57,7 @@ export function extendGrid(grid: TimeSlot[], need: number): TimeSlot[] {
   return out
 }
 
-export const todayStr = () => fromDate(new Date())
+export const todayStr = (): string => fromDate(new Date())
 
 export function mondayOf(d: string): string {
   return addDays(d, 1 - weekdayOf(d))

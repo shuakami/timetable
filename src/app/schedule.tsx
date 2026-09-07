@@ -7,7 +7,6 @@ import {
   resetEnd, setCount, setDuration, setEnd, setStart, type ScheduleDraft,
 } from '../domain/schedule'
 import { store } from './store'
-import { haptic } from './widgets'
 import { Page, PrimaryButton, Sheet, SheetClose, SheetHead, Stepper, Switch, TimeWheels, TopBar } from './ui'
 
 /* 作息时间：与原型 ScheduleScreen 逐屏一致 */
@@ -84,14 +83,14 @@ export function SchedulePage({ sem, onBack }: { sem: Semester; onBack: () => voi
                 <div className="flex items-center py-1.5">
                   <span className={`${COL_IDX} text-[12.5px] font-bold tabular-nums text-(--c-ink4)`}>{i + 1}</span>
                   <button
-                    onClick={() => { haptic('press'); setPick({ i, which: 'start' }) }}
+                    onClick={() => setPick({ i, which: 'start' })}
                     className={`flex-1 rounded-[10px] bg-(--c-surface2) py-1.5 text-center text-[15px] font-bold tabular-nums transition-transform duration-150 active:scale-[.96] ${wrong ? 'text-(--c-danger)' : 'text-(--c-ink)'}`}
                   >
                     {fmtMinutes(s)}
                   </button>
                   <ArrowIcon />
                   <button
-                    onClick={() => { haptic('press'); setPick({ i, which: 'end' }) }}
+                    onClick={() => setPick({ i, which: 'end' })}
                     className={`flex-1 rounded-[10px] py-1.5 text-center text-[15px] tabular-nums transition-transform duration-150 active:scale-[.96] ${custom ? 'font-bold text-(--c-ink)' : 'font-medium text-(--c-ink4)'}`}
                     style={custom ? { boxShadow: 'inset 0 0 0 1.5px var(--c-accent)' } : undefined}
                   >
@@ -110,7 +109,6 @@ export function SchedulePage({ sem, onBack }: { sem: Semester; onBack: () => voi
         <PrimaryButton
           disabled={!dirty || bad.size > 0}
           onClick={() => {
-            haptic('select')
             store.setSemester({ ...sem, timeGrid: gridFromDraft(d) })
             onBack()
           }}
@@ -150,7 +148,7 @@ function ScheduleTimeSheet({ draft, pick, onApply, onClose }: { draft: ScheduleD
       header={<SheetHead title={`第 ${i + 1} 节 ${isStart ? '开始' : '下课'}`} sub={sub} trail={<SheetClose onClick={() => dismiss.current?.()} />} />}
       footer={
         <div className="px-5 pt-2">
-          <PrimaryButton onClick={() => { haptic('select'); onApply(preview); dismiss.current?.() }}>确定</PrimaryButton>
+          <PrimaryButton onClick={() => { onApply(preview); dismiss.current?.() }}>确定</PrimaryButton>
         </div>
       }
     >
@@ -164,7 +162,7 @@ function ScheduleTimeSheet({ draft, pick, onApply, onClose }: { draft: ScheduleD
       {!isStart && custom && (
         <div className="mt-1 flex items-center rounded-[14px] bg-(--c-row-muted) px-3.5 py-3">
           <span className="flex-1 text-[13.5px] font-semibold text-(--c-ink)">标准时长 {draft.duration} 分</span>
-          <button onClick={() => { haptic('select'); onApply(resetEnd(draft, i)); dismiss.current?.() }} className="text-[13px] font-bold text-(--c-accent) transition-opacity active:opacity-60">
+          <button onClick={() => { onApply(resetEnd(draft, i)); dismiss.current?.() }} className="text-[13px] font-bold text-(--c-accent) transition-opacity active:opacity-60">
             恢复
           </button>
         </div>

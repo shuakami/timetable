@@ -8,7 +8,7 @@ import { uid } from '../domain/store'
 import { store, useStore } from './store'
 import { nowMinutes, todayStr } from './semester'
 import { camera, nativeCamera, type CapturedPhoto, type GalleryItem, type PermissionStatus } from './camera'
-import { openAppSettings } from './widgets'
+import { haptic, openAppSettings } from './widgets'
 import { PhotoViewer, TaskPhotoImg } from './photo'
 import { useImeY } from './ime'
 import {
@@ -68,6 +68,12 @@ function CheckBox({ done, color }: { done: boolean; color: string }) {
   )
 }
 
+/** 勾完成给一段成功触感，撤销只轻点一下 */
+function toggleDone(t: Task) {
+  haptic(t.done ? 'light' : 'success')
+  store.editTask(t.id, { done: !t.done })
+}
+
 function Check({ done, color, onClick }: { done: boolean; color: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="mt-[2px] flex-none">
@@ -93,7 +99,7 @@ export function TaskRow({
 
   return (
     <div className={`flex items-start rounded-[14px] px-3.5 py-3 ${tone === 'surface' ? 'bg-(--c-surface)' : 'bg-(--c-surface2)'} ${t.done ? 'opacity-45' : ''}`}>
-      <Check done={t.done} color={course?.color ?? 'var(--c-accent)'} onClick={() => store.editTask(t.id, { done: !t.done })} />
+      <Check done={t.done} color={course?.color ?? 'var(--c-accent)'} onClick={() => toggleDone(t)} />
       <button onClick={onOpen} className="ml-3 flex min-w-0 flex-1 items-start text-left">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -134,7 +140,7 @@ function InboxRow({
   const photo = t.photos?.[0]
   return (
     <div className="flex items-start rounded-[14px] bg-(--c-surface) px-3.5 py-3">
-      <Check done={t.done} color={course?.color ?? 'var(--c-accent)'} onClick={() => store.editTask(t.id, { done: !t.done })} />
+      <Check done={t.done} color={course?.color ?? 'var(--c-accent)'} onClick={() => toggleDone(t)} />
       <div className="ml-3 min-w-0 flex-1">
         <button onClick={onOpen} className="flex w-full items-start text-left">
           <div className="min-w-0 flex-1">
@@ -1127,7 +1133,7 @@ export function TaskDetailPage({
         </div>
 
         <button
-          onClick={() => store.editTask(cur.id, { done: !cur.done })}
+          onClick={() => toggleDone(cur)}
           className="mt-3 flex w-full items-center gap-3 rounded-[16px] bg-(--c-surface) px-4 py-3.5 text-left transition-transform duration-150 active:scale-[.98]"
         >
           <CheckBox done={cur.done} color={state.courses.find((c) => c.id === meta.cid)?.color ?? 'var(--c-accent)'} />

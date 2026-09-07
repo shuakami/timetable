@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { animate } from 'motion/react'
 import { camera, loadPhotoSrc, photoSrc } from './camera'
-import { nativeToast } from './widgets'
+import { haptic, nativeToast } from './widgets'
 import { ActionSheet, FADE, ICON, useBackClose } from './ui'
 
 /** 待办照片：路径异步转成可显示的地址，文件不在时留占位 */
@@ -68,6 +68,7 @@ export function PhotoViewer({ path, onClose, onDelete }: { path: string; onClose
     if (menu) return
     const timer = window.setTimeout(() => {
       if (press.current) press.current.fired = true
+      haptic('medium')
       setMenu(true)
     }, LONG_PRESS_MS)
     press.current = { x: e.clientX, y: e.clientY, timer, fired: false }

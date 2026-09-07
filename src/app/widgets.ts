@@ -95,10 +95,17 @@ export async function pasteText(): Promise<string> {
   }
 }
 
-export type HapticKind = 'tick' | 'edge' | 'select' | 'press' | 'reject'
+/* 触感词汇对齐 iOS：
+   selection — 滚轮刻度、分段选中变化（最轻）
+   light     — 轻触感：开关拨动、拖到边界
+   medium    — 长按菜单弹出、拖放落位
+   heavy     — 极少用：大块内容落位
+   success / warning / error — 结果通知：待办完成、导入成功 / 需留意 / 被拒绝
+   普通按钮、打开面板、确认按钮不加触感。 */
+export type HapticKind = 'selection' | 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'
 
-/** 触感反馈：原生走系统 HapticFeedbackConstants（滚轮刻度 / 确认 / 边界），浏览器里安静 */
-export function haptic(kind: HapticKind = 'tick'): void {
+/** 触感反馈：原生直驱线性马达，浏览器里安静 */
+export function haptic(kind: HapticKind = 'selection'): void {
   if (!native()) return
   WidgetBridge.haptic({ kind }).catch(() => undefined)
 }

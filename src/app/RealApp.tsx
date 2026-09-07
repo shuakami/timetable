@@ -6,14 +6,14 @@ import type { Course, Occurrence, Semester, SessionRule, Task, OverrideKind, Wid
 import { addDays, diffDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
 import { maskHasWeek, maskToWeeks } from '../domain/weeks'
 import { firstClassDate, occurrencesOn, occurrencesInWeek, type Snapshot } from '../domain/engine'
-import { normalize } from '../domain/importer'
+import { diffImport, normalize } from '../domain/importer'
 import type { NormalizedCourse, RuleOutput } from '../domain/importer'
 import { runRule, type RuleManifest, type RuleInputKind, DEFAULT_CSV_MAPPING } from '../domain/rules'
 import { fetchUrl } from '../domain/importers/url'
 import { AI_IMPORT_PROMPT } from '../domain/ai-prompt'
-import { uid, type Store, type State } from '../domain/store'
+import { uid, type SemesterArchive, type Store, type State } from '../domain/store'
 import { store, useStore } from './store'
-import { defaultSemester, extendGrid, isDefaultGrid, mondayOf, nowMinutes, todayStr } from './semester'
+import { defaultSemester, extendGrid, guessSemesterName, isDefaultGrid, mondayOf, nowMinutes, semesterEnded, termEnd, todayStr } from './semester'
 import Onboarding, { currentWeek } from './Onboarding'
 import {
   ChangePage, ConflictPage, CourseDetailPage, CourseEditPage, EditSessionPage,
@@ -90,6 +90,7 @@ function pressProps(onTap: () => void, onLong: (r: Rect, el: HTMLElement) => voi
       pressTimer = window.setTimeout(() => {
         pressFired = true
         pressTimer = null
+        haptic('medium')
         onLong(rect, el)
       }, 420)
     },
@@ -392,7 +393,7 @@ function useNowMinutes(): number {
 }
 
 function TodayView({
-  snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, onSemester, onCapture, liftKey,
+  snap, anchor, setAnchor, onPick, onMenu, onSearch, onImport, onManual, onSemester, onNewSemester, onCapture, liftKey,
 }: {
   snap: Snapshot
   anchor: string
@@ -403,6 +404,7 @@ function TodayView({
   onImport: () => void
   onManual: () => void
   onSemester: () => void
+  onNewSemester: () => void
   onCapture: (kind: 'camera' | 'text', courseId?: string) => void
   liftKey?: string
 }) {
@@ -477,13 +479,13 @@ function TodayView({
   const endKey = ended ? `${ended.date}-${ended.courseId}-${ended.start}` : ''
   const showEnd = ended && !endHidden.includes(endKey)
   const weekend = weekdayOf(anchor) >= 6
-  const termEnd = addDays(snap.semester.startDate, snap.semester.totalWeeks * 7 - 1)
+  const termEndDay = termEnd(snap.semester)
   /* 学期第一节课还在选中日之后：整个学期还没开课；两周内都没课且已过学期末：学期已结束 */
   const free = !nothingAtAll && head.length === 0
   const firstClass = useMemo(() => (free ? firstClassDate(snap, snap.semester.startDate) : null), [snap, free])
   const notStarted = free && firstClass != null && firstClass > anchor
   const idle = free && days.length === 1
-  const afterTerm = idle && anchor > termEnd && firstClassDate(snap, anchor) == null
+  const afterTerm = idle && anchor > termEndDay && firstClassDate(snap, anchor) == null
 
   return (
     <>
@@ -540,8 +542,8 @@ function TodayView({
             <EmptyBlock
               kind="term"
               title="学期已结束"
-              desc={`共 ${snap.semester.totalWeeks} 周，止于 ${md(termEnd)}。`}
-              actions={[['学期设置', onSemester]]}
+              desc={`${snap.semester.name}，共 ${snap.semester.totalWeeks} 周，止于 ${md(termEndDay)}。`}
+              actions={[['开始新学期', onNewSemester], ['学期设置', onSemester]]}
             />
           </div>
         ) : head.length === 0 && days.length === 1 ? (
@@ -1187,11 +1189,11 @@ function AiImportPage({ onBack, onNext, attach }: { onBack: () => void; onNext: 
   const copy = async () => {
     if (await copyText(attach ? `${AI_IMPORT_PROMPT.trimEnd()}\n\n—— 课表页面文字 ——\n${attach}` : AI_IMPORT_PROMPT)) {
       setCopied(true)
-      haptic('select')
+      haptic('success')
       nativeToast('已复制')
       window.setTimeout(() => setCopied(false), 1500)
     } else {
-      haptic('reject')
+      haptic('error')
       nativeToast('复制失败')
     }
   }
@@ -1199,7 +1201,6 @@ function AiImportPage({ onBack, onNext, attach }: { onBack: () => void; onNext: 
     const t = await pasteText()
     if (t.trim()) {
       setText(t)
-      haptic('select')
       return
     }
     nativeToast('剪贴板为空')
@@ -1310,16 +1311,30 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone 
     return JSON.stringify(g) === JSON.stringify(sem.timeGrid) ? null : g
   }, [out, sem.timeGrid])
 
+  /* 当前学期已结束且有内容：这次导入封存旧学期，开一个新学期，不和旧课合并 */
+  const rollover = !!store.state.semester && semesterEnded(sem) && (store.state.courses.length > 0 || store.state.entries.length > 0)
+
   /* 导入后的学期：作息取文件或当前，课程超出节次表时往后补齐 */
   const target = useMemo<Semester>(() => {
     if (!out) return sem
     const meta = out.semester ?? {}
     const grid = useFileGrid && fileGrid ? fileGrid : sem.timeGrid
     const need = Math.min(20, Math.max(0, ...out.courses.map((c) => c.endPeriod)))
-    return { ...sem, ...meta, timeGrid: extendGrid(grid, need) }
-  }, [out, sem, fileGrid, useFileGrid])
+    if (!rollover) return { ...sem, ...meta, timeGrid: extendGrid(grid, need) }
+    const startDate = meta.startDate ?? mondayOf(todayStr())
+    return {
+      ...sem,
+      id: uid(),
+      name: meta.name ?? guessSemesterName(startDate),
+      startDate,
+      totalWeeks: meta.totalWeeks ?? sem.totalWeeks,
+      vacations: [],
+      examWeeks: [],
+      timeGrid: extendGrid(grid, need),
+    }
+  }, [out, sem, fileGrid, useFileGrid, rollover])
   const pending = useMemo(() => (out ? normalize(out, target) : null), [out, target])
-  const preview = useMemo(() => (pending ? store.previewImport(pending.courses) : null), [pending])
+  const preview = useMemo(() => (pending ? (rollover ? diffImport([], pending.courses, new Set()) : store.previewImport(pending.courses)) : null), [pending, rollover])
 
   const parse = async () => {
     setBusy('parse')
@@ -1344,7 +1359,8 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone 
     const t0 = performance.now()
     const failed = pending.diagnostics.filter((d) => d.level === 'error').length
     const hadCourses = store.state.courses.length > 0
-    store.setSemester(target)
+    if (rollover) store.startSemester(target)
+    else store.setSemester(target)
     store.applyImport(pending.courses, {
       id: uid(), semesterId: target.id,
       ruleId: rule.id, ruleName: rule.name, ruleVersion: rule.version,
@@ -1431,7 +1447,14 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, onBack, onDone 
                   {preview.protectedKept.length > 0 && <span className="text-(--c-ink3)">保留改动 {preview.protectedKept.length}</span>}
                   {preview.removed.length > 0 && <span className="text-(--c-danger)">消失 {preview.removed.length}</span>}
                 </div>
-                {out?.semester && <div className="mt-1.5 px-1 text-[12.5px] font-semibold tabular-nums text-(--c-ink4)">{`${md(target.startDate)} 开学，共 ${target.totalWeeks} 周`}</div>}
+                {(out?.semester || rollover) && (
+                  <div className="mt-1.5 px-1 text-[12.5px] font-semibold tabular-nums text-(--c-ink4)">{`${target.name}，${md(target.startDate)} 开学，共 ${target.totalWeeks} 周`}</div>
+                )}
+                {rollover && (
+                  <div className="mt-2.5 rounded-[16px] bg-(--c-surface) px-4 py-3 text-[12.5px] font-medium text-(--c-ink3)">
+                    <span className="font-bold text-(--c-ink)">开始新学期</span>　{sem.name}已结束，封存至往期学期，仍可导出
+                  </div>
+                )}
 
                 {initialOut && pending.courses.length > 0 && (
                   <div className="mt-2.5">
@@ -1595,7 +1618,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
 
   const groups: [string, [string, string, MePage][]][] = [
     ['课表', [
-      ['学期', sem ? `${sem.name}，第 ${Math.max(0, Math.min(sem.totalWeeks, week))} / ${sem.totalWeeks} 周` : '未设置', 'semester'],
+      ['学期', sem ? (semesterEnded(sem) ? `${sem.name}，已结束` : `${sem.name}，第 ${Math.max(0, Math.min(sem.totalWeeks, week))} / ${sem.totalWeeks} 周`) : '未设置', 'semester'],
       ['作息时间', '', 'schedule'],
       ['课程', `${live.length} 门`, 'courses'],
       ['导入课表', '', 'import'],
@@ -2032,20 +2055,59 @@ function SubPage({ title, sub, onBack, children }: { title: string; sub?: string
   )
 }
 
-function SemesterSettings({ sem, onBack }: { sem: Semester; onBack: () => void }) {
+const liveCount = (s: Snapshot) => s.courses.filter((c) => !c.hidden && !c.removedByImport).length
+
+function SemesterSettings({ sem, onBack, onNew }: { sem: Semester; onBack: () => void; onNew: () => void }) {
+  const state = useStore()
   const [name, setName] = useState(sem.name)
   const [date, setDate] = useState(sem.startDate)
   const [weeks, setWeeks] = useState(sem.totalWeeks)
+  const [pick, setPick] = useState<SemesterArchive | null>(null)
+  const [confirmDel, setConfirmDel] = useState<SemesterArchive | null>(null)
   const start = mondayOf(date)
+  const ended = semesterEnded({ startDate: start, totalWeeks: weeks })
+  const archives = [...state.archives].reverse()
 
   return (
-    <SubPage title="学期" sub={`第 ${Math.max(1, currentWeek(start))} 周，共 ${weeks} 周`} onBack={onBack}>
+    <SubPage title="学期" sub={ended ? `已结束，止于 ${md(termEnd({ startDate: start, totalWeeks: weeks }))}` : `第 ${Math.max(1, currentWeek(start))} 周，共 ${weeks} 周`} onBack={onBack}>
       <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
         <Field k="名称"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field k="开学" sub={`第 1 周 ${md(start)} 周一`}><DateInput value={date} onChange={setDate} /></Field>
         <Field k="总周数"><TextInput type="number" min={1} max={64} value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} /></Field>
       </div>
 
+      <div className="mt-2.5 overflow-hidden rounded-[16px] bg-(--c-surface)">
+        <Row title="开始新学期" desc={ended ? "当前学期封存至往期" : undefined} onClick={onNew} />
+      </div>
+
+      {archives.length > 0 && (
+        <>
+          <div className="mt-7 mb-2 px-1 text-[12.5px] font-semibold text-(--c-ink4)">往期学期</div>
+          <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+            {archives.map((a) => (
+              <Row key={a.semester.id} title={a.semester.name} desc={`${liveCount(a)} 门课 · ${md(a.semester.startDate)} 开学`} onClick={() => setPick(a)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {pick && (
+        <ActionSheet
+          title={pick.semester.name}
+          groups={[
+            [{ title: '分享课表', icon: ICON.calendar, onClick: () => void shareIcs(pick) }],
+            [{ title: '删除', icon: ICON.trash, danger: true, onClick: () => setConfirmDel(pick) }],
+          ]}
+          onClose={() => setPick(null)}
+        />
+      )}
+      {confirmDel && (
+        <ActionSheet
+          title={`删除「${confirmDel.semester.name}」及 ${liveCount(confirmDel)} 门课，不可恢复`}
+          groups={[[{ title: '删除', icon: ICON.trash, danger: true, onClick: () => store.removeArchive(confirmDel.semester.id) }]]}
+          onClose={() => setConfirmDel(null)}
+        />
+      )}
 
       <div className="mt-8">
         <PrimaryButton
@@ -2059,6 +2121,50 @@ function SemesterSettings({ sem, onBack }: { sem: Semester; onBack: () => void }
             onBack()
           }}
         >保存</PrimaryButton>
+      </div>
+    </SubPage>
+  )
+}
+
+/* 新学期：当前学期连课表封存进往期，作息、待办、偏好带到新学期，完成后直接进导入 */
+function NewSemesterPage({ sem, onBack, onDone }: { sem: Semester; onBack: () => void; onDone: () => void }) {
+  const state = useStore()
+  const [date, setDate] = useState(() => mondayOf(todayStr()))
+  const start = mondayOf(date)
+  const [name, setName] = useState(() => guessSemesterName(start))
+  const [named, setNamed] = useState(false)
+  const [weeks, setWeeks] = useState(sem.totalWeeks)
+  const shown = named ? name : guessSemesterName(start)
+  const keep = state.courses.length > 0 || state.entries.length > 0
+  const live = liveCount({ ...state, semester: sem })
+
+  return (
+    <SubPage title="新学期" sub={keep ? `${sem.name} 封存至往期，${live} 门课` : undefined} onBack={onBack}>
+      <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
+        <Field k="名称"><TextInput value={shown} onChange={(e) => { setNamed(true); setName(e.target.value) }} /></Field>
+        <Field k="开学" sub={`第 1 周 ${md(start)} 周一`}><DateInput value={date} onChange={setDate} /></Field>
+        <Field k="总周数"><TextInput type="number" min={1} max={64} value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} /></Field>
+      </div>
+      <div className="mt-2.5 rounded-[16px] bg-(--c-surface) px-4 py-3.5 text-[12.5px] font-medium text-(--c-ink3)">
+        {keep ? '往期学期仍可在「学期」中查看与分享；作息时间与待办保留。' : '作息时间与待办保留。'}
+      </div>
+
+      <div className="mt-8">
+        <PrimaryButton
+          onClick={() => {
+            store.startSemester({
+              ...sem,
+              id: uid(),
+              name: shown.trim() || guessSemesterName(start),
+              startDate: start,
+              totalWeeks: Math.min(64, Math.max(1, weeks)),
+              vacations: [],
+              examWeeks: [],
+            })
+            void syncWidgets()
+            onDone()
+          }}
+        >开始新学期</PrimaryButton>
       </div>
     </SubPage>
   )
@@ -2168,6 +2274,7 @@ type Route =
   | { k: 'eduFail'; info: EduFailInfo }
   | { k: 'rule'; rule: RuleManifest | null }
   | { k: 'semester' }
+  | { k: 'newSemester' }
   | { k: 'schedule' }
   | { k: 'history' }
   | { k: 'trash' }
@@ -2222,6 +2329,13 @@ export default function RealApp() {
   const [stack, setStack] = useState<Route[]>([])
   const [menu, setMenu] = useState<{ occ: Occurrence; anchor: Rect; ghost: Ghost } | null>(null)
   const [searching, setSearching] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  /* 导出：有往期学期时先选学期，否则直接分享当前 */
+  const share = () => {
+    if (!store.state.semester) { nativeToast('先设置学期'); return }
+    if (store.state.archives.length > 0) setSharing(true)
+    else void shareIcs()
+  }
   const [compose, setCompose] = useState<{ courseId?: string } | null>(null)
   const [, tick] = useState(0)
 
@@ -2524,7 +2638,9 @@ export default function RealApp() {
       case 'rule':
         return <RuleEditorPage key={key} rule={r.rule} onBack={pop} />
       case 'semester':
-        return <SemesterSettings key={key} sem={snap.semester} onBack={pop} />
+        return <SemesterSettings key={key} sem={snap.semester} onBack={pop} onNew={() => push({ k: 'newSemester' })} />
+      case 'newSemester':
+        return <NewSemesterPage key={key} sem={snap.semester} onBack={pop} onDone={() => setStack([{ k: 'import' }])} />
       case 'schedule':
         return <SchedulePage key={key} sem={snap.semester} onBack={pop} />
       case 'history':
@@ -2603,6 +2719,7 @@ export default function RealApp() {
               onImport={() => push({ k: 'import' })}
               onManual={() => push({ k: 'manual' })}
               onSemester={() => push({ k: 'semester' })}
+              onNewSemester={() => push({ k: 'newSemester' })}
               onCapture={openCapture}
             />
           )}
@@ -2626,9 +2743,22 @@ export default function RealApp() {
               onText={() => setCompose({})}
             />
           )}
-          {tab === 3 && <MeView onPage={(p) => { if (p === 'share') void shareIcs().then((ok) => { if (!ok) nativeToast('先设置学期') }); else push({ k: p } as Route) }} />}
+          {tab === 3 && <MeView onPage={(p) => { if (p === 'share') share(); else push({ k: p } as Route) }} />}
         </motion.div>
       </AnimatePresence>
+
+      {sharing && (
+        <ActionSheet
+          title="分享哪个学期"
+          groups={[
+            snap ? [{ title: snap.semester.name, value: `${liveCount(snap)} 门课 · 当前`, icon: ICON.calendar, onClick: () => void shareIcs(snap) }] : [],
+            [...store.state.archives].reverse().map((a) => ({
+              title: a.semester.name, value: `${liveCount(a)} 门课 · ${md(a.semester.startDate)} 开学`, icon: ICON.book, onClick: () => void shareIcs(a),
+            })),
+          ]}
+          onClose={() => setSharing(false)}
+        />
+      )}
 
       {/* 搜索：盖在 Tab 上的浮层（淡入带一点上浮），位于内页之下：从搜索点进课程再返回，回到的是搜索 */}
       <AnimatePresence>
