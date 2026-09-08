@@ -1481,6 +1481,7 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, sy
               <div className="mt-6">
                 <div className="flex items-baseline gap-4 px-1 text-[12.5px] font-semibold tabular-nums">
                   {preview.added.length > 0 && <span className="text-(--c-accent)">新增 {preview.added.length}</span>}
+                  {preview.changed.length > 0 && <span className="text-(--c-ink)">调整 {preview.changed.length}</span>}
                   {preview.unchanged > 0 && <span className="text-(--c-ink3)">不变 {preview.unchanged}</span>}
                   {preview.protectedKept.length > 0 && <span className="text-(--c-ink3)">保留改动 {preview.protectedKept.length}</span>}
                   {preview.removed.length > 0 && <span className="text-(--c-danger)">消失 {preview.removed.length}</span>}

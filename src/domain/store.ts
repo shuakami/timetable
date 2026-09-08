@@ -4,7 +4,7 @@ import type {
 import { WIDGET_STYLES, defaultPrefs } from './types'
 import type { Snapshot } from './engine'
 import type { NormalizedCourse, ImportDiff } from './importer'
-import { diffImport } from './importer'
+import { diffImport, matchImport, pairRules } from './importer'
 import { BUILTIN_RULES, type RuleManifest } from './rules'
 
 /* 本地权威存储。真相全部在内存 State，持久化通过 Persistence 适配器：
@@ -15,7 +15,11 @@ export interface SemesterArchive extends Snapshot {
   archivedAt: number
 }
 
+/** 持久化结构版本，`hydrate` 按它做一次性迁移 */
+export const STATE_VERSION = 2
+
 export interface State {
+  version?: number
   semester: Semester | null
   archives: SemesterArchive[]
   courses: Course[]
@@ -32,6 +36,7 @@ export interface State {
 
 export function emptyState(): State {
   return {
+    version: STATE_VERSION,
     semester: null, archives: [], courses: [], rules: [], overrides: [], entries: [],
     batches: [], changes: [], userEditedCourseIds: [], savedRules: [...BUILTIN_RULES], tasks: [],
     prefs: defaultPrefs(),
@@ -64,6 +69,19 @@ export function hydrate(s: State): State {
   if (!s.tasks) s.tasks = []
   for (const t of s.tasks) if (!t.photos) t.photos = []
   s.prefs = hydratePrefs(s.prefs)
+  if ((s.version ?? 1) < 2) {
+    // v1 身份键带 星期|起始节，去掉后才能和新导入对上
+    const strip = (c: Course) => { c.identityKey = c.identityKey.replace(/\|\d+\|\d+$/, '') }
+    s.courses.forEach(strip)
+    for (const a of s.archives) a.courses.forEach(strip)
+  }
+  const dropOrphans = (snap: Pick<Snapshot, 'rules' | 'overrides'>) => {
+    const ruleIds = new Set(snap.rules.map((r) => r.id))
+    snap.overrides = snap.overrides.filter((o) => ruleIds.has(o.ruleId))
+  }
+  dropOrphans(s)
+  s.archives.forEach(dropOrphans)
+  s.version = STATE_VERSION
   return s
 }
 
@@ -308,52 +326,64 @@ export class Store {
   }
 
   previewImport(incoming: NormalizedCourse[]): ImportDiff {
-    return diffImport(this.state.courses, incoming, new Set(this.state.userEditedCourseIds))
+    return diffImport(this.state.courses, incoming, new Set(this.state.userEditedCourseIds), this.state.rules)
   }
 
   /** 事务式导入：全部计算完成后一次性替换状态。三方合并：
       - 用户改过的课保留用户字段，只更新排课规则
-      - 本次消失的标 removedByImport，不物理删除
-      - UserEntry / Override 永不触碰 */
+      - 规则尽量沿用旧 id（同星期同节次优先），挂在上面的 Override 和变更记录继续有效；
+        没有接班规则的 Override 随课次一起去掉
+      - 本次消失的标 removedByImport，不物理删除，规则和 Override 保留
+      - UserEntry 永不触碰 */
   applyImport(incoming: NormalizedCourse[], batch: Omit<ImportBatch, 'added' | 'updated' | 'removed'>): ImportDiff {
     const diff = this.previewImport(incoming)
     const edited = new Set(this.state.userEditedCourseIds)
-    const exByName = new Map(this.state.courses.filter((c) => c.source === 'import').map((c) => [c.identityKey, c]))
+    const matched = matchImport(this.state.courses, incoming)
+    const kept = new Set(matched.values())
+    const importIds = new Set(this.state.courses.filter((c) => c.source === 'import').map((c) => c.id))
 
     const courses: Course[] = this.state.courses.filter((c) => c.source !== 'import')
-    let rules: SessionRule[] = this.state.rules.filter((r) => {
-      const c = this.state.courses.find((x) => x.id === r.courseId)
-      return c?.source !== 'import'
-    })
+    const rules: SessionRule[] = this.state.rules.filter((r) => !importIds.has(r.courseId))
+    const liveRuleIds = new Set(rules.map((r) => r.id))
     let updated = 0
 
     for (const nc of incoming) {
-      const k = nc.course.identityKey
-      const ex = exByName.get(k)
+      const ex = matched.get(nc)
       let course: Course
+      let oldRules: SessionRule[] = []
       if (ex) {
         course = edited.has(ex.id)
           ? { ...ex, teacherPhone: ex.teacherPhone ?? nc.course.teacherPhone, removedByImport: false } // 保留用户值
           : { ...ex, ...nc.course, id: ex.id, semesterId: ex.semesterId, removedByImport: false }
+        oldRules = this.state.rules.filter((r) => r.courseId === ex.id)
         updated++
-        exByName.delete(k)
       } else {
         course = { ...nc.course, id: uid(), semesterId: this.state.semester?.id ?? '' }
       }
       courses.push(course)
-      for (const r of nc.rules) rules.push({ ...r, id: uid(), courseId: course.id })
+      const pairs = pairRules(oldRules, nc.rules)
+      for (const r of nc.rules) {
+        const id = pairs.get(r)?.id ?? uid()
+        rules.push({ ...r, id, courseId: course.id })
+        liveRuleIds.add(id)
+      }
     }
-    // 消失的
-    for (const c of exByName.values()) {
+    // 消失的：课、规则、Override 原样保留以便恢复
+    for (const c of this.state.courses) {
+      if (c.source !== 'import' || kept.has(c)) continue
       courses.push({ ...c, removedByImport: true, hidden: true })
-      // 保留其旧规则以便恢复
-      rules = [...rules, ...this.state.rules.filter((r) => r.courseId === c.id)]
+      for (const r of this.state.rules) {
+        if (r.courseId !== c.id) continue
+        rules.push(r)
+        liveRuleIds.add(r.id)
+      }
     }
+    const overrides = this.state.overrides.filter((o) => liveRuleIds.has(o.ruleId))
 
     const fullBatch: ImportBatch = {
       ...batch, added: diff.added.length, updated, removed: diff.removed.length,
     }
-    this.state = { ...this.state, courses, rules, batches: [...this.state.batches, fullBatch] }
+    this.state = { ...this.state, courses, rules, overrides, batches: [...this.state.batches, fullBatch] }
     this.commit()
     return diff
   }

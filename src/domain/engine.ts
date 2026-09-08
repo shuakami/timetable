@@ -131,8 +131,15 @@ export function occurrencesInWeek(snap: Snapshot, week: number): Map<number, Occ
   return m
 }
 
-/** 课程身份键：跨导入认出同一门课 */
-export function identityKey(name: string, teacher: string | undefined, weekday: number, startPeriod: number): string {
-  const norm = (s: string) => s.replace(/\s+/g, '').replace(/[（(].*?[)）]/g, (x) => x)
-  return [norm(name), teacher ? norm(teacher) : '', weekday, startPeriod].join('|')
+const normIdent = (s: string) => s.replace(/\s+/g, '')
+
+/** 课程身份键：跨导入认出同一门课。只看课名与教师，排课变动不改变身份 */
+export function identityKey(name: string, teacher: string | undefined): string {
+  return [normIdent(name), teacher ? normIdent(teacher) : ''].join('|')
+}
+
+/** 身份键里的课名部分，用于教师缺省或变动时按课名兜底匹配 */
+export function identityName(key: string): string {
+  const i = key.lastIndexOf('|')
+  return i < 0 ? key : key.slice(0, i)
 }

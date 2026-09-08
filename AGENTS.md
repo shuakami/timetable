@@ -53,7 +53,7 @@
 | 课程详情/编辑/冲突/变更/手动添加/搜索 | `src/app/pages.tsx` |
 | 首次引导 | `src/app/Onboarding.tsx` |
 | 公共组件、动效常量 | `src/app/ui.tsx` |
-| 原生桥（对话框、Toast、返回键、小组件） | `src/app/native.ts`、`src/app/widgets.ts`、`android/.../WidgetBridge.java`、`MainActivity.java` |
+| 原生桥（对话框、Toast、返回键、小组件） | `src/app/widgets.ts`、`android/.../WidgetBridge.java`、`MainActivity.java` |
 | 周次/节次/冲突算法 | `src/domain/engine.ts`、`weeks.ts`、`dates.ts` |
 | 导入解析、诊断、normalize | `src/domain/importer.ts`、`importers/*`、`rules.ts` |
 | 教务导入（选学校/内置浏览器/未识别页） | `src/app/edu.tsx`、`src/app/edu-browser.ts`、`src/domain/edu/*`、`android/.../TtEdu.java` |
@@ -72,9 +72,7 @@
 ### 验证
 
 ```bash
-npx tsc --noEmit
-npx vitest run
-npm run build
+npm run check          # = tsc --noEmit && vitest run && vite build
 npx cap sync android
 cd android && ./gradlew assembleDebug
 ```

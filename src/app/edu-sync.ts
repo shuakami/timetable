@@ -9,8 +9,7 @@ import type { School } from '../domain/edu/schools'
 import { detectSystem, isTimetablePage } from '../domain/edu/systems'
 import { parseZfKbList, termLabel, type ZfKb, type ZfTerm } from '../domain/edu/zhengfang'
 import { parseHtml } from '../domain/importers/html'
-import { diffImport, normalize, type NormalizedCourse, type RuleOutput } from '../domain/importer'
-import type { SessionRule } from '../domain/types'
+import { normalize, type NormalizedCourse, type RuleOutput } from '../domain/importer'
 import { uid } from '../domain/store'
 import { store } from './store'
 import { extendGrid, semesterEnded } from './semester'
@@ -162,29 +161,10 @@ function waitPage(): Promise<EduBgNav> {
   })
 }
 
-const sig = (r: Pick<SessionRule, 'weekday' | 'startPeriod' | 'endPeriod' | 'weeksMask' | 'location'>) =>
-  `${r.weekday}:${r.startPeriod}-${r.endPeriod}:${r.weeksMask}:${r.location ?? ''}`
-
 /** 和当前课表相比会变的处数：新增、消失、恢复、排课变化、老师变化（用户改过的课不算） */
 export function countChanges(incoming: NormalizedCourse[]): number {
-  const st = store.state
-  const edited = new Set(st.userEditedCourseIds)
-  const ex = new Map(st.courses.filter((c) => c.source === 'import').map((c) => [c.identityKey, c]))
-  const diff = diffImport(st.courses, incoming, edited)
-  let n = diff.added.length + diff.removed.length
-  for (const nc of incoming) {
-    const c = ex.get(nc.course.identityKey)
-    if (!c) continue
-    if (c.removedByImport) {
-      n++
-      continue
-    }
-    const a = st.rules.filter((r) => r.courseId === c.id).map(sig).sort().join('|')
-    const b = nc.rules.map(sig).sort().join('|')
-    if (a !== b) n++
-    else if (!edited.has(c.id) && (c.teacher ?? '') !== (nc.course.teacher ?? '')) n++
-  }
-  return n
+  const diff = store.previewImport(incoming)
+  return diff.added.length + diff.removed.length + diff.changed.length
 }
 
 /** 正方接口在未登录时返回登录页 HTML，JSON 解析失败 */

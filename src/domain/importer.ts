@@ -1,5 +1,5 @@
 import type { Course, Diagnostic, SessionRule, Semester, TimeSlot } from './types'
-import { identityKey } from './engine'
+import { identityKey, identityName } from './engine'
 import { parsePeriodRange, parseWeekExpr } from './weeks'
 import { COURSE_COLORS } from './palette'
 
@@ -70,15 +70,71 @@ export interface CsvMapping {
   delimiter?: string
 }
 
+/** 没指定分隔符时看第一行：逗号 / Tab / 分号里哪个最多 */
+export function detectDelimiter(text: string): string {
+  const first = text.split(/\r?\n/).find((l) => l.trim()) ?? ''
+  let best = ','
+  let n = -1
+  for (const d of [',', '\t', ';']) {
+    const c = first.split(d).length - 1
+    if (c > n) {
+      best = d
+      n = c
+    }
+  }
+  return best
+}
+
+/** RFC 4180：双引号包裹的字段里可含分隔符、换行，"" 表示一个引号；每行一条记录 */
+export function parseCsvRows(text: string, delim: string): { cells: string[]; line: number }[] {
+  const rows: { cells: string[]; line: number }[] = []
+  let cells: string[] = []
+  let cell = ''
+  let quoted = false
+  let line = 1
+  let rowLine = 1
+  const endRow = () => {
+    cells.push(cell)
+    if (cells.some((c) => c.trim())) rows.push({ cells: cells.map((c) => c.trim()), line: rowLine })
+    cells = []
+    cell = ''
+  }
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"'
+          i++
+        } else quoted = false
+      } else {
+        if (ch === '\n') line++
+        cell += ch
+      }
+    } else if (ch === '"' && cell.trim() === '') {
+      cell = ''
+      quoted = true
+    } else if (ch === delim) {
+      cells.push(cell)
+      cell = ''
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++
+      endRow()
+      line++
+      rowLine = line
+    } else cell += ch
+  }
+  endRow()
+  return rows
+}
+
 export function parseCsv(text: string, map: CsvMapping): RuleOutput {
   const diags: Diagnostic[] = []
   const courses: RuleCourse[] = []
-  const delim = map.delimiter ?? ','
-  const lines = text.split(/\r?\n/).filter((l) => l.trim())
-  const rows = lines.slice(map.skipRows ?? 0)
-  rows.forEach((line, i) => {
-    const cells = line.split(delim).map((c) => c.trim())
-    const row = i + (map.skipRows ?? 0) + 1
+  const src = text.replace(/^\uFEFF/, '')
+  const delim = map.delimiter ?? detectDelimiter(src)
+  const rows = parseCsvRows(src, delim).slice(map.skipRows ?? 0)
+  rows.forEach(({ cells, line: row }) => {
     const name = cells[map.name]
     if (!name) {
       diags.push({ level: 'error', code: 'MISSING_NAME', message: `第 ${row} 行缺少课程名`, at: { row } })
@@ -192,9 +248,8 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
       continue
     }
     if (!colorByName.has(rc.name)) colorByName.set(rc.name, rc.color ?? COURSE_COLORS[colorIdx++ % COURSE_COLORS.length])
-    const key = identityKey(rc.name, rc.teacher, rc.weekday, rc.startPeriod)
-    const nameKey = rc.name + '|' + (rc.teacher ?? '')
-    let nc = [...byKey.values()].find((x) => x.course.name + '|' + (x.course.teacher ?? '') === nameKey)
+    const key = identityKey(rc.name, rc.teacher)
+    let nc = byKey.get(key)
     if (!nc) {
       nc = {
         course: {
@@ -225,21 +280,93 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
   return { courses: [...byKey.values()], diagnostics: diags }
 }
 
+/* ---------- 跨导入匹配 ---------- */
+
+/** 本次导入的课 → 库里已有的同一门课。先按身份键，再按课名兜底（两边都只有一门同名课时） */
+export function matchImport(existing: Course[], incoming: NormalizedCourse[]): Map<NormalizedCourse, Course> {
+  const matched = new Map<NormalizedCourse, Course>()
+  const free = new Map(existing.filter((c) => c.source === 'import').map((c) => [c.identityKey, c]))
+  const rest: NormalizedCourse[] = []
+  for (const nc of incoming) {
+    const ex = free.get(nc.course.identityKey)
+    if (ex) {
+      matched.set(nc, ex)
+      free.delete(nc.course.identityKey)
+    } else rest.push(nc)
+  }
+  const count = (keys: Iterable<string>) => {
+    const m = new Map<string, number>()
+    for (const k of keys) m.set(identityName(k), (m.get(identityName(k)) ?? 0) + 1)
+    return m
+  }
+  const inNames = count(rest.map((nc) => nc.course.identityKey))
+  const exNames = count(free.keys())
+  for (const nc of rest) {
+    const name = identityName(nc.course.identityKey)
+    if (inNames.get(name) !== 1 || exNames.get(name) !== 1) continue
+    const ex = [...free.values()].find((c) => identityName(c.identityKey) === name)!
+    matched.set(nc, ex)
+    free.delete(ex.identityKey)
+  }
+  return matched
+}
+
+export const ruleSignature = (r: Pick<SessionRule, 'weekday' | 'startPeriod' | 'endPeriod' | 'weeksMask' | 'location'>) =>
+  `${r.weekday}:${r.startPeriod}-${r.endPeriod}:${r.weeksMask}:${r.location ?? ''}`
+
+/** 给本次导入的每条规则找旧规则接班（沿用 id，Override / 变更记录不失联）：
+    先同星期同节次，再同星期同起始节，最后同星期里起始节最近的；一条旧规则只接一次 */
+export function pairRules<T extends Pick<SessionRule, 'weekday' | 'startPeriod' | 'endPeriod'>>(
+  oldRules: SessionRule[], newRules: T[],
+): Map<T, SessionRule> {
+  const out = new Map<T, SessionRule>()
+  const free = new Set(oldRules)
+  const passes: ((a: T, b: SessionRule) => boolean)[] = [
+    (a, b) => a.weekday === b.weekday && a.startPeriod === b.startPeriod && a.endPeriod === b.endPeriod,
+    (a, b) => a.weekday === b.weekday && a.startPeriod === b.startPeriod,
+    (a, b) => a.weekday === b.weekday,
+  ]
+  for (const ok of passes) {
+    for (const nr of newRules) {
+      if (out.has(nr)) continue
+      let best: SessionRule | undefined
+      for (const or of free) {
+        if (!ok(nr, or)) continue
+        if (!best || Math.abs(or.startPeriod - nr.startPeriod) < Math.abs(best.startPeriod - nr.startPeriod)) best = or
+      }
+      if (best) {
+        out.set(nr, best)
+        free.delete(best)
+      }
+    }
+  }
+  return out
+}
+
 /* ---------- 简化 diff：只列会变的 ---------- */
 
 export interface ImportDiff {
   added: NormalizedCourse[]
   removed: Course[] // 本次导入里消失的（标 removedByImport，不物理删）
+  changed: Course[] // 还在，但排课或教师有变（含上次消失这次又出现的）
   protectedKept: Course[] // 用户改过、本次保留用户值的
   unchanged: number
 }
 
-export function diffImport(existing: Course[], incoming: NormalizedCourse[], userEditedIds: Set<string>): ImportDiff {
-  const exByKey = new Map(existing.filter((c) => c.source === 'import').map((c) => [c.identityKey, c]))
-  const inKeys = new Set(incoming.map((c) => c.course.identityKey))
-  const added = incoming.filter((c) => !exByKey.has(c.course.identityKey))
-  const removed = [...exByKey.values()].filter((c) => !inKeys.has(c.identityKey))
-  const protectedKept = existing.filter((c) => userEditedIds.has(c.id) && inKeys.has(c.identityKey))
-  const unchanged = incoming.length - added.length - protectedKept.length
-  return { added, removed, protectedKept, unchanged: Math.max(0, unchanged) }
+export function diffImport(existing: Course[], incoming: NormalizedCourse[], userEditedIds: Set<string>, rules: SessionRule[] = []): ImportDiff {
+  const matched = matchImport(existing, incoming)
+  const kept = new Set(matched.values())
+  const added = incoming.filter((c) => !matched.has(c))
+  const removed = existing.filter((c) => c.source === 'import' && !kept.has(c))
+  const changed: Course[] = []
+  const protectedKept: Course[] = []
+  for (const [nc, ex] of matched) {
+    const edited = userEditedIds.has(ex.id)
+    if (edited) protectedKept.push(ex)
+    const before = rules.filter((r) => r.courseId === ex.id).map(ruleSignature).sort().join('|')
+    const after = nc.rules.map(ruleSignature).sort().join('|')
+    if (ex.removedByImport || before !== after || (!edited && (ex.teacher ?? '') !== (nc.course.teacher ?? ''))) changed.push(ex)
+  }
+  const touched = new Set([...changed, ...protectedKept]).size
+  return { added, removed, changed, protectedKept, unchanged: Math.max(0, matched.size - touched) }
 }

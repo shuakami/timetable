@@ -2,7 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import Prototype from './App'
 import { initStore } from './app/store'
-import { setupNative } from './app/native'
 import { initTheme } from './app/theme'
 import { notifyWebReady } from './app/widgets'
 import './index.css'
@@ -13,7 +12,6 @@ const onboardStep = params.get('onboardStep')
 
 async function boot() {
   initTheme()
-  await setupNative()
   await initStore()
   const root = ReactDOM.createRoot(document.getElementById('root')!)
   if (onboardStep != null) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Semester } from '../types'
 import { dateOf, weekOf, weekdayOf, inVacation } from '../dates'
-import { firstClassDate, occurrencesOn, identityKey, type Snapshot } from '../engine'
+import { firstClassDate, occurrencesOn, identityKey, identityName, type Snapshot } from '../engine'
 import { weeksToMask } from '../weeks'
 
 const sem: Semester = {
@@ -121,10 +121,15 @@ describe('occurrencesOn', () => {
 
 describe('identityKey', () => {
   it('stable across whitespace', () => {
-    expect(identityKey('高等 数学', '王立群', 1, 1)).toBe(identityKey('高等数学', '王 立群', 1, 1))
+    expect(identityKey('高等 数学', '王立群')).toBe(identityKey('高等数学', '王 立群'))
   })
   it('differs by teacher', () => {
-    expect(identityKey('高数', '甲', 1, 1)).not.toBe(identityKey('高数', '乙', 1, 1))
+    expect(identityKey('高数', '甲')).not.toBe(identityKey('高数', '乙'))
+  })
+  it('没有教师时键以 | 结尾，课名部分可取回', () => {
+    expect(identityKey('高数', undefined)).toBe('高数|')
+    expect(identityName(identityKey('高数', '甲'))).toBe('高数')
+    expect(identityName(identityKey('高数', undefined))).toBe('高数')
   })
 })
 

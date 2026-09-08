@@ -94,9 +94,7 @@ npm run dev            # http://localhost:5173，浏览器直接调试 Web 端
 完整验证：
 
 ```bash
-npx tsc --noEmit
-npx vitest run
-npm run build
+npm run check          # tsc --noEmit && vitest run && vite build
 ```
 
 Android debug 包：

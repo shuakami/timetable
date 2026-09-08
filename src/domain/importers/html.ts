@@ -60,8 +60,10 @@ export function extractTable(html: string, tableIndex = 0): string[][] {
   return grid
 }
  
+/** 格内文本：一行一段，空行丢掉；只有连续两个以上 <br> 才留一个空行，作为格内多门课的分隔 */
 function cellText(inner: string): string {
   return inner
+    .replace(/(?:<br\s*\/?\s*>\s*){2,}/gi, '\n\x00\n')
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
@@ -73,6 +75,7 @@ function cellText(inner: string): string {
     .map((l) => l.trim())
     .filter(Boolean)
     .join('\n')
+    .replace(/\x00/g, '')
 }
  
 export interface HtmlTableOptions {

@@ -5,6 +5,7 @@ import type { IcsSemester } from '../ics'
 
 /* ICS 日历导入：VEVENT → 课程。
    - DTSTART/DTEND 定位星期与节次（按节次表就近对齐）
+   - 时区：浮动时间按墙钟；UTC（Z）和带 TZID 的换算到设备时区；TZID 不认识的按墙钟
    - RRULE FREQ=WEEKLY（INTERVAL/UNTIL/COUNT）展开为周次，EXDATE 挖掉
    - 无 RRULE 的按单次事件，落在哪周就是哪周
    - 课程表自己导出的文件头里带学期与节次表（X-TT-SEMESTER），按它对齐 */
@@ -14,9 +15,11 @@ interface VEvent {
   location?: string
   description?: string
   dtstart?: string
+  dtstartTz?: string
   dtend?: string
+  dtendTz?: string
   rrule?: string
-  exdate?: string[]
+  exdate?: { v: string; tzid?: string }[]
   status?: string
   color?: string
 }
@@ -39,7 +42,8 @@ export function parseIcsFile(text: string): { events: VEvent[]; semester?: IcsSe
     } else {
       const idx = line.indexOf(':')
       if (idx < 0) continue
-      const key = line.slice(0, idx).split(';')[0].toUpperCase()
+      const [key, ...params] = line.slice(0, idx).split(';').map((s, i) => (i === 0 ? s.toUpperCase() : s))
+      const tzid = params.find((p) => /^TZID=/i.test(p))?.slice(5).replace(/^"|"$/g, '')
       const val = line.slice(idx + 1).trim()
       if (!cur) {
         if (key === 'X-TT-SEMESTER') semester = parseSemester(unescapeIcs(val))
@@ -48,10 +52,14 @@ export function parseIcsFile(text: string): { events: VEvent[]; semester?: IcsSe
       if (key === 'SUMMARY') cur.summary = unescapeIcs(val)
       else if (key === 'LOCATION') cur.location = unescapeIcs(val)
       else if (key === 'DESCRIPTION') cur.description = unescapeIcs(val)
-      else if (key === 'DTSTART') cur.dtstart = val
-      else if (key === 'DTEND') cur.dtend = val
-      else if (key === 'RRULE') cur.rrule = val
-      else if (key === 'EXDATE') cur.exdate = [...(cur.exdate ?? []), ...val.split(',')]
+      else if (key === 'DTSTART') {
+        cur.dtstart = val
+        cur.dtstartTz = tzid
+      } else if (key === 'DTEND') {
+        cur.dtend = val
+        cur.dtendTz = tzid
+      } else if (key === 'RRULE') cur.rrule = val
+      else if (key === 'EXDATE') cur.exdate = [...(cur.exdate ?? []), ...val.split(',').map((v) => ({ v, tzid }))]
       else if (key === 'STATUS') cur.status = val.toUpperCase()
       else if (key === 'X-TT-COLOR') cur.color = /^#[0-9a-f]{6}$/i.test(val) ? val : undefined
     }
@@ -78,14 +86,38 @@ function unescapeIcs(s: string): string {
   return s.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\')
 }
 
-/** '20250901T080000' / '20250901' → { date, minutes } （忽略时区，按本地墙钟） */
-function parseIcsDt(v: string): { date: string; minutes: number } | null {
-  const m = v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?)?/)
-  if (!m) return null
-  return {
-    date: `${m[1]}-${m[2]}-${m[3]}`,
-    minutes: m[4] ? parseInt(m[4], 10) * 60 + parseInt(m[5], 10) : 0,
+const localTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone
+
+/** 某一瞬间在时区 tz 的偏移（分）；tz 不认识返回 null */
+function tzOffset(tz: string, utcMs: number): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+    }).formatToParts(new Date(utcMs))
+    const n = (t: string) => parseInt(parts.find((p) => p.type === t)?.value ?? '0', 10)
+    return Math.round((Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'), n('second')) - utcMs) / 60000)
+  } catch {
+    return null
   }
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const fromLocal = (d: Date) => ({ date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, minutes: d.getHours() * 60 + d.getMinutes() })
+
+/** '20250901T080000' / '20250901T000000Z' / '20250901' → 设备时区的 { date, minutes }。
+    浮动时间和 TZID 不认识（或就是设备时区）的按墙钟；Z 和其他 TZID 换算；纯日期不动 */
+export function parseIcsDt(v: string, tzid?: string): { date: string; minutes: number } | null {
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/)
+  if (!m) return null
+  const wall = { date: `${m[1]}-${m[2]}-${m[3]}`, minutes: m[4] ? parseInt(m[4], 10) * 60 + parseInt(m[5], 10) : 0 }
+  if (!m[4]) return wall
+  const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], m[6] ? +m[6] : 0)
+  if (m[7]) return fromLocal(new Date(asUtc))
+  if (!tzid || tzid === localTz()) return wall
+  const off = tzOffset(tzid, asUtc)
+  if (off == null) return wall
+  const off2 = tzOffset(tzid, asUtc - off * 60000) ?? off
+  return fromLocal(new Date(asUtc - off2 * 60000))
 }
 
 /** 时间 → 节次：起点取覆盖 start 的节（否则其后第一节），终点取覆盖 end 的节（否则其前最后一节） */
@@ -111,8 +143,8 @@ export function parseIcs(text: string, current: Semester): RuleOutput {
     if (!ev.summary || !ev.dtstart) continue
     // 全天事件（周次标记之类）和已取消的不是课
     if (!ev.dtstart.includes('T') || ev.status === 'CANCELLED') continue
-    const st = parseIcsDt(ev.dtstart)
-    const en = ev.dtend ? parseIcsDt(ev.dtend) : null
+    const st = parseIcsDt(ev.dtstart, ev.dtstartTz)
+    const en = ev.dtend ? parseIcsDt(ev.dtend, ev.dtendTz) : null
     if (!st) {
       diags.push({ level: 'error', code: 'BAD_DTSTART', message: `「${ev.summary}」开始时间无法解析`, at: { snippet: ev.dtstart } })
       continue
@@ -148,11 +180,11 @@ export function parseIcs(text: string, current: Semester): RuleOutput {
   }
 }
 
-function expandWeeks(sem: Semester, startDate: string, rrule?: string, exdate?: string[]): number[] {
+function expandWeeks(sem: Semester, startDate: string, rrule?: string, exdate?: { v: string; tzid?: string }[]): number[] {
   const w0 = weekOf(sem, startDate)
   const inTerm = (w: number) => w >= 1 && w <= sem.totalWeeks
   if (!rrule) return inTerm(w0) ? [w0] : []
-  const skip = new Set((exdate ?? []).map(parseIcsDt).filter((x): x is { date: string; minutes: number } => x != null).map((x) => weekOf(sem, x.date)))
+  const skip = new Set((exdate ?? []).map((d) => parseIcsDt(d.v, d.tzid)).filter((x): x is { date: string; minutes: number } => x != null).map((x) => weekOf(sem, x.date)))
   const parts = Object.fromEntries(rrule.split(';').map((p) => p.split('=') as [string, string]))
   if ((parts.FREQ ?? '').toUpperCase() !== 'WEEKLY') return inTerm(w0) ? [w0] : []
   const interval = parseInt(parts.INTERVAL ?? '1', 10) || 1
