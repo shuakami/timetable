@@ -1216,16 +1216,16 @@ function AiImportPage({ onBack, onNext, attach }: { onBack: () => void; onNext: 
         <TopBar title="让 AI 转换课表" sub={attach ? '复制这段 Prompt（已附上课表页面文字）交给任意 AI，输出后粘贴即可' : '复制这段 Prompt 连同课表交给任意 AI，输出后粘贴即可'} onBack={onBack} />
 
         <div className="relative mt-6 rounded-[16px] bg-(--c-surface) px-4 py-4">
-          <button onClick={copy} className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full transition-opacity active:opacity-60">
+          <button onClick={copy} className="absolute top-1.5 right-1.5 flex h-10 w-10 items-center justify-center rounded-full transition-opacity active:opacity-60">
             {copied ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-accent)' }} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-accent)' }} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink2)' }} strokeWidth="1.9"><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-6A3.5 3.5 0 0 0 3 6.5v6A2.5 2.5 0 0 0 5.5 15" /></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--c-ink2)' }} strokeWidth="1.9"><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-6A3.5 3.5 0 0 0 3 6.5v6A2.5 2.5 0 0 0 5.5 15" /></svg>
             )}
           </button>
           <div className="relative h-[168px] overflow-hidden">
             {lines.map((line, i) => (
-              <div key={i} className="pr-8 font-mono text-[11.5px] leading-[1.95]">
+              <div key={i} className="pr-10 font-mono text-[11.5px] leading-[1.95]">
                 {line === '' ? '\u00a0' : promptTokens(line).map(([t, c], j) => (
                   <span
                     key={j}
