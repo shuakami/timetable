@@ -31,6 +31,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
+import androidx.webkit.CustomHeader;
+import androidx.webkit.Profile;
 import androidx.webkit.ProfileStore;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
@@ -46,8 +48,11 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * 教务导入用的内置浏览器。
@@ -62,6 +67,11 @@ import java.util.Locale;
  * 页面里的脚本只在用户点「导入」等操作时通过 eval 注入，结果经 TtBridge.post 回传。
  * <p>
  * 自动更新用另一个不可见的 WebView（bg*）：同一 Profile 打开课表页，页面完成后由 JS 侧决定是否还在登录态并注入同一套脚本。
+ * <p>
+ * 请求头：WebView 会给每个请求补一个 X-Requested-With: 应用包名，没有关闭它的接口。强智等教务把带这个头的请求
+ * 一律当 AJAX：未登录时不跳登录页而是直接回一段 JSON（还没有 Content-Type，页面上就是乱码）。WebView 只在请求
+ * 没带该头时才补包名，所以这里给它一个空值，服务器看到的就与普通浏览器一致：支持 CUSTOM_REQUEST_HEADERS 的 WebView
+ * 用 Profile 的自定义请求头覆盖该学校的全部请求；老 WebView 退回到在 shouldOverrideUrlLoading 里把主文档导航带头重发。
  */
 @CapacitorPlugin(name = "TtEdu")
 public class TtEdu extends Plugin {
@@ -96,6 +106,72 @@ public class TtEdu extends Plugin {
         density = getContext().getResources().getDisplayMetrics().density;
     }
 
+    private static final String XRW = "X-Requested-With";
+    /** 与 Chromium 一致的重定向上限，防止「重定向到自身」时无限重发 */
+    private static final int MAX_REDIRECTS = 20;
+
+    /** 主文档导航用的请求头；referer 为发起页（WebView 会按默认 referrer policy 裁剪） */
+    private static Map<String, String> navHeaders(String referer) {
+        Map<String, String> h = new HashMap<>();
+        h.put(XRW, "");
+        if (referer != null && (referer.startsWith("http://") || referer.startsWith("https://"))) {
+            h.put("Referer", referer);
+        }
+        return h;
+    }
+
+    private static boolean isHttp(String scheme) {
+        return "http".equals(scheme) || "https".equals(scheme);
+    }
+
+    /**
+     * 给该 Profile 的所有 http(s) 请求（主文档、子框、XHR、POST）带空值 X-Requested-With；页面自己设了的不覆盖。
+     * 需要 WebView 支持 CUSTOM_REQUEST_HEADERS；不支持返回 false，由 {@link NavHeaderClient} 重发主文档导航兼容。
+     */
+    private static boolean profileHeader(String profile) {
+        try {
+            if (!WebViewFeature.isFeatureSupported(WebViewFeature.CUSTOM_REQUEST_HEADERS)) return false;
+            Profile p = ProfileStore.getInstance().getOrCreateProfile(profile);
+            p.addCustomHeader(new CustomHeader(XRW, "", Collections.singleton("*")));
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * shouldOverrideUrlLoading 的公共处理。reissue=true（Profile 请求头不可用）时，页面发起的 http(s) 主文档 GET 导航
+     * （含 POST 登录后的 302）取消掉，换成带 {@link #navHeaders} 的重发；应用自己 loadUrl 的导航 WebView 不会再回调，
+     * 不会递归。非 http(s) 协议一律吞掉（不外跳）。
+     */
+    private static class NavHeaderClient extends WebViewClient {
+        private final boolean reissue;
+        /** 连续重发的重定向次数；非重定向导航或页面完成时归零 */
+        private int redirects;
+
+        NavHeaderClient(boolean reissue) {
+            this.reissue = reissue;
+        }
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+            if (!isHttp(req.getUrl().getScheme())) return true;
+            if (!reissue || !req.isForMainFrame()) return false;
+            if (req.isRedirect()) {
+                if (++redirects > MAX_REDIRECTS) return false;
+            } else {
+                redirects = 0;
+            }
+            view.loadUrl(req.getUrl().toString(), navHeaders(view.getUrl()));
+            return true;
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            redirects = 0;
+        }
+    }
+
     /* ---------------- 页面接口 ---------------- */
 
     /** profile：每所学校一个；keep=true 时不清上次会话（仅多 Profile 可用时生效） */
@@ -111,8 +187,12 @@ public class TtEdu extends Plugin {
         getActivity().runOnUiThread(() -> {
             try {
                 ensureView(profile);
-                if (!(keep && profileName != null)) clearSession(null);
-                web.loadUrl(url);
+                final WebView w = web;
+                Runnable go = () -> {
+                    if (w == web) w.loadUrl(url, navHeaders(null));
+                };
+                if (keep && profileName != null) go.run();
+                else clearSession(go);
                 JSObject o = new JSObject();
                 o.put("persistent", profileName != null);
                 call.resolve(o);
@@ -173,16 +253,20 @@ public class TtEdu extends Plugin {
                 WebView host = bridge.getWebView();
                 ViewGroup parent = (ViewGroup) host.getParent();
                 WebView w = new WebView(getContext());
-                if (profile != null && !profile.isEmpty() && multiProfile()) WebViewCompat.setProfile(w, profile);
+                boolean viaProfile = false;
+                if (profile != null && !profile.isEmpty() && multiProfile()) {
+                    WebViewCompat.setProfile(w, profile);
+                    viaProfile = profileHeader(profile);
+                }
                 configure(w);
                 w.addJavascriptInterface(new Bridge(), "TtBridge");
-                w.setWebViewClient(new BgClient());
+                w.setWebViewClient(new BgClient(!viaProfile));
                 w.setWebChromeClient(new WebChromeClient());
                 w.setVisibility(View.INVISIBLE);
                 DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
                 parent.addView(w, 0, new ViewGroup.LayoutParams(dm.widthPixels, dm.heightPixels));
                 bg = w;
-                w.loadUrl(url);
+                w.loadUrl(url, navHeaders(null));
                 call.resolve();
             } catch (Exception e) {
                 call.reject(String.valueOf(e.getMessage()));
@@ -229,7 +313,7 @@ public class TtEdu extends Plugin {
     public void navigate(PluginCall call) {
         String url = call.getString("url", "");
         getActivity().runOnUiThread(() -> {
-            if (web != null && url != null && !url.isEmpty()) web.loadUrl(url);
+            if (web != null && url != null && !url.isEmpty()) web.loadUrl(url, navHeaders(null));
             call.resolve();
         });
     }
@@ -414,11 +498,13 @@ public class TtEdu extends Plugin {
         container.setPadding(0, Math.max(0, frameTop), 0, Math.max(0, frameBottom));
         web = new WebView(getContext());
         profileName = null;
+        boolean viaProfile = false;
         // Profile 必须在首次导航前指定
         if (profile != null && !profile.isEmpty() && multiProfile()) {
             try {
                 WebViewCompat.setProfile(web, profile);
                 profileName = profile;
+                viaProfile = profileHeader(profile);
             } catch (Exception ignored) {
             }
         }
@@ -426,7 +512,7 @@ public class TtEdu extends Plugin {
         web.setFocusableInTouchMode(true);
         configure(web);
         web.addJavascriptInterface(new Bridge(), "TtBridge");
-        web.setWebViewClient(new Client());
+        web.setWebViewClient(new Client(!viaProfile));
         web.setWebChromeClient(new Chrome());
         container.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -470,18 +556,20 @@ public class TtEdu extends Plugin {
         keep.clear();
     }
 
-    /** 清当前 Profile 的 Cookie（老 WebView 为全局，应用自身不用 Cookie）；有页面在时先清它的本地存储 */
+    /**
+     * 清当前 Profile 的 Cookie（老 WebView 为全局，应用自身不用 Cookie）；有页面在时先清它的本地存储。
+     * then 在 Cookie 真正清完后才跑，随后的 loadUrl 不会带着旧会话发出去。
+     */
     private void clearSession(Runnable then) {
-        if (web != null) {
-            final CookieManager cm = cookies(web);
-            web.evaluateJavascript("try{localStorage.clear();sessionStorage.clear()}catch(e){}", v -> {
-                cm.removeAllCookies(x -> cm.flush());
-                if (then != null) then.run();
-            });
-        } else {
-            CookieManager cm = CookieManager.getInstance();
-            cm.removeAllCookies(x -> cm.flush());
+        final CookieManager cm = web != null ? cookies(web) : CookieManager.getInstance();
+        Runnable cookies = () -> cm.removeAllCookies(x -> {
+            cm.flush();
             if (then != null) then.run();
+        });
+        if (web != null && web.getUrl() != null) {
+            web.evaluateJavascript("try{localStorage.clear();sessionStorage.clear()}catch(e){}", v -> cookies.run());
+        } else {
+            cookies.run();
         }
     }
 
@@ -580,11 +668,9 @@ public class TtEdu extends Plugin {
         notifyListeners("nav", snapshot(loading, progress));
     }
 
-    private final class Client extends WebViewClient {
-        @Override
-        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-            String scheme = req.getUrl().getScheme();
-            return !("http".equals(scheme) || "https".equals(scheme));
+    private final class Client extends NavHeaderClient {
+        Client(boolean reissue) {
+            super(reissue);
         }
 
         @Override
@@ -601,6 +687,7 @@ public class TtEdu extends Plugin {
 
         @Override
         public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
             painted = true;
             emit(false, 100);
         }
@@ -623,11 +710,9 @@ public class TtEdu extends Plugin {
     }
 
     /** 不可见 WebView 的导航：只报主文档完成 / 失败，登录态由 JS 侧按地址与标题判断 */
-    private final class BgClient extends WebViewClient {
-        @Override
-        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-            String scheme = req.getUrl().getScheme();
-            return !("http".equals(scheme) || "https".equals(scheme));
+    private final class BgClient extends NavHeaderClient {
+        BgClient(boolean reissue) {
+            super(reissue);
         }
 
         private void report(WebView view, String error) {
@@ -643,6 +728,7 @@ public class TtEdu extends Plugin {
 
         @Override
         public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
             report(view, null);
         }
 
