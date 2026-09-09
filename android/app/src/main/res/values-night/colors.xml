@@ -2,4 +2,9 @@
 <resources>
     <color name="appBackground">#111214</color>
     <color name="appStatusBar">#111214</color>
+    <color name="widgetSurface">#1C1D21</color>
+    <color name="widgetInk">#F1F1EF</color>
+    <color name="widgetInk3">#8F939C</color>
+    <color name="widgetInk4">#8F939C</color>
+    <color name="widgetAccent">#7C8FF0</color>
 </resources>
