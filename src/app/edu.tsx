@@ -8,6 +8,7 @@ import { SYSTEM_LABEL, detectSystem, hostOf, isTimetablePage, scrubUrl, type Edu
 import { schoolByUrl, searchSchools, urlFromQuery, type School } from '../domain/edu/schools'
 import { zfTermOptions, type PageCapture, type ProbeResult } from '../domain/edu/scripts'
 import { parseZfKbList, termLabel, type ZfTerm } from '../domain/edu/zhengfang'
+import { parseQzTable, qzTermLabel } from '../domain/edu/qiangzhi'
 import { LATEST_RELEASE_API, RELEASES_URL, isNewer, issueUrl } from '../domain/edu/release'
 import { DEBUG_MIME, buildDebugPackage } from '../domain/edu/debug'
 import { edu, nativeEdu, type EduNav } from './edu-browser'
@@ -197,6 +198,7 @@ type Ready =
   | { kind: 'none' }
   | { kind: 'table' }
   | { kind: 'zf'; zf: NonNullable<ProbeResult['zf']>; count: number | null }
+  | { kind: 'qz' }
 
 const HTML_CLASS = 'tt-edu'
 
@@ -274,6 +276,8 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   const onPage = !nav.loading && !nav.error && isTimetablePage(sys, nav.url, nav.title)
   const can = !nav.error && ready.kind !== 'none'
   const showPill = can || !!nav.error
+  /* 页面探测是否已经跑完一轮（强智课表在框架里，提示要等它判定完） */
+  const [probeSettled, setProbeSettled] = useState(false)
 
   /*
    * 原生页面在推入动画期间就开始加载（此时应用仍不透明，看不到它）；
@@ -334,44 +338,63 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     return () => ro.disconnect()
   }, [opened, sheet, menu, showPill, active, departed])
 
-  /* 还没到课表页时不摆胶囊，首次加载完成后用一条 toast 提示去向 */
+  /* 还没到课表页时不摆胶囊，首次加载完成后用一条 toast 提示去向；
+     强智主框架地址不变，「是否课表页」要等框架探测完才知道，提示推迟到那时 */
   const hinted = useRef(false)
   useEffect(() => {
     if (hinted.current || !opened || nav.loading || nav.error || onPage) return
+    if (sys === 'qiangzhi' && (!probeSettled || ready.kind !== 'none')) return
     hinted.current = true
     nativeToast('登录后打开课表页')
-  }, [opened, nav.loading, nav.error, onPage])
+  }, [opened, nav.loading, nav.error, onPage, sys, probeSettled, ready.kind])
 
-  /* 到了课表页：探测页面结构；正方再按当前学期取一次课程数给胶囊 */
+  /* 到了课表页：探测页面结构；正方再按当前学期取一次课程数给胶囊。
+     强智课表在 xsMain.jsp 的同源框架里，主框架地址不变：只要系统是强智就探，
+     并带几次重试等框架加载完（框架慢的话首次探测会扑空）。 */
+  const wantProbe = !nav.loading && !nav.error && (onPage || sys === 'qiangzhi')
   const probed = useRef('')
   useEffect(() => {
-    if (!onPage) {
+    if (!wantProbe) {
       probed.current = ''
+      setProbeSettled(false)
       setReady({ kind: 'none' })
       return
     }
     if (probed.current === nav.url) return
     probed.current = nav.url
+    setProbeSettled(false)
     let alive = true
     void (async () => {
       try {
-        const p = await edu.probe()
-        if (!alive) return
+        const waits = sys === 'qiangzhi' ? [0, 2000, 5000, 9000, 14000] : [0]
+        let p: ProbeResult | null = null
+        for (const w of waits) {
+          if (w) await new Promise((r) => setTimeout(r, w))
+          if (!alive || probed.current !== nav.url) return
+          p = await edu.probe()
+          if (sys !== 'qiangzhi' || p.qz) break
+        }
+        if (!alive || !p) return
         if (p.zf && sys === 'zhengfang_new') {
           setReady({ kind: 'zf', zf: p.zf, count: null })
           const list = await edu.zfFetch(p.zf.sel.xnm, p.zf.sel.xqm)
           if (alive) setReady({ kind: 'zf', zf: p.zf, count: parseZfKbList(list).courses.length })
+        } else if (sys === 'qiangzhi') {
+          /* 强智只认专用课表表：框架里的「我的课表」周视图等其它星期表不走通用解析 */
+          setReady(p.qz ? { kind: 'qz' } : { kind: 'none' })
         } else {
           setReady(p.table ? { kind: 'table' } : { kind: 'none' })
         }
       } catch {
         if (alive) setReady({ kind: 'none' })
+      } finally {
+        if (alive) setProbeSettled(true)
       }
     })()
     return () => {
       alive = false
     }
-  }, [onPage, nav.url, sys])
+  }, [wantProbe, nav.url, sys])
 
   /* 离场：先把学校页面定格贴进洞里，再交给调用方出栈；图解码好了才上屏，避免露一帧底色 */
   const leave = useCallback(async () => {
@@ -446,6 +469,21 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
     }
   }
 
+  const importQz = async () => {
+    setBusy(true)
+    try {
+      const r = await edu.qzTable()
+      const out = parseQzTable(r.html ?? '')
+      if (r.filtered && !r.refetched) out.diagnostics.push({ level: 'warn', code: 'WEEK_FILTERED', message: '周次筛选没有重置成功，课表可能不完整' })
+      if (r.term) out.semester = { name: qzTermLabel(r.term) }
+      await finish(out)
+    } catch {
+      await fail()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const exportDebug = async () => {
     try {
       const [capture, probe] = await Promise.all([edu.capture(), edu.probe().catch(() => null)])
@@ -458,6 +496,7 @@ export function EduBrowserPage({ school, active, onBack, onImport, onFail }: {
   const onImportTap = () => {
     if (busy || ready.kind === 'none') return
     if (ready.kind === 'zf') setSheet(true)
+    else if (ready.kind === 'qz') void importQz()
     else void importGeneric()
   }
 

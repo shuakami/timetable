@@ -10,10 +10,12 @@ export interface ProbeResult {
   table: boolean
   /** 正方新版课表页的学年/学期下拉 */
   zf: { xnm: string[]; xqm: string[]; sel: { xnm: string; xqm: string } } | null
+  /** 强智课表表（#kbtable / .kbcontent）在主文档或同源框架里的位置；没有为 null */
+  qz: { url: string; title: string } | null
 }
 
 export const PROBE_JS = `
-var r = { url: location.href, title: document.title, table: false, zf: null };
+var r = { url: location.href, title: document.title, table: false, zf: null, qz: null };
 var ts = document.getElementsByTagName('table');
 for (var i = 0; i < ts.length; i++) {
   if (/星期|周一|Monday|Mon\\b/i.test(ts[i].innerText || '')) { r.table = true; break; }
@@ -25,6 +27,26 @@ if (xn && xq && xn.tagName === 'SELECT' && xq.tagName === 'SELECT') {
       .filter(function (v) { return v !== ''; });
   };
   r.zf = { xnm: opt(xn), xqm: opt(xq), sel: { xnm: String(xn.value || ''), xqm: String(xq.value || '') } };
+}
+/* 强智教务：课表常在 xsMain.jsp 的同源框架里，主文档地址不变，只能探框架 */
+var qzHit = function (d) {
+  if (!d || !d.querySelector) return false;
+  if (d.querySelector('table#kbtable')) return true;
+  var qts = d.getElementsByTagName('table');
+  for (var j = 0; j < qts.length; j++) {
+    if (qts[j].querySelector('.kbcontent') || qts[j].querySelector('.kbcontent1')) return true;
+  }
+  return false;
+};
+if (qzHit(document)) r.qz = { url: location.href, title: document.title };
+else {
+  var qfs = document.querySelectorAll('iframe,frame');
+  for (var k = 0; k < qfs.length; k++) {
+    try {
+      var qd = qfs[k].contentDocument;
+      if (qd && qzHit(qd)) { r.qz = { url: qd.location.href, title: qd.title || '' }; break; }
+    } catch (e) {}
+  }
 }
 return r;
 `
@@ -49,6 +71,87 @@ return list.map(function (c) { return { kcmc: c.kcmc, xm: c.xm, cdmc: c.cdmc, xq
 
 /** 当前页面 HTML，给通用表格解析 */
 export const PAGE_HTML_JS = `return document.documentElement.outerHTML;`
+
+/**
+ * 强智教务课表提取：在主文档和同源框架里找 `table#kbtable`（退回含 .kbcontent 的表），
+ * 框架可能还在加载，轮询到上限；周次下拉不是「全部」时按表单同款参数重取一遍未筛选课表。
+ * 只读课表结构与下拉值；不读表单输入、不读 Cookie。
+ */
+export interface QzTableResult {
+  /** table#kbtable 的 outerHTML；没找到为 null */
+  html: string | null
+  /** 课表所在框架地址 */
+  url: string
+  title: string
+  /** 学年学期下拉当前选中项文本，如 "2026-2027-1" */
+  term: string
+  /** 页面像登录页（有密码框） */
+  login: boolean
+  /** 周次下拉被筛选过 */
+  filtered: boolean
+  /** 已用未筛选参数重取成功 */
+  refetched: boolean
+}
+
+export const QZ_TABLE_JS = `
+var docs = function () {
+  var out = [document];
+  var fs = document.querySelectorAll('iframe,frame');
+  for (var i = 0; i < fs.length; i++) {
+    try { var d = fs[i].contentDocument; if (d && d.location) out.push(d); } catch (e) {}
+  }
+  return out;
+};
+var findTable = function (d) {
+  var t = d.querySelector('table#kbtable');
+  if (t) return t;
+  var ts = d.getElementsByTagName('table');
+  for (var i = 0; i < ts.length; i++) {
+    if (ts[i].querySelector('.kbcontent') || ts[i].querySelector('.kbcontent1')) return ts[i];
+  }
+  return null;
+};
+var doc = null, tb = null;
+var deadline = Date.now() + 12000;
+for (;;) {
+  var ds = docs();
+  for (var i = 0; i < ds.length; i++) { tb = findTable(ds[i]); if (tb) { doc = ds[i]; break; } }
+  if (tb || Date.now() >= deadline) break;
+  await new Promise(function (r) { setTimeout(r, 400); });
+}
+var out = { html: null, url: location.href, title: document.title, term: '', login: false, filtered: false, refetched: false };
+if (!doc || !tb) {
+  var ls = docs();
+  for (var i = 0; i < ls.length; i++) {
+    try { if (ls[i].querySelector('input[type="password"]')) out.login = true; } catch (e) {}
+  }
+  return out;
+}
+var sel = doc.getElementById ? doc.getElementById('xnxq01id') : null;
+if (sel && sel.options && sel.selectedIndex >= 0) out.term = String(sel.options[sel.selectedIndex].text || '').trim();
+var zc = doc.getElementById ? doc.getElementById('zc') : null;
+out.filtered = !!(zc && zc.value);
+if (out.filtered) {
+  try {
+    var kbj = doc.getElementById('kbjcmsid');
+    var qs = 'zc=&demo=&xnxq01id=' + encodeURIComponent(sel ? sel.value : '') +
+      '&kbjcmsid=' + encodeURIComponent(kbj ? kbj.value : '');
+    var url = doc.location.href;
+    var res = await fetch(url, { method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: qs + '&sfFD=1' });
+    if (!res.ok) res = await fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + qs, { credentials: 'include' });
+    if (res.ok) {
+      var nd = new DOMParser().parseFromString(await res.text(), 'text/html');
+      var nt = findTable(nd);
+      if (nt) { tb = nt; out.refetched = true; }
+    }
+  } catch (e) {}
+}
+out.html = tb.outerHTML;
+out.url = doc.location.href;
+out.title = doc.title || '';
+return out;
+`
 
 /** 页面调试包用：主文档与同源子框架的 HTML、编码、文档类型 */
 export interface PageCapture {

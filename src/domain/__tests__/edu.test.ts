@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { guessTerm, parseJcs, parseZfKbList, termLabel, zcdToWeeks } from '../edu/zhengfang'
+import { parseQzTable, qzTermLabel } from '../edu/qiangzhi'
 import { detectSystem, hostOf, isTimetablePage, scrubUrl } from '../edu/systems'
 import { schoolByUrl, schoolCount, searchSchools, urlFromQuery } from '../edu/schools'
 import { wrapRun, zfTermOptions } from '../edu/scripts'
@@ -168,6 +169,82 @@ describe('非正方系统兜底：页面表格通用解析', () => {
   })
 })
 
+describe('强智教务课表（xskb_list.do / table#kbtable）', () => {
+  /* 按 jw.educationgroup.cn/gzasc_jsxsd 实测结构裁剪：格内 kbcontent(放大)/kbcontent1(缩略) 成对出现，
+     同格多门课用 ---- 分隔；行首是中文数字节次组 */
+  const cell = (id: string, compact: string, expanded: string) => `<td width="123" height="28" align="center" valign="top">
+    <input type="hidden" name="jx0415zbdiv_1" value="${id}-1"><input type="hidden" name="jx0415zbdiv_2" value="${id}-2">
+    <div id="${id}-1" class="kbcontent1" style="display: none;">${compact}</div>
+    <div id="${id}-2" style="" class="kbcontent">${expanded}</div>
+    <div class="kbcontent1 sykb1" style="display: none;"></div>
+    <div class="kbcontent sykb2"></div>
+  </td>`
+  const empty = (id: string) => cell(id, '&nbsp;', '&nbsp;')
+  const course = (name: string, teacher: string, weeks: string, room: string, secs = '') =>
+    `${name}<br><font title="老师">${teacher}</font><br><font title="周次(节次)">${weeks}${secs}</font><br><font title="教室">${room}</font><br>`
+  const compact = (name: string, weeks: string, room: string) =>
+    `${name}<br><font title="周次(节次)">${weeks}</font><br><font title="教室">${room}</font><br>`
+
+  const QZ_TABLE = `<table id="kbtable" border="1" width="100%" cellspacing="0" cellpadding="0" class="Nsb_r_list Nsb_table"><tbody>
+    <tr>
+      <th width="70" height="28" align="center">&nbsp;</th>
+      <th width="123" height="28" align="center">星期一</th><th width="123" height="28" align="center">星期二</th>
+      <th width="123" height="28" align="center">星期三</th><th width="123" height="28" align="center">星期四</th>
+      <th width="123" height="28" align="center">星期五</th><th width="123" height="28" align="center">星期六</th>
+      <th width="123" height="28" align="center">星期日</th>
+    </tr>
+    <tr>
+      <th width="70" height="28" align="center">第一二节&nbsp;<br>08:20-09:55</th>
+      ${cell('A1', compact('高等数学 A（1）', '4-17(周)', 'J2-302'), course('高等数学 A（1）', '许晓俊', '4-17(周)', 'J2-302', '[01-02节]'))}
+      ${cell('A2', compact('大学物理C', '9-17(周)', 'J1-506') + '----------------------<br>' + compact('程序设计与实践', '18(周)', 'S5208实验室'),
+        course('大学物理C', '黄留挥', '9-17(周)', 'J1-506', '[01-02节]') + '---------------------<br>' + course('程序设计与实践', '吴文龙', '18(周)', 'S5208实验室', '[01-02节]'))}
+      ${cell('A3', compact('中国近现代史纲要', '4-6,8-18(周)', 'J1-707'), course('中国近现代史纲要', '黄家家', '4-6,8-18(周)', 'J1-707', '[01-02节]'))}
+      ${empty('A4')}${empty('A5')}${empty('A6')}${empty('A7')}
+    </tr>
+    <tr>
+      <th width="70" height="28" align="center">第九十十一节&nbsp;<br>19:00-21:25</th>
+      ${empty('B1')}${empty('B2')}${empty('B3')}
+      ${cell('B4', compact('军事理论', '5-13(周)', 'J2-901'), '')}
+      ${cell('B5', compact('劳动教育', '7-10(周)', 'J2-504'), course('劳动教育', '王勇', '7-10(周)', 'J2-504', '[09-10-11节]'))}
+      ${empty('B6')}${empty('B7')}
+    </tr>
+    <tr><th width="70" height="28" align="center">备注:</th><td colspan="7" align="left">劳动教育 王勇 7-10周;</td></tr>
+  </tbody></table>`
+
+  it('kbtable 网格 → 课程：节次取格内 [xx节]，缩略版不重复计数', () => {
+    const out = parseQzTable(`<html><body>${QZ_TABLE}</body></html>`)
+    const got = out.courses.map((c) => [c.name, c.weekday, c.startPeriod, c.endPeriod, c.weeks, c.teacher, c.location])
+    expect(got).toEqual([
+      ['高等数学 A（1）', 1, 1, 2, '4,5,6,7,8,9,10,11,12,13,14,15,16,17', '许晓俊', 'J2-302'],
+      ['大学物理C', 2, 1, 2, '9,10,11,12,13,14,15,16,17', '黄留挥', 'J1-506'],
+      ['程序设计与实践', 2, 1, 2, '18', '吴文龙', 'S5208实验室'],
+      ['中国近现代史纲要', 3, 1, 2, '4,5,6,8,9,10,11,12,13,14,15,16,17,18', '黄家家', 'J1-707'],
+      // B4 只有缩略版：周次照取，节次退回行首「第九十十一节」→ 9-11，无老师
+      ['军事理论', 4, 9, 11, '5,6,7,8,9,10,11,12,13', undefined, 'J2-901'],
+      ['劳动教育', 5, 9, 11, '7,8,9,10', '王勇', 'J2-504'],
+    ])
+    expect(out.diagnostics.filter((d) => d.level === 'error')).toHaveLength(0)
+  })
+
+  it('课名尾部的红字调课标记（ P / O）不进课名', () => {
+    const t = QZ_TABLE.replace("大学物理C<br><font title=\"老师\">黄留挥", "大学物理C<span><font color=\"red\">&nbsp;P</font></span><br><font title=\"老师\">黄留挥")
+    const out = parseQzTable(t)
+    expect(out.courses.find((c) => c.name.includes('大学物理C'))?.name).toBe('大学物理C')
+  })
+
+  it('xsMain.jsp 框架壳（课表在 iframe 里）→ NO_TABLE，交给专用提取', () => {
+    const out = parseQzTable('<html><body><iframe src="/gzasc_jsxsd/xskb/xskb_list.do"></iframe><div>教学一体化服务平台</div></body></html>')
+    expect(out.courses).toHaveLength(0)
+    expect(out.diagnostics[0].code).toBe('NO_TABLE')
+  })
+
+  it('学年学期值转文案', () => {
+    expect(qzTermLabel('2026-2027-1')).toBe('2026–2027 学年 第 1 学期')
+    expect(qzTermLabel('2025-2026-2')).toBe('2025–2026 学年 第 2 学期')
+    expect(qzTermLabel('2026-1')).toBe('2026-1')
+  })
+})
+
 describe('页面调试包', () => {
   const capture = {
     url: 'https://jw.example.edu.cn/kb.html?ticket=abc',
@@ -184,7 +261,7 @@ describe('页面调试包', () => {
   }
 
   it('主文档原样保留，元信息进头部注释，子框架挂在 text/plain 脚本块里', () => {
-    const { text, name } = buildDebugPackage({ capture, system: 'qiangzhi', probe: { url: capture.url, title: '课表', table: false, zf: null }, version: '1.4.75', now: new Date(2026, 8, 15, 9, 5) })
+    const { text, name } = buildDebugPackage({ capture, system: 'qiangzhi', probe: { url: capture.url, title: '课表', table: false, zf: null, qz: null }, version: '1.4.75', now: new Date(2026, 8, 15, 9, 5) })
     expect(name).toBe('timetable-debug-jw.example.edu.cn-20260915-0905.html')
     expect(text.startsWith('<!--')).toBe(true)
     expect(text).toContain(capture.html)
