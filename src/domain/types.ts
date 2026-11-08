@@ -124,7 +124,7 @@ export type WidgetStyle = (typeof WIDGET_STYLES)[number]
 
 /** 提醒与小组件偏好。提醒全部由系统日历发出，这里只是写进日历的提醒模板 */
 export interface Prefs {
-  classLead: Minutes // 课前多久提醒
+  classLead: Minutes // 课前多久提醒，0 = 不提醒
   earlyLead: Minutes // 早课（08:30 前开始）再加一条更早的提醒，0 = 不加
   taskLeads: Minutes[] // 作业截止前多久（可多个）；没写时刻的作业按当天 23:00 截止
   examDays: number[] // 考试提前几天（0 = 当天早上 8 点）
@@ -164,7 +164,10 @@ export interface Occurrence {
   ruleId?: string
   entryId?: string
   name: string
+  /** 展开到的那一天；调课后的课是新日期 */
   date: LocalDate
+  /** 规则原定的那一次的日期；没调课时与 date 相同。Override 一律按它定位 */
+  originDate?: LocalDate
   week: number
   weekday: number
   startPeriod: number

@@ -109,6 +109,13 @@ describe('课程', () => {
     expect(e.reminders).toEqual([15])
   })
 
+  it('上课前提醒选「不提醒」：课程事件照常进日历但不带提醒，早课提醒也不叠加', () => {
+    const ev = noWeeks(planCalendar(snap({ courses: [course], rules: [weekly] }), [], { ...prefs, classLead: 0 }, now))
+    expect(ev).toHaveLength(1)
+    expect(ev[0].event.rrule).toContain('FREQ=WEEKLY')
+    expect(ev[0].reminders).toEqual([])
+  })
+
   it('每周一一条全天「第 N 周」，进上课那本日历', () => {
     const weeks = planCalendar(snap(), [], prefs, now).filter((e) => e.kind === 'week')
     expect(weeks).toHaveLength(8)

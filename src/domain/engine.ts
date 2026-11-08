@@ -51,6 +51,7 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
         muted: ov?.kind === 'muted' || false,
         conflict: false,
         source: course.source,
+        originDate: date,
       })
     }
   }
@@ -75,6 +76,7 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
       color: course.color,
       status: 'moved', muted: false, conflict: false,
       source: course.source,
+      originDate: ov.date,
     })
   }
   // 手动条目
@@ -119,6 +121,44 @@ export function markConflicts(list: Occurrence[]) {
         b.conflict = true
       }
     }
+  }
+}
+
+/**
+ * 规则在原定日期 date 的那一次课：展开结果优先；调走、假期里展开不出的按规则 + Override 合成。
+ * 返回的 Occurrence.date 恒为原定日期，时间/地点/老师是当前生效值，供「编辑本次」按周定位。
+ */
+export function occurrenceOnDate(snap: Snapshot, ruleId: string, date: LocalDate): Occurrence | null {
+  const rule = snap.rules.find((r) => r.id === ruleId)
+  if (!rule) return null
+  const { semester: sem } = snap
+  const week = weekOf(sem, date)
+  if (week < 1 || week > sem.totalWeeks || rule.weekday !== weekdayOf(date) || !maskHasWeek(rule.weeksMask, week)) return null
+  const course = snap.courses.find((c) => c.id === rule.courseId)
+  if (!course || course.hidden) return null
+  const hit = occurrencesOn(snap, date).find((o) => o.ruleId === ruleId && (o.originDate ?? o.date) === date)
+  if (hit) return hit
+  const ov = snap.overrides.find((o) => o.ruleId === ruleId && o.date === date)
+  const moved = ov?.kind === 'moved'
+  const sp = moved ? ov.newStartPeriod ?? rule.startPeriod : rule.startPeriod
+  const ep = moved ? ov.newEndPeriod ?? rule.endPeriod : rule.endPeriod
+  const t = slotTime(sem, sp, ep)
+  return {
+    key: `${ruleId}@${date}`,
+    courseId: course.id,
+    ruleId,
+    name: course.name,
+    date, week, weekday: rule.weekday,
+    startPeriod: sp, endPeriod: ep,
+    start: t.start, end: t.end,
+    location: (moved && ov.newLocation) || rule.location,
+    teacher: (moved && ov.newTeacher) || (rule.teacher ?? course.teacher),
+    color: course.color,
+    status: ov ? (ov.kind === 'moved' ? 'moved' : ov.kind === 'muted' ? 'normal' : ov.kind) : 'normal',
+    muted: ov?.kind === 'muted' || false,
+    conflict: false,
+    source: course.source,
+    originDate: date,
   }
 }
 

@@ -145,6 +145,7 @@ function describe(it: Pick<SeriesItem, 'teacher' | 'teacherPhone'>): string | un
 const courseSlug = (courseId?: string): CalendarSlug => (courseId ? courseCalendar(courseId) : OTHER_CALENDAR)
 
 function classReminders(prefs: Prefs, start: Minutes): Minutes[] {
+  if (prefs.classLead <= 0) return [] // 「不提醒」：课照常进日历，只是不发提醒
   const out = [prefs.classLead]
   if (start <= EARLY_BEFORE && prefs.earlyLead > prefs.classLead) out.push(prefs.earlyLead)
   return uniqSorted(out)

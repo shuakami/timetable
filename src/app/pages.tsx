@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import type { Course, Occurrence, OverrideKind, Task, UserEntry } from '../domain/types'
-import { dateOf, fmtDuration, fmtMinutes, fromDate, weekdayOf } from '../domain/dates'
-import { occurrencesOn, type Snapshot } from '../domain/engine'
-import { maskHasWeek } from '../domain/weeks'
+import { dateOf, fmtDuration, fmtMinutes, fromDate, weekOf, weekdayOf } from '../domain/dates'
+import { occurrenceOnDate, occurrencesOn, type Snapshot } from '../domain/engine'
+import { maskHasWeek, maskToWeeks } from '../domain/weeks'
 import { COURSE_COLORS } from '../domain/palette'
 import { uid } from '../domain/store'
 import { searchStickers, stickerFor, stickerOf } from '../domain/stickers'
@@ -630,7 +630,7 @@ export function ConflictPage({
   const keepOnly = (keepKey: string) => {
     for (const o of group) {
       if (o.key === keepKey) continue
-      if (o.ruleId) store.addOverride({ id: uid(), ruleId: o.ruleId, date: o.date, kind: 'cancelled', note: '冲突时只留一门', createdAt: Date.now() })
+      if (o.ruleId) store.addOverride({ id: uid(), ruleId: o.ruleId, date: o.originDate ?? o.date, kind: 'cancelled', note: '冲突时只留一门', createdAt: Date.now() })
     }
     onBack()
   }
@@ -788,62 +788,135 @@ export function ChangePage({ courseId, onBack }: { courseId?: string; onBack: ()
 export function EditSessionPage({
   occ, snap, onBack,
 }: {
-  occ: { ruleId?: string; courseId?: string; name: string; date: string; startPeriod: number; endPeriod: number; location?: string; teacher?: string; start: number; end: number }
+  occ: Occurrence
   snap: Snapshot
   onBack: () => void
 }) {
   const state = useStore()
   const rule = state.rules.find((r) => r.id === occ.ruleId)
+  const sem = snap.semester
+  /* 调过的课 occ.date 是新日期；originDate 才是规则排的那一次，周次选择从它起 */
+  const anchorDate = occ.originDate ?? occ.date
+  const weeks = useMemo(() => {
+    if (!rule) return [] as number[]
+    const ws = maskToWeeks(rule.weeksMask).filter((w) => w >= 1 && w <= sem.totalWeeks)
+    return ws.length > 0 ? ws : [Math.max(1, Math.min(sem.totalWeeks, weekOf(sem, anchorDate)))]
+  }, [rule, sem, anchorDate])
+  const [week, setWeek] = useState(() => {
+    const w = weekOf(sem, anchorDate)
+    return weeks.includes(w) ? w : (weeks[0] ?? 1)
+  })
+  /* 表单里读写的始终是 Store 最新值，导航时带过来的 snap 只做兜底 */
+  const live = useMemo<Snapshot>(
+    () => (state.semester ? { semester: state.semester, courses: state.courses, rules: state.rules, overrides: state.overrides, entries: state.entries } : snap),
+    [state, snap],
+  )
+  const target = rule ? occurrenceOnDate(live, rule.id, dateOf(sem, week, rule.weekday)) : null
+  const shown = target ?? occ
+  return (
+    <SessionForm
+      key={rule ? `${rule.id}@${shown.date}` : `entry-${occ.key}`}
+      occ={shown}
+      snap={live}
+      onBack={onBack}
+      weeks={rule && weeks.length > 1 ? weeks : undefined}
+      week={week}
+      onWeek={setWeek}
+    />
+  )
+}
+
+function SessionForm({
+  occ, snap, onBack, weeks, week, onWeek,
+}: {
+  occ: Occurrence
+  snap: Snapshot
+  onBack: () => void
+  weeks?: number[]
+  week?: number
+  onWeek?: (w: number) => void
+}) {
+  const state = useStore()
+  const rule = state.rules.find((r) => r.id === occ.ruleId)
+  const course = state.courses.find((c) => c.id === (occ.courseId ?? rule?.courseId))
   const ov = state.overrides.find((o) => o.ruleId === occ.ruleId && o.date === occ.date)
   const [scope, setScope] = useState(0) // 0 仅本次 1 每周
-  const [date, setDate] = useState(ov?.newDate ?? occ.date)
+  /* occ.date 是规则原定的那一次；occ 的时间/地点/老师字段已是这一次的生效值 */
+  const curDate = ov?.kind === 'moved' ? (ov.newDate ?? occ.date) : occ.date
+  const teacher0 = rule?.teacher ?? course?.teacher ?? ''
+  const [date, setDate] = useState(curDate)
   const [weekday, setWeekday] = useState<number>(rule?.weekday ?? 1)
-  const [sp, setSp] = useState(ov?.newStartPeriod ?? occ.startPeriod)
-  const [ep, setEp] = useState(ov?.newEndPeriod ?? occ.endPeriod)
-  const [loc, setLoc] = useState(ov?.newLocation ?? occ.location ?? '')
-  const teacher0 = rule?.teacher ?? occ.teacher ?? ''
-  const [teacher, setTeacher] = useState(ov?.newTeacher ?? teacher0)
+  const [sp, setSp] = useState(occ.startPeriod)
+  const [ep, setEp] = useState(occ.endPeriod)
+  const [loc, setLoc] = useState(occ.location ?? '')
+  const [teacher, setTeacher] = useState(occ.teacher ?? '')
   const [note, setNote] = useState(ov?.note ?? '')
   const [status, setStatus] = useState<number>(() => {
     const i = STATUS.findIndex(([k]) => k === ov?.kind)
     return i > 0 ? i : 0
   })
   const sem = snap.semester
+  /* 周次条：和节次选择器同一套横向滚动 + 两端渐变；换周重挂载后把所选周滚到中间 */
+  const weekRow = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = weekRow.current
+    if (!el || week == null) return
+    const a = el.querySelector<HTMLElement>(`[data-w="${week}"]`)
+    if (a) el.scrollLeft = Math.max(0, a.offsetLeft - (el.clientWidth - a.offsetWidth) / 2)
+  }, [week])
 
-  const changed =
-    date !== occ.date ||
+  /* 「仅本次」的现状 = 这一次的生效安排；「每周」的现状 = 规则本身 */
+  const sessionChanged =
+    date !== curDate ||
     sp !== occ.startPeriod ||
     ep !== occ.endPeriod ||
     loc.trim() !== (occ.location ?? '') ||
+    teacher.trim() !== (occ.teacher ?? '')
+  const ruleChanged =
+    !rule ||
+    weekday !== rule.weekday ||
+    sp !== rule.startPeriod ||
+    ep !== rule.endPeriod ||
+    loc.trim() !== (rule.location ?? '') ||
     teacher.trim() !== teacher0
+  const statusKind = STATUS[status][0]
   const dirty =
     scope === 1
-      ? weekday !== rule?.weekday || sp !== occ.startPeriod || ep !== occ.endPeriod || loc.trim() !== (occ.location ?? '') || teacher.trim() !== teacher0
-      : changed || note.trim() !== (ov?.note ?? '') || STATUS[status][0] !== (ov?.kind === 'moved' ? undefined : ov?.kind)
+      ? ruleChanged
+      : sessionChanged || note.trim() !== (ov?.note ?? '') || statusKind !== (ov?.kind === 'moved' ? undefined : ov?.kind)
 
   const save = () => {
-    if (!occ.ruleId) return
+    if (!occ.ruleId || !rule) return
     if (scope === 1) {
       store.editSessionRule(occ.ruleId, { weekday: weekday as 1 | 2 | 3 | 4 | 5 | 6 | 7, startPeriod: sp, endPeriod: ep, location: loc.trim() || undefined, ...(teacher.trim() !== teacher0 ? { teacher: teacher.trim() || undefined } : {}) })
       onBack()
       return
     }
     const kind = STATUS[status][0]
+    const noteTxt = note.trim() || undefined
     if (!kind) {
-      if (changed) {
+      /* 日期/节次/地点/老师全部回到规则默认、又没有备注 = 撤销这一次的改动；
+         地点与老师留空表示沿用规则，不算改动 */
+      const toRule =
+        date === occ.date &&
+        sp === rule.startPeriod &&
+        ep === rule.endPeriod &&
+        (loc.trim() || (rule.location ?? '')) === (rule.location ?? '') &&
+        (teacher.trim() || teacher0) === teacher0
+      if (toRule && !noteTxt) {
+        if (ov) store.removeOverride(occ.ruleId, occ.date)
+      } else {
         store.addOverride({
           id: uid(), ruleId: occ.ruleId, date: occ.date, kind: 'moved',
           newDate: date, newStartPeriod: sp, newEndPeriod: ep,
-          newLocation: loc.trim() || undefined, newTeacher: teacher.trim() !== teacher0 ? teacher.trim() : undefined, note: note.trim() || undefined,
+          newLocation: loc.trim() || undefined, newTeacher: teacher.trim() !== teacher0 ? teacher.trim() || undefined : undefined, note: noteTxt,
           createdAt: Date.now(),
         })
-      } else if (ov) {
-        store.removeOverride(occ.ruleId, occ.date)
       }
     } else {
       store.addOverride({
         id: uid(), ruleId: occ.ruleId, date: occ.date, kind,
-        note: note.trim() || undefined, createdAt: Date.now(),
+        note: noteTxt, createdAt: Date.now(),
       })
     }
     onBack()
@@ -859,6 +932,33 @@ export function EditSessionPage({
 
         {scope === 0 && (
           <>
+            {weeks && weeks.length > 1 && week != null && onWeek && rule && (
+              <div className="mt-4 rounded-[16px] bg-(--c-surface) py-3.5">
+                <div className="flex items-baseline justify-between px-4">
+                  <span className="text-[12.5px] font-medium text-(--c-ink4)">周次</span>
+                  <span className="text-[13px] font-bold tabular-nums text-(--c-ink)">
+                    第 {week} 周
+                    <span className="ml-2 font-semibold text-(--c-ink4)">{md(dateOf(sem, week, rule.weekday))} {WD[rule.weekday]}</span>
+                  </span>
+                </div>
+                <div
+                  ref={weekRow}
+                  className="mt-2.5 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  style={{ maskImage: 'linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent)' }}
+                >
+                  {weeks.map((w) => (
+                    <button
+                      key={w}
+                      data-w={w}
+                      onClick={() => onWeek(w)}
+                      className={`h-[30px] w-[38px] flex-none rounded-[9px] text-[12px] font-bold tabular-nums transition-colors ${w === week ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink4)'}`}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mt-4 text-[12.5px] font-semibold text-(--c-ink3)">状态</div>
             <div className="mt-2.5"><Chips items={STATUS.map(([, l]) => l)} active={status} onPick={setStatus} /></div>
           </>

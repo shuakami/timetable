@@ -6,7 +6,7 @@ import type { Course, Occurrence, Semester, SessionRule, Task, OverrideKind, Wid
 import { addDays, diffDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
 import { holidaysBetween } from '../domain/holidays'
 import { maskHasWeek, maskToWeeks } from '../domain/weeks'
-import { firstClassDate, occurrencesOn, occurrencesInWeek, type Snapshot } from '../domain/engine'
+import { firstClassDate, occurrenceOnDate, occurrencesOn, occurrencesInWeek, type Snapshot } from '../domain/engine'
 import { diffImport, normalize } from '../domain/importer'
 import type { NormalizedCourse, RuleOutput } from '../domain/importer'
 import { runRule, type RuleManifest, type RuleInputKind, DEFAULT_CSV_MAPPING } from '../domain/rules'
@@ -1674,7 +1674,7 @@ function MeView({ onPage }: { onPage: (p: MePage) => void }) {
       ['分享课表', '', 'share'],
     ]],
     ['提醒', [
-      ['上课提醒', `课前 ${state.prefs.classLead} 分钟`, 'notif'],
+      ['上课提醒', state.prefs.classLead > 0 ? `课前 ${state.prefs.classLead} 分钟` : '不提醒', 'notif'],
       ['作业提醒', taskLeadsText(state.prefs.taskLeads), 'notif'],
     ]],
     ['外观', [
@@ -2441,7 +2441,8 @@ type Route =
   | { k: 'stats' }
   | { k: 'erase' }
 
-/* 课程详情里点某条每周安排：找到这条规则在本周（或第一周）的那次课 */
+/* 课程详情里点某条每周安排：找到这条规则在本周（或第一周）的那次课；
+   那次已调走时也能定位到原定日期，交给编辑页的周次选择 */
 function occurrenceOfRule(snap: Snapshot, ruleId: string): Occurrence | null {
   const rule = snap.rules.find((r) => r.id === ruleId)
   if (!rule) return null
@@ -2449,8 +2450,7 @@ function occurrenceOfRule(snap: Snapshot, ruleId: string): Occurrence | null {
   const weeks = [cur, ...Array.from({ length: snap.semester.totalWeeks }, (_, i) => i + 1)]
   for (const w of weeks) {
     if (!maskHasWeek(rule.weeksMask, w)) continue
-    const date = dateOf(snap.semester, w, rule.weekday)
-    const hit = occurrencesOn(snap, date).find((o) => o.ruleId === ruleId)
+    const hit = occurrenceOnDate(snap, ruleId, dateOf(snap.semester, w, rule.weekday))
     if (hit) return hit
   }
   return null
@@ -2849,14 +2849,14 @@ export default function RealApp() {
   const mo = menu?.occ
   const ovr = (kind: OverrideKind) => {
     if (!mo?.ruleId) return
-    store.addOverride({ id: uid(), kind, date: mo.date, ruleId: mo.ruleId, createdAt: Date.now() })
+    store.addOverride({ id: uid(), kind, date: mo.originDate ?? mo.date, ruleId: mo.ruleId, createdAt: Date.now() })
     closeMenu()
     haptic(kind === 'cancelled' ? 'warning' : 'light')
     nativeToast(kind === 'cancelled' ? '本节已停课' : kind === 'leave' ? '已请假' : '本节已静音')
   }
   const restore = () => {
     if (!mo?.ruleId) return
-    store.removeOverride(mo.ruleId, mo.date)
+    store.removeOverride(mo.ruleId, mo.originDate ?? mo.date)
     closeMenu()
     haptic('light')
     nativeToast('已恢复')

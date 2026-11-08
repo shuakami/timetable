@@ -40,11 +40,14 @@ const examDaysLabel = (days: number[]) => {
 const OPTIONS: Record<PrefKey, { title: string; sub?: string; multi?: boolean; options: Option[] }> = {
   classLead: {
     title: '上课前提醒',
-    options: CLASS_LEADS.map((n) => ({
-      label: `${n} 分钟`,
-      patch: { classLead: n },
-      match: (p) => p.classLead === n,
-    })),
+    options: [
+      ...CLASS_LEADS.map((n) => ({
+        label: `${n} 分钟`,
+        patch: { classLead: n },
+        match: (p: Prefs) => p.classLead === n,
+      })),
+      { label: '不提醒', patch: { classLead: 0 }, match: (p: Prefs) => p.classLead === 0 },
+    ],
   },
   earlyLead: {
     title: '首节课额外提醒',
@@ -175,7 +178,7 @@ export function PrefPickPage({ pref, onBack }: { pref: PrefKey; onBack: () => vo
 /* ---------------- 首次：加进手机日历（全屏内页） ---------------- */
 
 const KINDS: { color: string; label: string; lead: (p: Prefs) => string }[] = [
-  { color: 'var(--c-accent)', label: '上课', lead: (p) => `提前 ${p.classLead} 分钟` },
+  { color: 'var(--c-accent)', label: '上课', lead: (p) => (p.classLead > 0 ? `提前 ${p.classLead} 分钟` : '不提醒') },
   { color: 'var(--c-amber)', label: '作业', lead: (p) => (p.taskLeads.length > 0 ? `提前 ${[...p.taskLeads].sort((a, b) => b - a).map(leadLabel).join('、')}` : '不提醒') },
   { color: 'var(--c-rose)', label: '考试', lead: (p) => (p.examDays.length > 0 ? `提前 ${examDaysLabel(p.examDays)}` : '不提醒') },
 ]
