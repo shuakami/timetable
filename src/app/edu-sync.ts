@@ -8,6 +8,7 @@ import type { RuleManifest } from '../domain/rules'
 import type { School } from '../domain/edu/schools'
 import { detectSystem, isTimetablePage } from '../domain/edu/systems'
 import { parseZfKbList, termLabel, type ZfKb, type ZfTerm } from '../domain/edu/zhengfang'
+import { parseQzTable, qzTermLabel } from '../domain/edu/qiangzhi'
 import { parseHtml } from '../domain/importers/html'
 import { normalize, type NormalizedCourse, type RuleOutput } from '../domain/importer'
 import { uid } from '../domain/store'
@@ -196,7 +197,8 @@ async function doSync(): Promise<SyncOutcome> {
     const nav = await page
     if (nav.error) return finish(s, 'error', '页面打不开')
     const sys = detectSystem(nav.url, s.school.system)
-    if (!isTimetablePage(sys, nav.url, nav.title)) return finish(s, 'expired')
+    /* 强智课表在框架里，主框架地址是 xsMain.jsp 壳，isTimetablePage 判不出：交给提取脚本找 */
+    if (!isTimetablePage(sys, nav.url, nav.title) && sys !== 'qiangzhi') return finish(s, 'expired')
 
     let out: RuleOutput
     if (sys === 'zhengfang_new' && s.term) {
@@ -207,6 +209,12 @@ async function doSync(): Promise<SyncOutcome> {
         return finish(s, looksExpired(e) ? 'expired' : 'error', e instanceof Error ? e.message : undefined)
       }
       out = { ...parseZfKbList(list), semester: { name: termLabel(s.term) } }
+    } else if (sys === 'qiangzhi') {
+      const r = await edu.bgQzTable()
+      if (!r.html) return finish(s, r.login ? 'expired' : 'error', r.login ? undefined : '没有解析出课程')
+      out = parseQzTable(r.html)
+      if (r.filtered && !r.refetched) out.diagnostics.push({ level: 'warn', code: 'WEEK_FILTERED', message: '周次筛选没有重置成功，课表可能不完整' })
+      if (r.term) out.semester = { name: qzTermLabel(r.term) }
     } else {
       out = parseHtml(await edu.bgPageHtml(), { mode: 'grid' })
     }

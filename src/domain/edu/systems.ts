@@ -31,7 +31,7 @@ export const SYSTEM_LABEL: Record<EduSystemId, string> = {
 export const isEduSystem = (s: string): s is EduSystemId => s in SYSTEM_LABEL
 
 /** 有专用抓取脚本的系统；其余走页面表格通用解析 */
-export const SCRIPTED: ReadonlySet<EduSystemId> = new Set<EduSystemId>(['zhengfang_new'])
+export const SCRIPTED: ReadonlySet<EduSystemId> = new Set<EduSystemId>(['zhengfang_new', 'qiangzhi'])
 
 const URL_MARKS: [RegExp, EduSystemId][] = [
   [/\/jwglxt\//i, 'zhengfang_new'],
