@@ -57,6 +57,14 @@ export function extendGrid(grid: TimeSlot[], need: number): TimeSlot[] {
   return out
 }
 
+/** 节次超出时给默认表和每套作息制都补齐；都够长就原样返回（引用不变） */
+export function extendSemesterGrid(sem: Semester, need: number): Semester {
+  const timeGrid = extendGrid(sem.timeGrid, need)
+  const grids = sem.grids?.map((g) => ({ ...g, timeGrid: extendGrid(g.timeGrid, need) }))
+  const same = timeGrid === sem.timeGrid && (!grids || grids.every((g, i) => g.timeGrid === sem.grids![i].timeGrid))
+  return same ? sem : { ...sem, timeGrid, ...(grids ? { grids } : {}) }
+}
+
 export const todayStr = (): string => fromDate(new Date())
 
 export function mondayOf(d: string): string {

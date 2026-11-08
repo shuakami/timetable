@@ -1,8 +1,9 @@
 import type {
-  Course, Occurrence, Override, Semester, SessionRule, UserEntry, LocalDate,
+  Course, Occurrence, Override, Semester, SessionRule, TimeSlot, UserEntry, LocalDate,
 } from './types'
 import { addDays, dateOf, inVacation, weekOf, weekdayOf } from './dates'
 import { maskHasWeek } from './weeks'
+import { gridForWeek } from './grids'
 
 export interface Snapshot {
   semester: Semester
@@ -12,9 +13,9 @@ export interface Snapshot {
   entries: UserEntry[]
 }
 
-function slotTime(sem: Semester, startPeriod: number, endPeriod: number) {
-  const s = sem.timeGrid.find((t) => t.index === startPeriod)
-  const e = sem.timeGrid.find((t) => t.index === endPeriod)
+function slotTime(grid: TimeSlot[], startPeriod: number, endPeriod: number) {
+  const s = grid.find((t) => t.index === startPeriod)
+  const e = grid.find((t) => t.index === endPeriod)
   return { start: s?.start ?? 0, end: e?.end ?? 0 }
 }
 
@@ -23,6 +24,8 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
   const { semester: sem } = snap
   const week = weekOf(sem, date)
   const wd = weekdayOf(date)
+  /* 这一天所在周用哪套节次表；学期外/未覆盖周回落默认表 */
+  const grid = gridForWeek(sem, week)
   const out: Occurrence[] = []
   if (week < 1 || week > sem.totalWeeks || inVacation(sem, date)) {
     // 学期外/假期：常规课不展开，但"调课到这一天"的和 UserEntry 里指定日期的仍显示
@@ -35,7 +38,7 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
       if (ov?.kind === 'moved' && (ov.newDate ?? date) !== date) continue // 已调走
       const sp = ov?.kind === 'moved' ? ov.newStartPeriod ?? rule.startPeriod : rule.startPeriod
       const ep = ov?.kind === 'moved' ? ov.newEndPeriod ?? rule.endPeriod : rule.endPeriod
-      const t = slotTime(sem, sp, ep)
+      const t = slotTime(grid, sp, ep)
       out.push({
         key: `${rule.id}@${date}`,
         courseId: course.id,
@@ -62,7 +65,7 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
     if (!rule || !course || course.hidden) continue
     const sp = ov.newStartPeriod ?? rule.startPeriod
     const ep = ov.newEndPeriod ?? rule.endPeriod
-    const t = slotTime(sem, sp, ep)
+    const t = slotTime(grid, sp, ep)
     out.push({
       key: `${rule.id}@${ov.date}->${date}`,
       courseId: course.id, ruleId: rule.id,
@@ -81,7 +84,7 @@ export function occurrencesOn(snap: Snapshot, date: LocalDate): Occurrence[] {
   for (const en of snap.entries) {
     const hit = en.date ? en.date === date : en.weekday === wd && week >= 1 && week <= sem.totalWeeks && !inVacation(sem, date)
     if (!hit) continue
-    const t = slotTime(sem, en.startPeriod, en.endPeriod)
+    const t = slotTime(grid, en.startPeriod, en.endPeriod)
     out.push({
       key: `${en.id}@${date}`,
       entryId: en.id,

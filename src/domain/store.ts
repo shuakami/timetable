@@ -6,6 +6,7 @@ import type { Snapshot } from './engine'
 import type { NormalizedCourse, ImportDiff } from './importer'
 import { diffImport, matchImport, pairRules } from './importer'
 import { BUILTIN_RULES, type RuleManifest } from './rules'
+import { sanitizeGrids } from './grids'
 
 /* 本地权威存储。真相全部在内存 State，持久化通过 Persistence 适配器：
    Web 用 localStorage，Capacitor 换 SQLite 适配器，接口不变。 */
@@ -16,7 +17,7 @@ export interface SemesterArchive extends Snapshot {
 }
 
 /** 持久化结构版本，`hydrate` 按它做一次性迁移 */
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 
 export interface State {
   version?: number
@@ -75,6 +76,15 @@ export function hydrate(s: State): State {
     s.courses.forEach(strip)
     for (const a of s.archives) a.courses.forEach(strip)
   }
+  // 多作息制是后加的可选字段：清洗坏数据，没有可用项就删掉 grids
+  const fixGrids = (sem: Semester | null | undefined) => {
+    if (!sem) return
+    const g = sanitizeGrids(sem.grids, sem.totalWeeks)
+    if (g) sem.grids = g
+    else delete sem.grids
+  }
+  fixGrids(s.semester)
+  for (const a of s.archives) fixGrids(a.semester)
   const dropOrphans = (snap: Pick<Snapshot, 'rules' | 'overrides'>) => {
     const ruleIds = new Set(snap.rules.map((r) => r.id))
     snap.overrides = snap.overrides.filter((o) => ruleIds.has(o.ruleId))

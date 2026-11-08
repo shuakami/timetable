@@ -1,4 +1,4 @@
-import type { Semester } from './types'
+import type { ScheduleGrid, Semester } from './types'
 import type { DesiredEvent } from './calendar-plan'
 
 /* 课表导出为标准 .ics：任何日历应用都能直接打开；
@@ -12,6 +12,8 @@ export interface IcsSemester {
   startDate: string
   totalWeeks: number
   timeGrid: Semester['timeGrid']
+  /** 多作息制随文件走，重新导入时按周次区间还原 */
+  grids?: ScheduleGrid[]
 }
 
 function pad(n: number): string {

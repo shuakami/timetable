@@ -1,6 +1,7 @@
 import type { Diagnostic, Semester } from '../types'
 import { extractPhone, type RuleCourse, type RuleOutput } from '../importer'
 import { weekOf, weekdayOf } from '../dates'
+import { gridForDate, sanitizeGrids } from '../grids'
 import type { IcsSemester } from '../ics'
 
 /* ICS 日历导入：VEVENT → 课程。
@@ -76,7 +77,14 @@ function parseSemester(json: string): IcsSemester | undefined {
       ? o.timeGrid.filter((t) => typeof t.index === 'number' && typeof t.start === 'number' && typeof t.end === 'number' && t.end > t.start)
       : []
     if (grid.length === 0 || grid.some((t, i) => t.index !== i + 1)) return undefined
-    return { name: typeof o.name === 'string' && o.name.trim() ? o.name.trim() : '当前学期', startDate: o.startDate, totalWeeks: Math.round(o.totalWeeks), timeGrid: grid }
+    const grids = sanitizeGrids(o.grids, Math.round(o.totalWeeks))
+    return {
+      name: typeof o.name === 'string' && o.name.trim() ? o.name.trim() : '当前学期',
+      startDate: o.startDate,
+      totalWeeks: Math.round(o.totalWeeks),
+      timeGrid: grid,
+      ...(grids ? { grids } : {}),
+    }
   } catch {
     return undefined
   }
@@ -121,8 +129,7 @@ export function parseIcsDt(v: string, tzid?: string): { date: string; minutes: n
 }
 
 /** 时间 → 节次：起点取覆盖 start 的节（否则其后第一节），终点取覆盖 end 的节（否则其前最后一节） */
-function periodsFor(sem: Semester, start: number, end: number): { start: number; end: number } | null {
-  const grid = sem.timeGrid
+function periodsFor(grid: Semester['timeGrid'], start: number, end: number): { start: number; end: number } | null {
   const sp = grid.find((t) => t.start <= start && start < t.end) ?? grid.find((t) => t.start >= start)
   const ep = [...grid].reverse().find((t) => t.start < end && end <= t.end) ?? [...grid].reverse().find((t) => t.end <= end)
   if (!sp || !ep || ep.index < sp.index) return null
@@ -150,7 +157,8 @@ export function parseIcs(text: string, current: Semester): RuleOutput {
       continue
     }
     const endMin = en && en.date === st.date ? en.minutes : st.minutes + 90
-    const pr = periodsFor(sem, st.minutes, endMin)
+    /* 钟点对回节次按事件当天生效的作息制，多作息制课表才能认对节次 */
+    const pr = periodsFor(gridForDate(sem, st.date), st.minutes, endMin)
     if (!pr) {
       diags.push({ level: 'error', code: 'TIME_OUT_OF_GRID', message: `「${ev.summary}」时间不在节次表内` })
       continue
@@ -176,7 +184,13 @@ export function parseIcs(text: string, current: Semester): RuleOutput {
   return {
     courses,
     diagnostics: diags,
-    ...(semester ? { timeGrid: semester.timeGrid, semester: { name: semester.name, startDate: semester.startDate, totalWeeks: semester.totalWeeks } } : {}),
+    ...(semester
+      ? {
+          timeGrid: semester.timeGrid,
+          ...(semester.grids ? { grids: semester.grids } : {}),
+          semester: { name: semester.name, startDate: semester.startDate, totalWeeks: semester.totalWeeks },
+        }
+      : {}),
   }
 }
 

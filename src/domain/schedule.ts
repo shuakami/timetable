@@ -122,6 +122,57 @@ export function breakBefore(d: ScheduleDraft, i: number): Minutes {
   return i === 0 ? 0 : d.starts[i] - endOf(d, i - 1)
 }
 
+/** 「课间」候选间隔的上限：达到这个长度的间隔算午休 / 晚饭级长课间，不参与统一课间 */
+export const BREAK_MAX = 60
+
+/**
+ * 出现次数最多的普通课间（0–59 分）作为标准课间；平局取较短的。
+ * 没有普通课间（全是长课间）返回 null。
+ */
+export function commonBreak(d: ScheduleDraft): Minutes | null {
+  const count = new Map<number, number>()
+  for (let i = 1; i < d.starts.length; i++) {
+    const g = breakBefore(d, i)
+    if (g < 0 || g >= BREAK_MAX) continue
+    count.set(g, (count.get(g) ?? 0) + 1)
+  }
+  let best: Minutes | null = null
+  let n = 0
+  for (const [g, c] of [...count.entries()].sort((a, b) => a[0] - b[0])) {
+    if (c > n) {
+      best = g
+      n = c
+    }
+  }
+  return best
+}
+
+/**
+ * 统一课间：把所有与当前标准课间相同的间隔改成 m 分钟。
+ * 只动「课间」——长课间（≥60 分）和已经单独错开的间隔保持不动，
+ * 之后的节次随所在节整体平移、相对间隔不变。
+ */
+export function setCommonBreak(d: ScheduleDraft, m: Minutes): ScheduleDraft {
+  m = clamp(Math.round(m), 0, 24 * 60)
+  const cur = commonBreak(d)
+  if (cur == null || m === cur) return d
+  let out = d
+  for (let i = 1; i < out.starts.length; i++) {
+    if (breakBefore(out, i) === cur) out = setStart(out, i, endOf(out, i - 1) + m, true)
+  }
+  return out
+}
+
+/**
+ * 把第 i 节（0 起）前的课间设为 m 分钟：这一节的开始 = 上一节下课 + m。
+ * shiftLater 时之后的节次整体平移（保持它们的课间不变），否则只动这一节。
+ */
+export function setGapBefore(d: ScheduleDraft, i: number, m: Minutes, shiftLater: boolean): ScheduleDraft {
+  if (i <= 0 || i >= d.starts.length) return d
+  m = clamp(Math.round(m), 0, 24 * 60)
+  return setStart(d, i, endOf(d, i - 1) + m, shiftLater)
+}
+
 /** 重叠 / 倒序的节次序号（从 0 起），用于标红 */
 export function invalidPeriods(d: ScheduleDraft): number[] {
   const bad: number[] = []

@@ -27,7 +27,7 @@ export function icsOf(snap: Snapshot): { text: string; name: string } {
   const sem = snap.semester
   const text = buildIcs(events, {
     name: sem.name,
-    semester: { name: sem.name, startDate: sem.startDate, totalWeeks: sem.totalWeeks, timeGrid: sem.timeGrid },
+    semester: { name: sem.name, startDate: sem.startDate, totalWeeks: sem.totalWeeks, timeGrid: sem.timeGrid, grids: sem.grids },
     courseCount: snap.courses.filter((c) => !c.hidden && !c.removedByImport).length,
     colors: new Map(snap.courses.map((c) => [c.id, c.color])),
   })
