@@ -2,7 +2,7 @@ import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } fro
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react'
 import { flushSync } from 'react-dom'
 import { App as CapApp } from '@capacitor/app'
-import type { Course, Occurrence, Semester, SessionRule, Task, OverrideKind, WidgetStyle } from '../domain/types'
+import type { Course, Occurrence, ScheduleGrid, Semester, SessionRule, Task, OverrideKind, WidgetStyle } from '../domain/types'
 import { addDays, diffDays, fmtDuration, fmtMinutes, inVacation, weekOf, weekdayOf, dateOf } from '../domain/dates'
 import { holidaysBetween } from '../domain/holidays'
 import { maskHasWeek, maskToWeeks } from '../domain/weeks'
@@ -15,7 +15,7 @@ import { AI_IMPORT_PROMPT } from '../domain/ai-prompt'
 import { ScanPage } from './scan'
 import { uid, type SemesterArchive, type Store, type State } from '../domain/store'
 import { store, useStore } from './store'
-import { defaultSemester, extendGrid, guessSemesterName, isDefaultGrid, mondayOf, nowMinutes, semesterEnded, termEnd, todayStr } from './semester'
+import { defaultSemester, extendSemesterGrid, guessSemesterName, isDefaultGrid, mondayOf, nowMinutes, semesterEnded, termEnd, todayStr } from './semester'
 import Onboarding, { currentWeek } from './Onboarding'
 import {
   ChangePage, ConflictPage, CourseDetailPage, CourseEditPage, EditSessionPage,
@@ -26,8 +26,9 @@ import { camera, loadPhotoSrc, nativeCamera, photoSrc, rememberPhoto, type Captu
 import { justEndedClass } from '../domain/next-class'
 import { stickerOfOcc } from '../domain/stickers'
 import { CARD_INSET, buildAxis, rowHeights } from '../domain/time-axis'
+import { defaultGridRange, gridForWeek, maxPeriods } from '../domain/grids'
 import { WeekAxis, WeekCard, WeekLines } from './week-axis'
-import { SchedulePage } from './schedule'
+import { GridsPage, SchedulePage } from './schedule'
 import { EDU_RULE, EduBrowserPage, EduFailPage, EduSchoolPage, PreviewGrid, eduBack, type EduFailInfo } from './edu'
 import { edu } from './edu-browser'
 import { enableEduSync, eduSyncing, logoutEduSync, outcomeText, resumeSync, setEduSyncEnabled, statusText, syncNow, useEduSync, type EduSyncSource } from './edu-sync'
@@ -692,8 +693,10 @@ function WeekGrid({ snap, week, anchor, today, now, setAnchor, onPick, onMenu, l
   const axis = useMemo(() => {
     const all = [...byDay.values()].flat()
     const span = all.length > 0 ? { start: Math.min(...all.map((o) => o.start)), end: Math.max(...all.map((o) => o.end)) } : undefined
-    return buildAxis(sem.timeGrid, span, rowHeights(sem.timeGrid, all.map((o) => ({ start: o.start, end: o.end, name: o.name, loc: o.location })), colW))
-  }, [sem.timeGrid, byDay, colW])
+    /* 这一周用哪套节次表；作息制按周对齐，一周内不会跨表 */
+    const grid = gridForWeek(sem, week)
+    return buildAxis(grid, span, rowHeights(grid, all.map((o) => ({ start: o.start, end: o.end, name: o.name, loc: o.location })), colW))
+  }, [sem, week, byDay, colW])
   const first = axis.segs[0]
   const last = axis.segs[axis.segs.length - 1]
   const gridH = axis.height + 8
@@ -1332,24 +1335,30 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, sy
   /* 当前学期已结束且有内容：这次导入封存旧学期，开一个新学期，不和旧课合并 */
   const rollover = !!store.state.semester && semesterEnded(sem) && (store.state.courses.length > 0 || store.state.entries.length > 0)
 
-  /* 导入后的学期：作息取文件或当前，课程超出节次表时往后补齐 */
+  /* 导入后的学期：作息取文件或当前（含多作息制），课程超出节次表时往后补齐 */
   const target = useMemo<Semester>(() => {
     if (!out) return sem
     const meta = out.semester ?? {}
     const grid = useFileGrid && fileGrid ? fileGrid : sem.timeGrid
     const need = Math.min(20, Math.max(0, ...out.courses.map((c) => c.endPeriod)))
-    if (!rollover) return { ...sem, ...meta, timeGrid: extendGrid(grid, need) }
+    /* 文件自带多作息制就采用；没有就保留当前学期的 */
+    const grids = out.grids ?? sem.grids
+    if (!rollover) return extendSemesterGrid({ ...sem, ...meta, timeGrid: grid, ...(grids ? { grids } : {}) }, need)
     const startDate = meta.startDate ?? mondayOf(todayStr())
-    return {
-      ...sem,
-      id: uid(),
-      name: meta.name ?? guessSemesterName(startDate),
-      startDate,
-      totalWeeks: meta.totalWeeks ?? sem.totalWeeks,
-      vacations: [],
-      examWeeks: [],
-      timeGrid: extendGrid(grid, need),
-    }
+    return extendSemesterGrid(
+      {
+        ...sem,
+        id: uid(),
+        name: meta.name ?? guessSemesterName(startDate),
+        startDate,
+        totalWeeks: meta.totalWeeks ?? sem.totalWeeks,
+        vacations: [],
+        examWeeks: [],
+        timeGrid: grid,
+        ...(grids ? { grids } : {}),
+      },
+      need,
+    )
   }, [out, sem, fileGrid, useFileGrid, rollover])
   const pending = useMemo(() => (out ? normalize(out, target) : null), [out, target])
   const preview = useMemo(() => (pending ? (rollover ? diffImport([], pending.courses, new Set()) : store.previewImport(pending.courses)) : null), [pending, rollover])
@@ -1500,7 +1509,7 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, sy
 
                 {initialOut && pending.courses.length > 0 && (
                   <div className="mt-2.5">
-                    <PreviewGrid courses={pending.courses} periods={target.timeGrid.length} />
+                    <PreviewGrid courses={pending.courses} periods={maxPeriods(target)} />
                   </div>
                 )}
 
@@ -1509,7 +1518,7 @@ function ImportRunPage({ rule, initialText, initialOut, autoRun, overBrowser, sy
                     <div className="min-w-0 flex-1">
                       <div className="text-[14px] font-bold">采用文件里的作息时间</div>
                       <div className="mt-0.5 truncate text-[12px] font-medium tabular-nums text-(--c-ink4)">
-                        {`${fileGrid.length} 节 ${fmtMinutes(fileGrid[0].start)}–${fmtMinutes(fileGrid[fileGrid.length - 1].end)}，当前 ${sem.timeGrid.length} 节`}
+                        {`${fileGrid.length} 节 ${fmtMinutes(fileGrid[0].start)}–${fmtMinutes(fileGrid[fileGrid.length - 1].end)}，当前 ${maxPeriods(sem)} 节`}
                       </div>
                     </div>
                     <Switch on={useFileGrid} onChange={setUseFileGrid} />
@@ -2428,6 +2437,8 @@ type Route =
   | { k: 'newSemester' }
   | { k: 'archive'; id: string }
   | { k: 'schedule' }
+  | { k: 'grids' }
+  | { k: 'gridEdit'; id: string | null }
   | { k: 'history' }
   | { k: 'trash' }
   | { k: 'courses' }
@@ -2584,6 +2595,15 @@ export default function RealApp() {
     else setCompose({ courseId })
   }
   const pop = () => setStack((s) => s.slice(0, -1))
+  /* 添加作息制：默认抄当前节次表、生效区间取第一段空档，然后直接进它的编辑页 */
+  const addGrid = () => {
+    const sem = store.state.semester
+    if (!sem) return
+    const [f, t] = defaultGridRange(sem)
+    const g: ScheduleGrid = { id: uid(), name: '', fromWeek: f, toWeek: t, timeGrid: sem.timeGrid.map((s) => ({ ...s })) }
+    store.setSemester({ ...sem, grids: [...(sem.grids ?? []), g] })
+    push({ k: 'gridEdit', id: g.id })
+  }
   /* 未识别页顶替浏览器页（会话已关）；预览页推在浏览器上方，退回时回到浏览器 */
   const replaceTop = (r: Route) => setStack((s) => [...s.slice(0, -1), r])
   const backToTimetable = () => { setStack([]); setTab(0) }
@@ -2811,7 +2831,19 @@ export default function RealApp() {
       case 'newSemester':
         return <NewSemesterPage key={key} sem={snap.semester} onBack={pop} onDone={() => setStack([{ k: 'import' }])} />
       case 'schedule':
-        return <SchedulePage key={key} sem={snap.semester} onBack={pop} />
+        return <SchedulePage key={key} sem={snap.semester} onBack={pop} onGrids={() => push({ k: 'grids' })} />
+      case 'grids':
+        return (
+          <GridsPage
+            key={key}
+            sem={snap.semester}
+            onBack={pop}
+            onEdit={(id) => push({ k: 'gridEdit', id })}
+            onAdd={addGrid}
+          />
+        )
+      case 'gridEdit':
+        return <SchedulePage key={key} sem={snap.semester} gridId={r.id ?? undefined} onBack={pop} />
       case 'history':
         return <HistoryPage key={key} onBack={pop} />
       case 'trash':

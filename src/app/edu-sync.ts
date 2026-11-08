@@ -13,7 +13,7 @@ import { parseHtml } from '../domain/importers/html'
 import { normalize, type NormalizedCourse, type RuleOutput } from '../domain/importer'
 import { uid } from '../domain/store'
 import { store } from './store'
-import { extendGrid, semesterEnded } from './semester'
+import { extendSemesterGrid, semesterEnded } from './semester'
 import { edu, eduProfile, nativeEdu, type EduBgNav } from './edu-browser'
 
 export const EDU_RULE: RuleManifest = { id: 'builtin-edu', name: '教务系统', version: '1.0', input: 'json', createdAt: 0, updatedAt: 0 }
@@ -221,7 +221,7 @@ async function doSync(): Promise<SyncOutcome> {
     if (out.courses.length === 0) return finish(s, 'error', '没有解析出课程')
 
     const need = Math.min(20, Math.max(0, ...out.courses.map((c) => c.endPeriod)))
-    const target = need > sem.timeGrid.length ? { ...sem, timeGrid: extendGrid(sem.timeGrid, need) } : sem
+    const target = extendSemesterGrid(sem, need)
     const pending = normalize(out, target)
     const changes = countChanges(pending.courses)
     if (changes === 0) return finish(s, 'nochange')

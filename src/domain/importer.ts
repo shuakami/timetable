@@ -1,5 +1,6 @@
-import type { Course, Diagnostic, SessionRule, Semester, TimeSlot } from './types'
+import type { Course, Diagnostic, ScheduleGrid, SessionRule, Semester, TimeSlot } from './types'
 import { identityKey, identityName } from './engine'
+import { maxPeriods } from './grids'
 import { parsePeriodRange, parseWeekExpr } from './weeks'
 import { COURSE_COLORS } from './palette'
 
@@ -22,6 +23,8 @@ export interface RuleOutput {
   courses: RuleCourse[]
   diagnostics: Diagnostic[]
   timeGrid?: TimeSlot[] // 课表自带节次表时覆盖学期设置
+  /** 课表自带多作息制（冬夏令时）时带上；已按周次区间清洗 */
+  grids?: ScheduleGrid[]
   /** 来源自带学期信息（开学日、周数）时覆盖学期设置 */
   semester?: Partial<Pick<Semester, 'name' | 'startDate' | 'totalWeeks'>>
 }
@@ -243,8 +246,8 @@ export function normalize(out: RuleOutput, sem: Semester): { courses: Normalized
       diags.push({ level: 'error', code: 'UNPARSED_WEEKS', message: `「${rc.name}」周次无法解析：${rc.weeks}`, at: { snippet: rc.weeks } })
       continue
     }
-    if (rc.endPeriod > sem.timeGrid.length) {
-      diags.push({ level: 'error', code: 'PERIOD_OUT_OF_GRID', message: `「${rc.name}」节次 ${rc.startPeriod}-${rc.endPeriod} 超出节次表（共 ${sem.timeGrid.length} 节）` })
+    if (rc.endPeriod > maxPeriods(sem)) {
+      diags.push({ level: 'error', code: 'PERIOD_OUT_OF_GRID', message: `「${rc.name}」节次 ${rc.startPeriod}-${rc.endPeriod} 超出节次表（共 ${maxPeriods(sem)} 节）` })
       continue
     }
     if (!colorByName.has(rc.name)) colorByName.set(rc.name, rc.color ?? COURSE_COLORS[colorIdx++ % COURSE_COLORS.length])

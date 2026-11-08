@@ -15,12 +15,23 @@ export interface DateRange {
   end: LocalDate // 含
 }
 
+/** 一套作息制：命中周次区间的日子用它自己的节次表；其余周次用 Semester.timeGrid */
+export interface ScheduleGrid {
+  id: string
+  name: string
+  fromWeek: number // 生效起始周（含）
+  toWeek: number // 生效结束周（含）
+  timeGrid: TimeSlot[]
+}
+
 export interface Semester {
   id: string
   name: string
   startDate: LocalDate // 第 1 周周一
   totalWeeks: number
   timeGrid: TimeSlot[]
+  /** 多作息制（冬夏令时等）；省略或为空表示单一作息 */
+  grids?: ScheduleGrid[]
   vacations: (DateRange & { name: string })[]
   /** 全国法定节假日不排课；省略视为开启 */
   holidays?: boolean

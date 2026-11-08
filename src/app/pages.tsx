@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import type { Course, Occurrence, OverrideKind, Task, UserEntry } from '../domain/types'
 import { dateOf, fmtDuration, fmtMinutes, fromDate, weekOf, weekdayOf } from '../domain/dates'
+import { gridForDate, gridForWeek } from '../domain/grids'
 import { occurrenceOnDate, occurrencesOn, type Snapshot } from '../domain/engine'
 import { maskHasWeek, maskToWeeks } from '../domain/weeks'
 import { COURSE_COLORS } from '../domain/palette'
@@ -163,8 +164,10 @@ export function CourseDetailPage({
       for (let w = 1; w <= sem.totalWeeks; w++) {
         if (!maskHasWeek(r.weeksMask, w)) continue
         const date = dateOf(sem, w, r.weekday)
-        const s = sem.timeGrid.find((t) => t.index === r.startPeriod)
-        const e = sem.timeGrid.find((t) => t.index === r.endPeriod)
+        /* 每周的钟点按那一周生效的作息制解析 */
+        const grid = gridForWeek(sem, w)
+        const s = grid.find((t) => t.index === r.startPeriod)
+        const e = grid.find((t) => t.index === r.endPeriod)
         out.push({ date, ruleId: r.id, startPeriod: r.startPeriod, endPeriod: r.endPeriod, start: s?.start ?? 0, end: e?.end ?? 0, location: r.location })
       }
     }
@@ -211,6 +214,8 @@ export function CourseDetailPage({
 
   const merged = mergeRules(rules)
   const todayWd = weekdayOf(today)
+  /* 星期缩略图没有具体周次，按当前周生效的作息制显示钟点 */
+  const curGrid = gridForWeek(sem, weekOf(sem, today))
   return (
     <Page>
       <div className="flex-1 overflow-y-auto px-4 pb-10 [scrollbar-width:none]">
@@ -275,8 +280,8 @@ export function CourseDetailPage({
                         style={on ? { background: tint(cur.color, 22), minHeight: 46 } : { minHeight: 46 }}
                       >
                         {on ? segs.map((m, i) => {
-                          const s = sem.timeGrid.find((t) => t.index === m.startPeriod)
-                          const e = sem.timeGrid.find((t) => t.index === m.endPeriod)
+                          const s = curGrid.find((t) => t.index === m.startPeriod)
+                          const e = curGrid.find((t) => t.index === m.endPeriod)
                           return (
                             <span key={i} className={`flex flex-col items-center text-[10.5px] font-bold leading-[1.35] tabular-nums text-(--c-ink) ${i > 0 ? 'mt-1.5' : ''}`}>
                               <span>{s ? fmtMinutes(s.start) : `第${m.startPeriod}节`}</span>
@@ -418,6 +423,8 @@ export function CourseEditPage({ course, onBack, onEditSession }: { course: Cour
     if (el && i >= 0) el.scrollLeft = Math.max(0, i * 32 - 140)
   }, [cur.color])
   const rules = state.rules.filter((r) => r.courseId === cur.id)
+  /* 规则跨周次可能跨作息制，钟点按当前周生效的作息制显示 */
+  const curGrid = state.semester ? gridForWeek(state.semester, weekOf(state.semester, todayStr())) : undefined
 
   const dirty =
     name.trim() !== cur.name ||
@@ -477,7 +484,7 @@ export function CourseEditPage({ course, onBack, onEditSession }: { course: Cour
               {sortRules(rules).map((r) => (
                 <button key={r.id} onClick={() => onEditSession(r.id)} className="flex w-full items-center px-4 py-3 text-left active:bg-(--c-surface2)">
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">{WD[r.weekday]} {ruleClock(state.semester?.timeGrid, r)}</div>
+                    <div className="text-[14px] font-semibold tabular-nums text-(--c-ink)">{WD[r.weekday]} {ruleClock(curGrid, r)}</div>
                     {r.location && <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{r.location}</div>}
                   </div>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
@@ -516,7 +523,16 @@ export function ManualAddPage({ snap, onBack }: { snap: Snapshot | null; onBack:
   const [ep, setEp] = useState(2)
   const [loc, setLoc] = useState('')
   const sem = snap?.semester
-  const grid = sem?.timeGrid
+  /** 每周重复时按最近的那个 weekday 落点解析作息制，单次按所选日期 */
+  const entryDate = weekly
+    ? (() => {
+        const base = new Date(`${todayStr()}T00:00:00`)
+        const cur = base.getDay() === 0 ? 7 : base.getDay()
+        base.setDate(base.getDate() + (weekday - cur))
+        return base.toISOString().slice(0, 10)
+      })()
+    : date
+  const grid = sem ? gridForDate(sem, entryDate) : undefined
   const timeText = (() => {
     const s = grid?.find((t) => t.index === sp)
     const e = grid?.find((t) => t.index === ep)
@@ -526,16 +542,8 @@ export function ManualAddPage({ snap, onBack }: { snap: Snapshot | null; onBack:
   /** 同一天已有的安排，用于提前提示重叠 */
   const clash = useMemo(() => {
     if (!snap) return []
-    const d = weekly
-      ? (() => {
-          const base = new Date(`${todayStr()}T00:00:00`)
-          const cur = base.getDay() === 0 ? 7 : base.getDay()
-          base.setDate(base.getDate() + (weekday - cur))
-          return base.toISOString().slice(0, 10)
-        })()
-      : date
-    return occurrencesOn(snap, d).filter((o) => o.startPeriod <= ep && o.endPeriod >= sp && o.status !== 'cancelled')
-  }, [snap, weekly, weekday, date, sp, ep])
+    return occurrencesOn(snap, entryDate).filter((o) => o.startPeriod <= ep && o.endPeriod >= sp && o.status !== 'cancelled')
+  }, [snap, entryDate, sp, ep])
 
   const save = () => {
     if (!store.state.semester) store.setSemester(defaultSemester(mondayOf(todayStr())))
@@ -983,7 +991,7 @@ function SessionForm({
         </div>
 
         <div className="mt-2.5">
-          <PeriodPicker grid={sem.timeGrid} sp={sp} ep={ep} onPick={(a, b) => { setSp(a); setEp(b) }} />
+          <PeriodPicker grid={gridForDate(sem, occ.date)} sp={sp} ep={ep} onPick={(a, b) => { setSp(a); setEp(b) }} />
         </div>
 
         {ov && (

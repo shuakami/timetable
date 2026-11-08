@@ -2031,14 +2031,49 @@ function Stepper({ value, unit }: { value: number; unit?: string }) {
   )
 }
 
-function ScheduleScreen({ overlay }: { overlay?: React.ReactNode }) {
+function ScheduleScreen({ overlay, system }: { overlay?: React.ReactNode; system?: { name: string; from: number; to: number } }) {
   const rows = scheduleStarts.map(([s, e], i) => ({ i: i + 1, s, e: e ?? s + SCHED_DUR, custom: e != null }))
   const last = rows[rows.length - 1]
+  /* 与 domain/schedule.commonBreak 同口径：出现最多的 <60 分间隔，平局取短的 */
+  const common = (() => {
+    const c = new Map<number, number>()
+    for (const r of rows.slice(1)) {
+      const g = r.s - rows[r.i - 2].e
+      if (g >= 0 && g < 60) c.set(g, (c.get(g) ?? 0) + 1)
+    }
+    let best: number | null = null
+    let n = 0
+    for (const [g, k] of [...c.entries()].sort((a, b) => a[0] - b[0])) {
+      if (k > n) {
+        best = g
+        n = k
+      }
+    }
+    return best ?? 10
+  })()
   return (
     <Phone tall>
       <div className="relative flex-1 pt-12">
-        <SubHead title="作息时间" sub={`${rows.length} 节 · 每节 ${SCHED_DUR} 分钟 · ${hm(rows[0].s)} – ${hm(last.e)}`} />
-        <div className="mt-6 px-5">
+        <SubHead title={system ? '作息制' : '作息时间'} sub={system ? `${system.name}，第 ${system.from}–${system.to} 周` : `${rows.length} 节 · 每节 ${SCHED_DUR} 分钟 · ${hm(rows[0].s)} – ${hm(last.e)}`} />
+        {system && (
+          <div className="mt-6 px-5">
+            <div className="divide-y divide-(--c-surface2) rounded-[18px] bg-(--c-surface)">
+              <div className="flex items-center px-4 py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">名称</span>
+                <span className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[14px] font-bold text-(--c-ink)">{system.name}</span>
+              </div>
+              <div className="flex items-center px-4 py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">开始周</span>
+                <span className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[14px] font-bold tabular-nums text-(--c-ink)">{system.from}</span>
+              </div>
+              <div className="flex items-center px-4 py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">结束周</span>
+                <span className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[14px] font-bold tabular-nums text-(--c-ink)">{system.to}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className={`px-5 ${system ? 'mt-3' : 'mt-6'}`}>
           <div className="rounded-[18px] bg-(--c-surface) px-4">
             <div className="flex items-center py-3">
               <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">总节数</span>
@@ -2048,7 +2083,20 @@ function ScheduleScreen({ overlay }: { overlay?: React.ReactNode }) {
               <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">标准时长</span>
               <Stepper value={SCHED_DUR} unit="分" />
             </div>
+            <div className="flex items-center border-t border-(--c-line2) py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">课间</span>
+              <Stepper value={common} unit="分" />
+            </div>
           </div>
+          {!system && (
+            <div className="mt-3 flex items-center rounded-[18px] bg-(--c-surface) px-4 py-3.5">
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-bold text-(--c-ink)">作息制</div>
+                <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">1 套</div>
+              </div>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4" strokeLinecap="round" className="ml-3 flex-none"><path d="m9 5 7 7-7 7" /></svg>
+            </div>
+          )}
 
           <div className="mt-5 flex items-baseline px-0.5">
             <span className="flex-1 text-[12px] font-bold tracking-[-.01em] text-(--c-ink5)">节次</span>
@@ -2070,12 +2118,12 @@ function ScheduleScreen({ overlay }: { overlay?: React.ReactNode }) {
               return (
                 <React.Fragment key={r.i}>
                   {prev && (
-                    <div className={`flex items-center ${big ? 'h-[30px]' : 'h-[18px]'}`}>
+                    <button className={`flex w-full items-center ${big ? 'h-[30px]' : 'h-[18px]'} transition-opacity active:opacity-60`}>
                       <span className="w-[26px] flex-none" />
                       <span className={`flex-1 border-t border-dashed ${big ? 'border-(--c-line)' : 'border-(--c-line2)'}`} />
                       <span className={`px-2 text-[11px] font-semibold tabular-nums ${big ? 'text-(--c-ink4)' : 'text-(--c-ink5)'}`}>{big ? (r.s < 15 * 60 ? '午休' : r.s < 20 * 60 ? '晚饭' : '休息') + ' ' : ''}{gapText(gap)}</span>
                       <span className={`flex-1 border-t border-dashed ${big ? 'border-(--c-line)' : 'border-(--c-line2)'}`} />
-                    </div>
+                    </button>
                   )}
                   <div className="flex items-center py-1.5">
                     <span className="w-[26px] flex-none text-[12.5px] font-bold tabular-nums text-(--c-ink4)">{r.i}</span>
@@ -2133,6 +2181,10 @@ function OnboardScheduleScreen() {
               <Stepper value={dur} unit="分" />
             </div>
             <div className="flex items-center border-t border-(--c-line2) py-3">
+              <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">课间</span>
+              <Stepper value={gap} unit="分" />
+            </div>
+            <div className="flex items-center border-t border-(--c-line2) py-3">
               <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">第 1 节开始</span>
               <span className="rounded-[10px] bg-(--c-surface2) px-3 py-1.5 text-[15px] font-bold tabular-nums text-(--c-ink)">08:00</span>
             </div>
@@ -2152,6 +2204,37 @@ function OnboardScheduleScreen() {
       </div>
       <div className="px-5 pb-6">
         <div className="rounded-[18px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">继续</div>
+      </div>
+    </Phone>
+  )
+}
+
+/* 作息制列表：默认作息管没排到其他作息制的周次；每套可命名、定周次区间 */
+function GridsScreen() {
+  const systems: [string, string][] = [
+    ['默认作息', '其余周次'],
+    ['夏令时', '第 9–16 周'],
+  ]
+  return (
+    <Phone tall>
+      <div className="relative flex-1 pt-12">
+        <SubHead title="作息制" sub="2 套" />
+        <div className="mt-6 px-5">
+          <div className="divide-y divide-(--c-surface2) overflow-hidden rounded-[18px] bg-(--c-surface)">
+            {systems.map(([t, d]) => (
+              <div key={t} className="flex items-center px-4 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-bold text-(--c-ink)">{t}</div>
+                  <div className="mt-0.5 text-[12px] font-medium text-(--c-ink4)">{d}</div>
+                </div>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink5)" strokeWidth="2.4" strokeLinecap="round" className="ml-3 flex-none"><path d="m9 5 7 7-7 7" /></svg>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="sticky bottom-0 mt-6 px-5 pb-6 pt-3" style={{ background: 'var(--c-fade)' }}>
+          <div className="rounded-[18px] bg-(--c-accent) py-[15px] text-center text-[15px] font-bold text-white">添加作息制</div>
+        </div>
       </div>
     </Phone>
   )
@@ -3108,6 +3191,26 @@ function EditSessionScreen() {
           <Chips items={['仅本次', '每周']} active={0} />
         </div>
 
+        <div className="mt-4 rounded-[16px] bg-(--c-surface) py-3.5">
+          <div className="flex items-baseline justify-between px-4">
+            <span className="text-[12.5px] font-medium text-(--c-ink4)">周次</span>
+            <span className="text-[13px] font-bold tabular-nums text-(--c-ink)">
+              第 11 周
+              <span className="ml-2 font-semibold text-(--c-ink4)">10月16日 周四</span>
+            </span>
+          </div>
+          <div className="mt-2.5 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {Array.from({ length: 12 }, (_, i) => i + 5).map((w) => (
+              <span
+                key={w}
+                className={`flex h-[30px] w-[38px] flex-none items-center justify-center rounded-[9px] text-[12px] font-bold tabular-nums ${w === 11 ? 'bg-(--c-accent-soft) text-(--c-accent)' : 'bg-(--c-bg) text-(--c-ink4)'}`}
+              >
+                {w}
+              </span>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-4 text-[12.5px] font-semibold text-(--c-ink3)">详情</div>
         <div className="mt-2.5 divide-y divide-(--c-surface2) overflow-hidden rounded-[16px] bg-(--c-surface)">
           <Field k="状态" v="正常上课" sub="可改为请假、停课或调课" />
@@ -3421,6 +3524,8 @@ const screens: [string, string, () => React.ReactElement][] = [
   ['notif', '提醒', () => <NotifPrefScreen />],
   ['schedule', '作息时间', () => <ScheduleScreen />],
   ['schedule-time', '作息时间 · 改开始', () => <ScheduleScreen overlay={<ScheduleTimeSheet />} />],
+  ['grids', '作息制', () => <GridsScreen />],
+  ['schedule-grid', '作息制 · 夏令时', () => <ScheduleScreen system={{ name: '夏令时', from: 9, to: 16 }} />],
   ['onboard-schedule', '引导 · 作息时间', () => <OnboardScheduleScreen />],
   ['calendar-intro', '同步至系统日历', () => <CalendarIntroScreen />],
   ['widget', '桌面小组件', () => <WidgetScreen />],

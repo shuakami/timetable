@@ -1,7 +1,7 @@
 import { useMemo, useState, type MutableRefObject } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { diffDays, fmtMinutes } from '../domain/dates'
-import { DEFAULT_DURATION, DURATION_STEP, MAX_DURATION, MAX_PERIODS, MIN_DURATION, MIN_PERIODS, generateGrid } from '../domain/schedule'
+import { DEFAULT_BREAK, DEFAULT_DURATION, DURATION_STEP, MAX_DURATION, MAX_PERIODS, MIN_DURATION, MIN_PERIODS, generateGrid } from '../domain/schedule'
 import { store } from './store'
 import { defaultSemester, mondayOf, todayStr } from './semester'
 import { DateInput, Field, Page, PrimaryButton, Row, Stepper, TextAction, TimeSheet, TopBar, md } from './ui'
@@ -60,9 +60,10 @@ export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDon
   const start = mondayOf(date)
   const [count, setCount] = useState(DEFAULT_PERIODS)
   const [duration, setDuration] = useState(DEFAULT_DURATION)
+  const [gap, setGap] = useState(DEFAULT_BREAK)
   const [first, setFirst] = useState(DEFAULT_FIRST)
   const [pickFirst, setPickFirst] = useState(false)
-  const grid = useMemo(() => generateGrid(count, duration, first), [count, duration, first])
+  const grid = useMemo(() => generateGrid(count, duration, first, gap), [count, duration, first, gap])
 
   const finish = (ruleId: string | null) => {
     store.setSemester({ ...defaultSemester(start), totalWeeks: WEEKS, timeGrid: grid })
@@ -115,6 +116,10 @@ export default function Onboarding({ onDone, initialStep = 0, backRef }: { onDon
               <div className="flex items-center border-t border-(--c-line2) py-3">
                 <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">每节时长</span>
                 <Stepper value={duration} unit="分" min={MIN_DURATION} max={MAX_DURATION} step={DURATION_STEP} onChange={setDuration} />
+              </div>
+              <div className="flex items-center border-t border-(--c-line2) py-3">
+                <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">课间</span>
+                <Stepper value={gap} unit="分" min={0} max={60} step={5} onChange={setGap} />
               </div>
               <div className="flex items-center border-t border-(--c-line2) py-3">
                 <span className="flex-1 text-[14px] font-semibold text-(--c-ink)">第 1 节开始</span>
